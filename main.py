@@ -1,11 +1,18 @@
+import csv
 import dataclasses
 import math
 import random
+import shlex
+import string
+import subprocess
 
 import numpy as np
 from numpy import exp
 from scipy.special import gammaln
 from functools import lru_cache
+
+
+SIMULATION_OUTCOMES_CSV_OUTPUT_PATH_FORMAT = "./simulation_outcomes_commit_{}_seed_{}.csv"
 
 
 @lru_cache(1024)
@@ -34,7 +41,7 @@ def posterior_probability_of_positive_classification(n_seen, n_seen_positive, n_
     )
 
 
-def get_early_stopping_classification(n_seen, n_seen_positive, n_unseen, threshold_p):
+def get_early_stopping_classification_and_credence(n_seen, n_seen_positive, n_unseen, threshold_p):
     p_positive_classification = posterior_probability_of_positive_classification(
         n_seen,
         n_seen_positive,
@@ -42,21 +49,22 @@ def get_early_stopping_classification(n_seen, n_seen_positive, n_unseen, thresho
     )
 
     if p_positive_classification > threshold_p:
-        return True
+        return True, p_positive_classification
 
     if p_positive_classification < 1 - threshold_p:
-        return False
+        return False, 1 - p_positive_classification
 
-    return None
+    return None, None
 
 
 @dataclasses.dataclass(frozen=True)
 class SingleSimulationOutcome:
     n_trees: int
-    early_stopping_threshold: float
+    early_stopping_credence_threshold: float
     p_positive_tree: float
     early_stopping_classification: bool
     early_stopping_index: int
+    early_stopping_credence: float
     complete_forest_classification: bool
 
     @property
@@ -64,21 +72,22 @@ class SingleSimulationOutcome:
         return self.early_stopping_classification == self.complete_forest_classification
 
 
-def simulate_observation(n_trees, early_stopping_threshold, p_positive_tree=None):
+def simulate_observation(n_trees, early_stopping_credence_threshold, p_positive_tree=None):
     if p_positive_tree is None:
         p_positive_tree = random.random()
 
     n_positive_trees = 0
     early_stopping_classification = None
+    early_stopping_credence = None
     early_stopping_index = None
 
     for i_tree in range(n_trees):
         if early_stopping_classification is None:
-            early_stopping_classification = get_early_stopping_classification(
+            early_stopping_classification, early_stopping_credence = get_early_stopping_classification_and_credence(
                 i_tree,
                 n_positive_trees,
                 n_trees - i_tree,
-                early_stopping_threshold
+                early_stopping_credence_threshold
             )
 
             if early_stopping_classification is not None:
@@ -92,33 +101,55 @@ def simulate_observation(n_trees, early_stopping_threshold, p_positive_tree=None
     if early_stopping_classification is None:
         early_stopping_classification = complete_forest_classification
         early_stopping_index = n_trees
+        early_stopping_credence = 1
 
     return SingleSimulationOutcome(
         n_trees,
-        early_stopping_threshold,
+        early_stopping_credence_threshold,
         p_positive_tree,
         early_stopping_classification,
         early_stopping_index,
+        early_stopping_credence,
         complete_forest_classification
     )
 
 
 if __name__ == "__main__":
-    random.seed("2023-05-06T16:39")
+    random_seed = "".join(random.choices(string.ascii_lowercase + string.ascii_uppercase + string.digits, k=8))
+    random.seed(random_seed)
+
+    print(f"Seed: {random_seed}")
 
     n_simulations = 1000
     n_trees = 999
+    all_simulation_outcomes = []
 
-    for early_stopping_threshold in np.linspace(0.8, 0.99, num=20):
-        print(f"Threshold: {early_stopping_threshold}")
+    for early_stopping_credence_threshold in np.linspace(0.8, 0.99, num=20):
+        print(f"Threshold: {early_stopping_credence_threshold}")
 
-        simulation_outcomes = [
-            simulate_observation(n_trees, early_stopping_threshold=early_stopping_threshold)
+        simulation_outcomes_for_threshold = [
+            simulate_observation(n_trees, early_stopping_credence_threshold=early_stopping_credence_threshold)
             for i_simulation in range(n_simulations)
         ]
 
-        n_matching_outcomes = sum(so.classifications_match for so in simulation_outcomes)
-        mean_early_stopping_index = np.mean([so.early_stopping_index for so in simulation_outcomes])
+        n_matching_outcomes = sum(so.classifications_match for so in simulation_outcomes_for_threshold)
+        mean_early_stopping_index = np.mean([so.early_stopping_index for so in simulation_outcomes_for_threshold])
+        mean_early_stopping_credence = np.mean([so.early_stopping_credence for so in simulation_outcomes_for_threshold])
 
         print(f" Matching outcomes: {n_matching_outcomes} / {n_simulations}")
-        print(f" Mean early-stopping length: {mean_early_stopping_index} / {n_trees}")
+        print(f" Mean early-stopping index: {mean_early_stopping_index} / {n_trees}")
+        print(f" Mean early-stopping credence: {mean_early_stopping_credence}")
+
+        all_simulation_outcomes.extend(simulation_outcomes_for_threshold)
+
+    git_commit_hash = subprocess.run(
+        shlex.split("git rev-parse --short HEAD"),
+        stdout=subprocess.PIPE
+    ).stdout.decode().strip()
+
+    csv_output_path = SIMULATION_OUTCOMES_CSV_OUTPUT_PATH_FORMAT.format(git_commit_hash, random_seed)
+
+    with open(csv_output_path, "w", newline="") as output_file:
+        writer = csv.writer(output_file)
+        writer.writerow(field.name for field in dataclasses.fields(SingleSimulationOutcome))
+        writer.writerows(dataclasses.astuple(so) for so in all_simulation_outcomes)
