@@ -128,7 +128,7 @@ if __name__ == "__main__":
         print(f"Threshold: {early_stopping_credence_threshold}")
 
         simulation_outcomes_for_threshold = [
-            simulate_observation(n_trees, early_stopping_credence_threshold=early_stopping_credence_threshold)
+            simulate_observation(n_trees, early_stopping_credence_threshold)
             for i_simulation in range(n_simulations)
         ]
 
