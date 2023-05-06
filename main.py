@@ -20,17 +20,17 @@ def log_factorial(x):
     return gammaln(x+1)
 
 
-def probability_of_n_unseen_positive(n_seen, n_seen_positive, n_unseen, n_unseen_positive):
+def probability_of_n_unseen_positive(n_seen, n_seen_positive, n_unseen, n_unseen_positive, prior_alpha=1, prior_beta=1):
     return exp(
         log_factorial(n_unseen)
-        + log_factorial(n_seen + 1)
-        + log_factorial(n_seen_positive + n_unseen_positive)
-        + log_factorial(n_seen + n_unseen - n_seen_positive - n_unseen_positive)
+        + log_factorial(prior_alpha + prior_beta + n_seen - 1)
+        + log_factorial(prior_alpha + n_seen_positive + n_unseen_positive - 1)
+        + log_factorial(prior_beta + n_seen + n_unseen - n_seen_positive - n_unseen_positive - 1)
         - log_factorial(n_unseen_positive)
         - log_factorial(n_unseen - n_unseen_positive)
-        - log_factorial(n_seen_positive)
-        - log_factorial(n_seen - n_seen_positive)
-        - log_factorial(n_seen + n_unseen + 1)
+        - log_factorial(prior_alpha + n_seen_positive - 1)
+        - log_factorial(prior_beta + n_seen - n_seen_positive - 1)
+        - log_factorial(prior_alpha + prior_beta + n_seen + n_unseen - 1)
     )
 
 
