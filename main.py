@@ -20,7 +20,7 @@ def log_factorial(x):
     return gammaln(x+1)
 
 
-def probability_of_n_unseen_positive(n_seen, n_seen_positive, n_unseen, n_unseen_positive, prior_alpha=1, prior_beta=1):
+def probability_of_n_unseen_positives(n_seen, n_seen_positive, n_unseen, n_unseen_positive, prior_alpha, prior_beta):
     return exp(
         log_factorial(n_unseen)
         + log_factorial(prior_alpha + prior_beta + n_seen - 1)
@@ -34,18 +34,20 @@ def probability_of_n_unseen_positive(n_seen, n_seen_positive, n_unseen, n_unseen
     )
 
 
-def posterior_probability_of_positive_classification(n_seen, n_seen_positive, n_unseen):
+def posterior_probability_of_positive_classification(n_seen, n_seen_positive, n_unseen, prior_alpha, prior_beta):
     return 1 - sum(
-        probability_of_n_unseen_positive(n_seen, n_seen_positive, n_unseen, n_unseen_positive)
+        probability_of_n_unseen_positives(n_seen, n_seen_positive, n_unseen, n_unseen_positive, prior_alpha, prior_beta)
         for n_unseen_positive in range(math.floor((n_seen + n_unseen) / 2 - n_seen_positive) + 1)
     )
 
 
-def get_early_stopping_classification_and_credence(n_seen, n_seen_positive, n_unseen, threshold_p):
+def get_early_classification_and_credence(n_seen, n_seen_positive, n_unseen, threshold_p, prior_alpha, prior_beta):
     p_positive_classification = posterior_probability_of_positive_classification(
         n_seen,
         n_seen_positive,
-        n_unseen
+        n_unseen,
+        prior_alpha,
+        prior_beta
     )
 
     if p_positive_classification > threshold_p:
@@ -59,6 +61,8 @@ def get_early_stopping_classification_and_credence(n_seen, n_seen_positive, n_un
 
 @dataclasses.dataclass(frozen=True)
 class SingleSimulationOutcome:
+    prior_alpha: float
+    prior_beta: float
     n_trees: int
     early_stopping_credence_threshold: float
     p_positive_tree: float
@@ -72,7 +76,7 @@ class SingleSimulationOutcome:
         return self.early_stopping_classification == self.complete_forest_classification
 
 
-def simulate_observation(n_trees, early_stopping_credence_threshold, p_positive_tree=None):
+def simulate_observation(n_trees, early_stopping_credence_threshold, p_positive_tree=None, prior_alpha=1, prior_beta=1):
     if p_positive_tree is None:
         p_positive_tree = random.random()
 
@@ -83,11 +87,13 @@ def simulate_observation(n_trees, early_stopping_credence_threshold, p_positive_
 
     for i_tree in range(n_trees):
         if early_stopping_classification is None:
-            early_stopping_classification, early_stopping_credence = get_early_stopping_classification_and_credence(
+            early_stopping_classification, early_stopping_credence = get_early_classification_and_credence(
                 i_tree,
                 n_positive_trees,
                 n_trees - i_tree,
-                early_stopping_credence_threshold
+                early_stopping_credence_threshold,
+                prior_alpha,
+                prior_beta
             )
 
             if early_stopping_classification is not None:
@@ -104,6 +110,8 @@ def simulate_observation(n_trees, early_stopping_credence_threshold, p_positive_
         early_stopping_credence = 1
 
     return SingleSimulationOutcome(
+        prior_alpha,
+        prior_beta,
         n_trees,
         early_stopping_credence_threshold,
         p_positive_tree,
@@ -122,13 +130,26 @@ if __name__ == "__main__":
 
     n_simulations = 1000
     n_trees = 999
+    prior_alpha = 1000
+    prior_beta = 1000
+    p_positive_tree = 0.5
+
     all_simulation_outcomes = []
 
-    for early_stopping_credence_threshold in np.linspace(0.8, 0.99, num=20):
+    print(f"Prior distribution of p_positive_tree: Beta({prior_alpha}, {prior_beta})")
+    print(f"Actual p_positive_tree: {p_positive_tree}")
+
+    for early_stopping_credence_threshold in np.linspace(0.9, 0.99, num=10):
         print(f"Threshold: {early_stopping_credence_threshold}")
 
         simulation_outcomes_for_threshold = [
-            simulate_observation(n_trees, early_stopping_credence_threshold)
+            simulate_observation(
+                n_trees,
+                early_stopping_credence_threshold,
+                p_positive_tree,
+                prior_alpha,
+                prior_beta
+            )
             for i_simulation in range(n_simulations)
         ]
 
