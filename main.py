@@ -1,10 +1,9 @@
 import csv
+import datetime
 import dataclasses
 import math
+import os.path
 import random
-import shlex
-import string
-import subprocess
 
 import numpy as np
 from numpy import exp
@@ -12,7 +11,9 @@ from scipy.special import gammaln
 from functools import lru_cache
 
 
-SIMULATION_OUTCOMES_CSV_OUTPUT_PATH_FORMAT = "./simulation_outcomes_commit_{}_seed_{}.csv"
+OUTPUT_DIRECTORY_FORMAT = "./simulation_outcomes/{}"
+DETAILED_OUTPUT_PATH_FORMAT = os.path.join(OUTPUT_DIRECTORY_FORMAT, "details.csv")
+SUMMARY_OUTPUT_PATH_FORMAT = os.path.join(OUTPUT_DIRECTORY_FORMAT, "summary.txt")
 
 
 @lru_cache(1024)
@@ -122,55 +123,61 @@ def simulate_observation(n_trees, early_stopping_credence_threshold, p_positive_
     )
 
 
+def simulate_observations(
+        n_simulations=100,
+        n_trees=999,
+        prior_alpha=1,
+        prior_beta=1,
+        distrib_p_positive_tree=random.random,
+        random_seed=None
+):
+    timestamp = datetime.datetime.now().isoformat().replace(":", "_").replace(".", "_")
+    output_directory_path = OUTPUT_DIRECTORY_FORMAT.format(timestamp)
+    os.makedirs(output_directory_path)
+
+    with open(DETAILED_OUTPUT_PATH_FORMAT.format(timestamp), "w", newline="") as detailed_output_file,\
+         open(SUMMARY_OUTPUT_PATH_FORMAT.format(timestamp), "w") as summary_output_file:
+
+        if random_seed is None:
+            random_seed = timestamp
+        random.seed(random_seed)
+
+        outcome_writer = csv.writer(detailed_output_file)
+        outcome_writer.writerow(field.name for field in dataclasses.fields(SingleSimulationOutcome))
+
+        def log_summary(message):
+            print(message)
+            print(message, file=summary_output_file)
+
+        log_summary(f"Seed: {random_seed}")
+
+        log_summary(f"Prior distribution of p_positive_tree: Beta({prior_alpha}, {prior_beta})")
+        log_summary(f"Actual distribution of p_positive_tree: {distrib_p_positive_tree}")
+
+        for early_stopping_credence_threshold in np.linspace(0.9, 0.99, num=10):
+            log_summary(f"Threshold: {early_stopping_credence_threshold}")
+
+            simulation_outcomes = [
+                simulate_observation(
+                    n_trees,
+                    early_stopping_credence_threshold,
+                    distrib_p_positive_tree(),
+                    prior_alpha,
+                    prior_beta
+                )
+                for i_simulation in range(n_simulations)
+            ]
+
+            n_matching_outcomes = sum(so.classifications_match for so in simulation_outcomes)
+            mean_early_stopping_index = np.mean([so.early_stopping_index for so in simulation_outcomes])
+            mean_early_stopping_credence = np.mean([so.early_stopping_credence for so in simulation_outcomes])
+
+            log_summary(f" Matching outcomes: {n_matching_outcomes} / {n_simulations}")
+            log_summary(f" Mean early-stopping index: {mean_early_stopping_index} / {n_trees}")
+            log_summary(f" Mean early-stopping credence: {mean_early_stopping_credence}")
+
+            outcome_writer.writerows(dataclasses.astuple(so) for so in simulation_outcomes)
+
+
 if __name__ == "__main__":
-    random_seed = "".join(random.choices(string.ascii_lowercase + string.ascii_uppercase + string.digits, k=8))
-    random.seed(random_seed)
-
-    print(f"Seed: {random_seed}")
-
-    n_simulations = 1000
-    n_trees = 999
-    prior_alpha = 1000
-    prior_beta = 1000
-    p_positive_tree = 0.5
-
-    all_simulation_outcomes = []
-
-    print(f"Prior distribution of p_positive_tree: Beta({prior_alpha}, {prior_beta})")
-    print(f"Actual p_positive_tree: {p_positive_tree}")
-
-    for early_stopping_credence_threshold in np.linspace(0.9, 0.99, num=10):
-        print(f"Threshold: {early_stopping_credence_threshold}")
-
-        simulation_outcomes_for_threshold = [
-            simulate_observation(
-                n_trees,
-                early_stopping_credence_threshold,
-                p_positive_tree,
-                prior_alpha,
-                prior_beta
-            )
-            for i_simulation in range(n_simulations)
-        ]
-
-        n_matching_outcomes = sum(so.classifications_match for so in simulation_outcomes_for_threshold)
-        mean_early_stopping_index = np.mean([so.early_stopping_index for so in simulation_outcomes_for_threshold])
-        mean_early_stopping_credence = np.mean([so.early_stopping_credence for so in simulation_outcomes_for_threshold])
-
-        print(f" Matching outcomes: {n_matching_outcomes} / {n_simulations}")
-        print(f" Mean early-stopping index: {mean_early_stopping_index} / {n_trees}")
-        print(f" Mean early-stopping credence: {mean_early_stopping_credence}")
-
-        all_simulation_outcomes.extend(simulation_outcomes_for_threshold)
-
-    git_commit_hash = subprocess.run(
-        shlex.split("git rev-parse --short HEAD"),
-        stdout=subprocess.PIPE
-    ).stdout.decode().strip()
-
-    csv_output_path = SIMULATION_OUTCOMES_CSV_OUTPUT_PATH_FORMAT.format(git_commit_hash, random_seed)
-
-    with open(csv_output_path, "w", newline="") as output_file:
-        writer = csv.writer(output_file)
-        writer.writerow(field.name for field in dataclasses.fields(SingleSimulationOutcome))
-        writer.writerows(dataclasses.astuple(so) for so in all_simulation_outcomes)
+    simulate_observations()
