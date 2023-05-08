@@ -124,7 +124,7 @@ def simulate_observation(n_trees, early_stopping_credence_threshold, p_positive_
 
 
 def simulate_observations(
-        n_simulations=100,
+        n_simulations=1000,
         n_trees=999,
         prior_alpha=1,
         prior_beta=1,
@@ -181,3 +181,7 @@ def simulate_observations(
 
 if __name__ == "__main__":
     simulate_observations()
+    simulate_observations(distrib_p_positive_tree=lambda: random.choice([0.1, 0.9]))
+    simulate_observations(distrib_p_positive_tree=lambda: random.choice([0.1, 0.9]), prior_alpha=0.1, prior_beta=0.1)
+    simulate_observations(distrib_p_positive_tree=lambda: 0.5)
+    simulate_observations(distrib_p_positive_tree=lambda: 0.5, prior_alpha=10000, prior_beta=10000)
