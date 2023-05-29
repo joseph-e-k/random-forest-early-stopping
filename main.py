@@ -4,12 +4,14 @@ import dataclasses
 import math
 import os.path
 import random
+from typing import Callable
 
 import numpy as np
 from numpy import exp
 from scipy.special import gammaln
 from functools import lru_cache
 
+from friendly_distributions import Multinomial, Uniform
 
 OUTPUT_DIRECTORY_FORMAT = "./simulation_outcomes/{}"
 DETAILED_OUTPUT_PATH_FORMAT = os.path.join(OUTPUT_DIRECTORY_FORMAT, "details.csv")
@@ -126,9 +128,9 @@ def simulate_observation(n_trees, early_stopping_credence_threshold, p_positive_
 def simulate_observations(
         n_simulations=1000,
         n_trees=999,
-        prior_alpha=1,
-        prior_beta=1,
-        distrib_p_positive_tree=random.random,
+        prior_alpha: int | float = 1,
+        prior_beta: int | float = 1,
+        distrib_p_positive_tree: Callable[[], float] = Uniform(0, 1),
         random_seed=None
 ):
     timestamp = datetime.datetime.now().isoformat().replace(":", "_").replace(".", "_")
@@ -180,8 +182,16 @@ def simulate_observations(
 
 
 if __name__ == "__main__":
+    heavy_fringe_distribution = Multinomial([0.1, 0.9])
+    heavy_center_distribution = Multinomial([0.499, 0.501])
+
     simulate_observations()
-    simulate_observations(distrib_p_positive_tree=lambda: random.choice([0.1, 0.9]))
-    simulate_observations(distrib_p_positive_tree=lambda: random.choice([0.1, 0.9]), prior_alpha=0.1, prior_beta=0.1)
-    simulate_observations(distrib_p_positive_tree=lambda: 0.5)
-    simulate_observations(distrib_p_positive_tree=lambda: 0.5, prior_alpha=10000, prior_beta=10000)
+    simulate_observations(distrib_p_positive_tree=heavy_fringe_distribution)
+    simulate_observations(distrib_p_positive_tree=heavy_fringe_distribution, prior_alpha=0.1, prior_beta=0.1)
+    simulate_observations(distrib_p_positive_tree=heavy_center_distribution)
+    simulate_observations(
+        distrib_p_positive_tree=heavy_center_distribution,
+        prior_alpha=10000,
+        prior_beta=10000,
+        n_simulations=1
+    )
