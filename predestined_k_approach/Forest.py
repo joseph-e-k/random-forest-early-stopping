@@ -9,7 +9,7 @@ import numpy as np
 from .ForestState import ForestState
 
 
-Envelope: TypeAlias = tuple[tuple[float, float]]
+Envelope: TypeAlias = tuple[tuple[float, float], ...]
 
 
 @dataclasses.dataclass(frozen=True)
@@ -20,12 +20,13 @@ class ForestAnalysis:
 
 
 @dataclasses.dataclass(frozen=True)
-class ForestWithEnvelope:
+class Forest:
     n_total: int
     n_total_positive: int
-    envelope: Envelope
 
-    _states: ClassVar[WeakKeyDictionary[Self, list[list[ForestState | None]]]] = WeakKeyDictionary()
+    @property
+    def result(self) -> bool:
+        return self.n_total_positive > self.n_total / 2
 
     @property
     def n_steps(self) -> int:
@@ -35,19 +36,34 @@ class ForestWithEnvelope:
     def n_values(self) -> int:
         return self.n_total_positive + 1
 
-    @property
-    def result(self) -> bool:
-        return self.n_total_positive > self.n_total / 2
+    def get_null_envelope(self):
+        return ((-np.inf, np.inf),) * self.n_steps
+
+
+@dataclasses.dataclass(frozen=True)
+class ForestWithEnvelope:
+    forest: Forest
+    envelope: Envelope
+
+    _states: ClassVar[WeakKeyDictionary[Self, list[list[ForestState | None]]]] = WeakKeyDictionary()
+
+    n_total = property(lambda self: self.forest.n_total)
+    n_total_positive = property(lambda self: self.forest.n_total_positive)
+    result = property(lambda self: self.forest.result)
+    n_steps = property(lambda self: self.forest.n_steps)
+    n_values = property(lambda self: self.forest.n_values)
 
     def __post_init__(self):
         self._states[self] = [[None] * self.n_values for _ in range(self.n_steps)]
 
     @classmethod
     def create(cls, n_total, n_total_positive, envelope=None):
-        if envelope is None:
-            envelope = tuple((-np.inf, np.inf) for _ in range(n_total + 1))
+        forest = Forest(n_total, n_total_positive)
 
-        return cls(n_total, n_total_positive, envelope)
+        if envelope is None:
+            envelope = forest.get_null_envelope()
+
+        return cls(forest, envelope)
 
     def __getitem__(self, index):
         n_seen, n_seen_positive = index
