@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 import dataclasses
-from typing import TypeAlias, ClassVar, Self
-from weakref import WeakKeyDictionary
-
-import numpy as np
+from itertools import zip_longest
+from typing import TypeAlias
 
 from .ForestState import ForestState
 
@@ -37,15 +35,38 @@ class Forest:
         return self.n_total_positive + 1
 
     def get_null_envelope(self):
-        return ((-np.inf, np.inf),) * self.n_steps
+        return ((0, self.n_total_positive),) * self.n_steps
+
+    def get_optimal_lower_boundary(self, allowable_error, verbose=False) -> list[int]:
+        # Note: this function assumes that the correct result is positive
+        remaining_allowable_error = allowable_error
+
+        boundary = [0]
+
+        for step in range(1, self.n_steps):
+            envelope = tuple(zip_longest(boundary, [self.n_total_positive] * self.n_steps, fillvalue=0))
+            forest_with_envelope = ForestWithEnvelope(self, envelope)
+
+            state = forest_with_envelope[step, boundary[-1]]
+
+            if state.get_prob() <= remaining_allowable_error:
+                if verbose:
+                    print(f"Stop if {state.n_seen_positive} / {state.n_seen} are positive: p = {state.get_prob()}")
+
+                boundary.append(boundary[-1] + 1)
+                remaining_allowable_error -= state.get_prob()
+            else:
+                boundary.append(boundary[-1])
+
+        return boundary
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass
 class ForestWithEnvelope:
     forest: Forest
     envelope: Envelope
 
-    _states: ClassVar[WeakKeyDictionary[Self, list[list[ForestState | None]]]] = WeakKeyDictionary()
+    _states: list[list[ForestState | None]] = dataclasses.field(init=False, repr=False, compare=False, hash=False)
 
     n_total = property(lambda self: self.forest.n_total)
     n_total_positive = property(lambda self: self.forest.n_total_positive)
@@ -54,7 +75,7 @@ class ForestWithEnvelope:
     n_values = property(lambda self: self.forest.n_values)
 
     def __post_init__(self):
-        self._states[self] = [[None] * self.n_values for _ in range(self.n_steps)]
+        self._states = [[None] * self.n_values for _ in range(self.n_steps)]
 
     @classmethod
     def create(cls, n_total, n_total_positive, envelope=None):
@@ -67,11 +88,11 @@ class ForestWithEnvelope:
 
     def __getitem__(self, index):
         n_seen, n_seen_positive = index
-        state = self._states[self][n_seen][n_seen_positive]
+        state = self._states[n_seen][n_seen_positive]
 
         if state is None:
             state = ForestState(self, n_seen, n_seen_positive)
-            self._states[self][n_seen][n_seen_positive] = state
+            self._states[n_seen][n_seen_positive] = state
 
         return state
 

@@ -1,27 +1,28 @@
 from __future__ import annotations
 
 import dataclasses
-from typing import ClassVar, TYPE_CHECKING
-from weakref import WeakKeyDictionary
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .Forest import ForestWithEnvelope
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass
 class ForestState:
     forest: ForestWithEnvelope
     n_seen: int
     n_seen_positive: int
 
-    _prob: ClassVar[WeakKeyDictionary[ForestState, float]] = WeakKeyDictionary()
+    _prob: float | None = dataclasses.field(init=False, repr=False, compare=False, hash=False)
 
     def __post_init__(self):
         if self.n_seen == 0:
             if self.n_seen_positive == 0:
-                self._prob[self] = 1
+                self._prob = 1
             else:
-                self._prob[self] = 0
+                self._prob = 0
+        else:
+            self._prob = None
 
     @property
     def n_total(self) -> int:
@@ -57,12 +58,9 @@ class ForestState:
         return self.n_seen_positive > self.n_seen / 2
 
     def get_prob(self):
-        try:
-            return self._prob[self]
-        except KeyError:
-            prob = self._compute_prob()
-            self._prob[self] = prob
-            return prob
+        if self._prob is None:
+            self._prob = self._compute_prob()
+        return self._prob
 
     def _compute_prob(self):
         prob = 0
