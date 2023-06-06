@@ -1,6 +1,6 @@
 from pprint import pprint
 
-from predestined_k_approach.Forest import Forest
+from predestined_k_approach.Forest import ForestWithEnvelope
 
 if __name__ == "__main__":
-    pprint(Forest.create(5, 2).analyse())
+    pprint(ForestWithEnvelope.create(5, 2).analyse())

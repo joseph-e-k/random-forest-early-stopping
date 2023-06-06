@@ -5,12 +5,12 @@ from typing import ClassVar, TYPE_CHECKING
 from weakref import WeakKeyDictionary
 
 if TYPE_CHECKING:
-    from .Forest import Forest
+    from .Forest import ForestWithEnvelope
 
 
 @dataclasses.dataclass(frozen=True)
 class ForestState:
-    forest: Forest
+    forest: ForestWithEnvelope
     n_seen: int
     n_seen_positive: int
 
