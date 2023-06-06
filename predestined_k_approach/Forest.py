@@ -13,6 +13,13 @@ Envelope: TypeAlias = tuple[tuple[float, float]]
 
 
 @dataclasses.dataclass(frozen=True)
+class ForestAnalysis:
+    probs_states: tuple[tuple[float, ...], ...]
+    prob_error: float
+    expected_runtime: float
+
+
+@dataclasses.dataclass(frozen=True)
 class Forest:
     n_total: int
     n_total_positive: int
@@ -27,6 +34,10 @@ class Forest:
     @property
     def n_values(self) -> int:
         return self.n_total_positive + 1
+
+    @property
+    def result(self) -> bool:
+        return self.n_total_positive > self.n_total / 2
 
     def __post_init__(self):
         self._states[self] = [[None] * self.n_values for _ in range(self.n_steps)]
@@ -48,8 +59,27 @@ class Forest:
 
         return state
 
-    def get_state_probs(self):
-        return [
-            [self[step, value].get_prob() for value in range(self.n_values)]
-            for step in range(self.n_steps)
-        ]
+    def analyse(self):
+        probs_states = []
+        prob_error = 0
+        expected_runtime = 0
+
+        for n_seen in range(self.n_steps):
+            probs_states.append([])
+
+            for n_seen_positive in range(self.n_values):
+                state = self[n_seen, n_seen_positive]
+
+                if state.is_terminal:
+                    expected_runtime += n_seen * state.get_prob()
+
+                    if state.result != self.result:
+                        prob_error += state.get_prob()
+
+                probs_states[-1].append(state.get_prob())
+
+        return ForestAnalysis(
+            probs_states=tuple(tuple(probs) for probs in probs_states),
+            prob_error=prob_error,
+            expected_runtime=expected_runtime
+        )

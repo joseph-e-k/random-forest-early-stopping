@@ -52,6 +52,10 @@ class ForestState:
         lower_es_boundary, upper_es_boundary = self.forest.envelope[self.n_seen]
         return not (self.n_remaining > 0 and lower_es_boundary <= self.n_seen_positive <= upper_es_boundary)
 
+    @property
+    def result(self) -> bool:
+        return self.n_seen_positive > self.n_seen / 2
+
     def get_prob(self):
         try:
             return self._prob[self]
