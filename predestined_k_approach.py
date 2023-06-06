@@ -37,12 +37,12 @@ class Forest:
         return cls(n_total, n_total_positive, envelope)
 
     def __getitem__(self, index):
-        n_observed, n_observed_positive = index
-        state = self._states[self][n_observed][n_observed_positive]
+        n_seen, n_seen_positive = index
+        state = self._states[self][n_seen][n_seen_positive]
 
         if state is None:
-            state = ForestState(self, n_observed, n_observed_positive)
-            self._states[self][n_observed][n_observed_positive] = state
+            state = ForestState(self, n_seen, n_seen_positive)
+            self._states[self][n_seen][n_seen_positive] = state
 
         return state
 
@@ -56,14 +56,14 @@ class Forest:
 @dataclasses.dataclass(frozen=True)
 class ForestState:
     forest: Forest
-    n_observed: int
-    n_observed_positive: int
+    n_seen: int
+    n_seen_positive: int
 
     _prob: ClassVar[WeakKeyDictionary[ForestState, float]] = WeakKeyDictionary()
 
     def __post_init__(self):
-        if self.n_observed == 0:
-            if self.n_observed_positive == 0:
+        if self.n_seen == 0:
+            if self.n_seen_positive == 0:
                 self._prob[self] = 1
             else:
                 self._prob[self] = 0
@@ -78,24 +78,24 @@ class ForestState:
 
     @property
     def n_remaining(self) -> int:
-        return self.n_total - self.n_observed
+        return self.n_total - self.n_seen
 
     @property
     def n_remaining_positive(self) -> int:
-        return self.n_total_positive - self.n_observed_positive
+        return self.n_total_positive - self.n_seen_positive
 
     @property
-    def negative_observation_prob(self):
+    def prob_see_negative(self):
         return (self.n_remaining - self.n_remaining_positive) / self.n_remaining
 
     @property
-    def positive_observation_prob(self):
+    def prob_see_positive(self):
         return self.n_remaining_positive / self.n_remaining
 
     @property
     def is_terminal(self) -> bool:
-        lower_es_boundary, upper_es_boundary = self.forest.envelope[self.n_observed]
-        return not (self.n_remaining > 0 and lower_es_boundary <= self.n_observed_positive <= upper_es_boundary)
+        lower_es_boundary, upper_es_boundary = self.forest.envelope[self.n_seen]
+        return not (self.n_remaining > 0 and lower_es_boundary <= self.n_seen_positive <= upper_es_boundary)
 
     def get_prob(self):
         try:
@@ -108,16 +108,16 @@ class ForestState:
     def _compute_prob(self):
         prob = 0
         
-        upper_parent_state = self.forest[self.n_observed - 1, self.n_observed_positive]
+        upper_parent_state = self.forest[self.n_seen - 1, self.n_seen_positive]
 
         if not upper_parent_state.is_terminal:
-            prob = upper_parent_state.get_prob() * upper_parent_state.negative_observation_prob
+            prob = upper_parent_state.get_prob() * upper_parent_state.prob_see_negative
 
-        if self.n_observed_positive > 0:
-            lower_parent_state = self.forest[self.n_observed - 1, self.n_observed_positive - 1]
+        if self.n_seen_positive > 0:
+            lower_parent_state = self.forest[self.n_seen - 1, self.n_seen_positive - 1]
 
             if not lower_parent_state.is_terminal:
-                prob += lower_parent_state.get_prob() * lower_parent_state.positive_observation_prob
+                prob += lower_parent_state.get_prob() * lower_parent_state.prob_see_positive
 
         return prob
 
