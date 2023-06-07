@@ -10,7 +10,7 @@ def get_optimal_envelope(n_total, error_rate):
     upper_boundary = Forest(n_total, n_minority).get_optimal_upper_boundary(error_rate)
     lower_boundary = Forest(n_total, n_majority).get_optimal_lower_boundary(error_rate)
 
-    return tuple(zip(lower_boundary, upper_boundary))
+    return list(zip(lower_boundary, upper_boundary))
 
 
 def describe_envelope(envelope):
@@ -26,7 +26,7 @@ def describe_envelope(envelope):
 
 
 def main():
-    n_total = 201
+    n_total = 101
     envelope = get_optimal_envelope(n_total, 0.05)
 
     print(f"Envelope: stop if {describe_envelope(envelope)}")

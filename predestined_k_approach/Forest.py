@@ -6,7 +6,7 @@ from typing import TypeAlias
 
 from .ForestState import ForestState, ImpossibleForestState
 
-Envelope: TypeAlias = tuple[tuple[float, float], ...]
+Envelope: TypeAlias = list[tuple[float, float]]
 
 
 @dataclasses.dataclass(frozen=True)
@@ -32,6 +32,16 @@ class Forest:
     def get_null_envelope(self):
         return ((0, self.n_total_positive),) * self.n_steps
 
+    def partial_lower_boundary_to_envelope(self, boundary):
+        return list(zip_longest(boundary, [self.n_total_positive] * self.n_steps, fillvalue=boundary[-1]))
+
+    def partial_upper_boundary_to_envelope(self, boundary):
+        naively_extrapolated_boundary = boundary + [
+            boundary[-1] + i + 1
+            for i in range(self.n_steps - len(boundary))
+        ]
+        return list(zip([0] * self.n_steps, naively_extrapolated_boundary))
+
     def get_optimal_lower_boundary(self, allowable_error) -> list[int]:
         if not self.result:
             raise ValueError("get_optimal_lower_boundary() should only be called when the correct result is positive")
@@ -39,18 +49,21 @@ class Forest:
         remaining_allowable_error = allowable_error
 
         boundary = [0]
+        envelope = self.partial_lower_boundary_to_envelope(boundary)
+        forest_with_envelope = ForestWithEnvelope(self, envelope)
 
         for step in range(1, self.n_steps):
-            envelope = tuple(zip_longest(boundary, [self.n_total_positive] * self.n_steps, fillvalue=boundary[-1]))
-            forest_with_envelope = ForestWithEnvelope(self, envelope)
-
             state = forest_with_envelope[step, boundary[-1]]
 
             if state.get_prob() <= remaining_allowable_error:
                 boundary.append(boundary[-1] + 1)
+                envelope = self.partial_lower_boundary_to_envelope(boundary)
+                forest_with_envelope.update_envelope_suffix(envelope[step:])
+
                 remaining_allowable_error -= state.get_prob()
+
             else:
-                boundary.append(boundary[-1])
+                boundary.append(envelope[step][0])
 
         return boundary
 
@@ -60,23 +73,23 @@ class Forest:
             raise ValueError("get_optimal_upper_boundary() should only be called when the correct result is negative")
 
         remaining_allowable_error = allowable_error
+
         boundary = [0]
+        envelope = self.partial_upper_boundary_to_envelope(boundary)
+        forest_with_envelope = ForestWithEnvelope(self, envelope)
 
         for step in range(1, self.n_steps):
-            naively_extrapolated_boundary = boundary + [
-                boundary[-1] + i + 1
-                for i in range(self.n_steps - len(boundary))
-            ]
-            envelope = tuple(zip([0] * self.n_steps, naively_extrapolated_boundary))
-            forest_with_envelope = ForestWithEnvelope(self, envelope)
-
             state = forest_with_envelope[step, boundary[-1] + 1]
 
             if state.get_prob() <= remaining_allowable_error:
                 boundary.append(boundary[-1])
+                envelope = self.partial_upper_boundary_to_envelope(boundary)
+                forest_with_envelope.update_envelope_suffix(envelope[step:])
+
                 remaining_allowable_error -= state.get_prob()
+
             else:
-                boundary.append(boundary[-1] + 1)
+                boundary.append(envelope[step][1])
 
         return boundary
 
@@ -93,8 +106,12 @@ class ForestWithEnvelope:
     result = property(lambda self: self.forest.result)
     n_steps = property(lambda self: self.forest.n_steps)
 
+    def _initialize_states(self, starting_index=0):
+        self._states[starting_index:] = [[None] * self.n_steps for _ in range(starting_index, self.n_steps)]
+
     def __post_init__(self):
-        self._states = [[None] * self.n_steps for _ in range(self.n_steps)]
+        self._states = []
+        self._initialize_states()
 
     @classmethod
     def create(cls, n_total, n_total_positive, envelope=None):
@@ -143,3 +160,8 @@ class ForestWithEnvelope:
             prob_error=prob_error,
             expected_runtime=expected_runtime
         )
+
+    def update_envelope_suffix(self, envelope_suffix: Envelope):
+        index = len(self.envelope) - len(envelope_suffix)
+        self.envelope[index:] = envelope_suffix
+        self._initialize_states(index)
