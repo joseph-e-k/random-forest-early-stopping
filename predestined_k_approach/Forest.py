@@ -6,12 +6,11 @@ from typing import TypeAlias
 
 from .ForestState import ForestState, ImpossibleForestState
 
-Envelope: TypeAlias = list[tuple[float, float]]
+Envelope: TypeAlias = list[tuple[int, int]]
 
 
 @dataclasses.dataclass(frozen=True)
 class ForestAnalysis:
-    probs_states: tuple[tuple[float, ...], ...]
     prob_error: float
     expected_runtime: float
 
@@ -137,26 +136,20 @@ class ForestWithEnvelope:
         return ImpossibleForestState(self, n_seen, n_seen_positive)
 
     def analyse(self):
-        probs_states = []
         prob_error = 0
         expected_runtime = 0
 
         for n_seen in range(self.n_steps):
-            probs_states.append([])
+            lower_bound, upper_bound = self.envelope[n_seen]
+            terminal_states = [self[n_seen, lower_bound-1], self[n_seen, upper_bound+1]]
 
-            for n_seen_positive in range(self.n_steps):
-                state = self[n_seen, n_seen_positive]
+            for state in terminal_states:
+                expected_runtime += n_seen * state.get_prob()
 
-                if state.is_terminal:
-                    expected_runtime += n_seen * state.get_prob()
-
-                    if state.result != self.result:
-                        prob_error += state.get_prob()
-
-                probs_states[-1].append(state.get_prob())
+                if state.result != self.result:
+                    prob_error += state.get_prob()
 
         return ForestAnalysis(
-            probs_states=tuple(tuple(probs) for probs in probs_states),
             prob_error=prob_error,
             expected_runtime=expected_runtime
         )
