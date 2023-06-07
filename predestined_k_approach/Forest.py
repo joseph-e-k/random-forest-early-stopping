@@ -33,25 +33,55 @@ class Forest:
         return ((0, self.n_total_positive),) * self.n_steps
 
     def get_optimal_lower_boundary(self, allowable_error, verbose=False) -> list[int]:
-        # Note: this function assumes that the correct result is positive
+        if not self.result:
+            raise ValueError("get_optimal_lower_boundary() should only be called when the correct result is positive")
+
         remaining_allowable_error = allowable_error
 
         boundary = [0]
 
         for step in range(1, self.n_steps):
-            envelope = tuple(zip_longest(boundary, [self.n_total_positive] * self.n_steps, fillvalue=0))
+            envelope = tuple(zip_longest(boundary, [self.n_total_positive] * self.n_steps, fillvalue=boundary[-1]))
             forest_with_envelope = ForestWithEnvelope(self, envelope)
 
             state = forest_with_envelope[step, boundary[-1]]
 
             if state.get_prob() <= remaining_allowable_error:
                 if verbose:
-                    print(f"Stop if {state.n_seen_positive} / {state.n_seen} are positive: p = {state.get_prob()}")
+                    print(f"Stop if <={state.n_seen_positive} / {state.n_seen} are positive: p = {state.get_prob()}")
 
                 boundary.append(boundary[-1] + 1)
                 remaining_allowable_error -= state.get_prob()
             else:
                 boundary.append(boundary[-1])
+
+        return boundary
+
+    def get_optimal_upper_boundary(self, allowable_error, verbose=False) -> list[int]:
+        # TODO: Reduce code duplication between this function and get_optimal_lower_boundary
+        if self.result:
+            raise ValueError("get_optimal_upper_boundary() should only be called when the correct result is negative")
+
+        remaining_allowable_error = allowable_error
+        boundary = [0]
+
+        for step in range(1, self.n_steps):
+            naively_extrapolated_boundary = boundary + [
+                boundary[-1] + i + 1
+                for i in range(self.n_steps - len(boundary))
+            ]
+            envelope = tuple(zip([0] * self.n_steps, naively_extrapolated_boundary))
+            forest_with_envelope = ForestWithEnvelope(self, envelope)
+
+            state = forest_with_envelope[step, boundary[-1] + 1]
+
+            if state.get_prob() <= remaining_allowable_error:
+                if verbose:
+                    print(f"Stop if >={state.n_seen_positive} / {state.n_seen} are positive: p = {state.get_prob()}")
+                boundary.append(boundary[-1])
+                remaining_allowable_error -= state.get_prob()
+            else:
+                boundary.append(boundary[-1] + 1)
 
         return boundary
 
