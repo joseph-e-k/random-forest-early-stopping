@@ -4,8 +4,7 @@ import dataclasses
 from itertools import zip_longest
 from typing import TypeAlias
 
-from .ForestState import ForestState
-
+from .ForestState import ForestState, ImpossibleForestState
 
 Envelope: TypeAlias = tuple[tuple[float, float], ...]
 
@@ -29,10 +28,6 @@ class Forest:
     @property
     def n_steps(self) -> int:
         return self.n_total + 1
-
-    @property
-    def n_values(self) -> int:
-        return self.n_total_positive + 1
 
     def get_null_envelope(self):
         return ((0, self.n_total_positive),) * self.n_steps
@@ -72,10 +67,9 @@ class ForestWithEnvelope:
     n_total_positive = property(lambda self: self.forest.n_total_positive)
     result = property(lambda self: self.forest.result)
     n_steps = property(lambda self: self.forest.n_steps)
-    n_values = property(lambda self: self.forest.n_values)
 
     def __post_init__(self):
-        self._states = [[None] * self.n_values for _ in range(self.n_steps)]
+        self._states = [[None] * self.n_steps for _ in range(self.n_steps)]
 
     @classmethod
     def create(cls, n_total, n_total_positive, envelope=None):
@@ -88,13 +82,17 @@ class ForestWithEnvelope:
 
     def __getitem__(self, index):
         n_seen, n_seen_positive = index
-        state = self._states[n_seen][n_seen_positive]
 
-        if state is None:
-            state = ForestState(self, n_seen, n_seen_positive)
-            self._states[n_seen][n_seen_positive] = state
+        if 0 <= n_seen_positive <= n_seen <= self.n_total and n_seen_positive <= self.n_total_positive:
+            state = self._states[n_seen][n_seen_positive]
 
-        return state
+            if state is None:
+                state = ForestState(self, n_seen, n_seen_positive)
+                self._states[n_seen][n_seen_positive] = state
+
+            return state
+
+        return ImpossibleForestState(self, n_seen, n_seen_positive)
 
     def analyse(self):
         probs_states = []
@@ -104,7 +102,7 @@ class ForestWithEnvelope:
         for n_seen in range(self.n_steps):
             probs_states.append([])
 
-            for n_seen_positive in range(self.n_values):
+            for n_seen_positive in range(self.n_steps):
                 state = self[n_seen, n_seen_positive]
 
                 if state.is_terminal:

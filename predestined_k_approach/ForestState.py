@@ -68,12 +68,25 @@ class ForestState:
         upper_parent_state = self.forest[self.n_seen - 1, self.n_seen_positive]
 
         if not upper_parent_state.is_terminal:
-            prob = upper_parent_state.get_prob() * upper_parent_state.prob_see_negative
+            prob += upper_parent_state.get_prob() * upper_parent_state.prob_see_negative
 
-        if self.n_seen_positive > 0:
-            lower_parent_state = self.forest[self.n_seen - 1, self.n_seen_positive - 1]
+        lower_parent_state = self.forest[self.n_seen - 1, self.n_seen_positive - 1]
 
-            if not lower_parent_state.is_terminal:
-                prob += lower_parent_state.get_prob() * lower_parent_state.prob_see_positive
+        if not lower_parent_state.is_terminal:
+            prob += lower_parent_state.get_prob() * lower_parent_state.prob_see_positive
 
         return prob
+
+
+@dataclasses.dataclass
+class ImpossibleForestState(ForestState):
+    def get_prob(self) -> float:
+        return 0
+
+    @property
+    def prob_see_negative(self):
+        return 0
+
+    @property
+    def prob_see_positive(self):
+        return 0
