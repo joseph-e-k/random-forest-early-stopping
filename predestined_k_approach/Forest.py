@@ -32,7 +32,7 @@ class Forest:
     def get_null_envelope(self):
         return ((0, self.n_total_positive),) * self.n_steps
 
-    def get_optimal_lower_boundary(self, allowable_error, verbose=False) -> list[int]:
+    def get_optimal_lower_boundary(self, allowable_error) -> list[int]:
         if not self.result:
             raise ValueError("get_optimal_lower_boundary() should only be called when the correct result is positive")
 
@@ -47,9 +47,6 @@ class Forest:
             state = forest_with_envelope[step, boundary[-1]]
 
             if state.get_prob() <= remaining_allowable_error:
-                if verbose:
-                    print(f"Stop if <={state.n_seen_positive} / {state.n_seen} are positive: p = {state.get_prob()}")
-
                 boundary.append(boundary[-1] + 1)
                 remaining_allowable_error -= state.get_prob()
             else:
@@ -57,7 +54,7 @@ class Forest:
 
         return boundary
 
-    def get_optimal_upper_boundary(self, allowable_error, verbose=False) -> list[int]:
+    def get_optimal_upper_boundary(self, allowable_error) -> list[int]:
         # TODO: Reduce code duplication between this function and get_optimal_lower_boundary
         if self.result:
             raise ValueError("get_optimal_upper_boundary() should only be called when the correct result is negative")
@@ -76,8 +73,6 @@ class Forest:
             state = forest_with_envelope[step, boundary[-1] + 1]
 
             if state.get_prob() <= remaining_allowable_error:
-                if verbose:
-                    print(f"Stop if >={state.n_seen_positive} / {state.n_seen} are positive: p = {state.get_prob()}")
                 boundary.append(boundary[-1])
                 remaining_allowable_error -= state.get_prob()
             else:

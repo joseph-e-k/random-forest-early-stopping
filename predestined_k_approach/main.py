@@ -1,6 +1,4 @@
 import math
-import sys
-from pprint import pprint
 
 from predestined_k_approach.Forest import ForestWithEnvelope, Forest
 
@@ -15,12 +13,30 @@ def get_optimal_envelope(n_total, error_rate):
     return tuple(zip(lower_boundary, upper_boundary))
 
 
-if __name__ == "__main__":
-    n_total = 101
+def describe_envelope(envelope):
+    lower_boundary = [bounds[0] for bounds in envelope]
+
+    shifts = []
+
+    for i in range(1, len(lower_boundary)):
+        if lower_boundary[i] > lower_boundary[i-1]:
+            shifts.append((i, lower_boundary[i]))
+
+    return ", ".join(f"< {value} / {index}" for (index, value) in shifts)
+
+
+def main():
+    n_total = 201
     envelope = get_optimal_envelope(n_total, 0.05)
+
+    print(f"Envelope: stop if {describe_envelope(envelope)}")
 
     for n_positive in range(0, n_total + 1):
         forest_with_envelope = ForestWithEnvelope.create(n_total, n_positive, envelope)
         analysis = forest_with_envelope.analyse()
         print(f"{n_positive} positive / {n_total}: "
               f"error rate = {analysis.prob_error}, expected runtime = {analysis.expected_runtime}")
+
+
+if __name__ == "__main__":
+    main()
