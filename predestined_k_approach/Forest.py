@@ -30,18 +30,37 @@ class Forest:
     def n_steps(self) -> int:
         return self.n_total + 1
 
-    def get_null_envelope(self):
-        return ((0, self.n_total_positive),) * self.n_steps
+    def get_null_envelope(self) -> Envelope:
+        return self.fill_boundary_to_envelope([0], is_upper=False)
 
-    def partial_lower_boundary_to_envelope(self, boundary):
-        return list(zip_longest(boundary, [self.n_total_positive] * self.n_steps, fillvalue=boundary[-1]))
+    def fill_lower_boundary(self, partial_boundary: list[int]) -> list[int]:
+        return partial_boundary + [partial_boundary[-1]] * (self.n_steps - len(partial_boundary))
 
-    def partial_upper_boundary_to_envelope(self, boundary):
-        naively_extrapolated_boundary = boundary + [
-            boundary[-1] + i + 1
-            for i in range(self.n_steps - len(boundary))
+    def fill_upper_boundary(self, partial_boundary: list[int]) -> list[int]:
+        return partial_boundary + [
+            partial_boundary[-1] + i + 1
+            for i in range(self.n_steps - len(partial_boundary))
         ]
-        return list(zip([0] * self.n_steps, naively_extrapolated_boundary))
+
+    def fill_boundary(self, partial_boundary: list[int], is_upper: bool) -> list[int]:
+        if is_upper:
+            return self.fill_upper_boundary(partial_boundary)
+        return self.fill_lower_boundary(partial_boundary)
+
+    def fill_boundary_to_envelope(self, partial_boundary: list[int], is_upper: bool, symmetrical: bool = False) -> Envelope:
+        boundary = self.fill_boundary(partial_boundary, is_upper)
+
+        if symmetrical:
+            other_boundary = self.get_mirror_boundary(boundary)
+        else:
+            other_boundary = self.fill_boundary([0], not is_upper)
+
+        if is_upper:
+            lower_boundary, upper_boundary = other_boundary, boundary
+        else:
+            lower_boundary, upper_boundary = boundary, other_boundary
+
+        return list(zip(lower_boundary, upper_boundary))
 
     def get_greedy_lower_boundary(self, allowable_error) -> list[int]:
         if not self.result:
@@ -50,7 +69,7 @@ class Forest:
         remaining_allowable_error = allowable_error
 
         boundary = [0]
-        envelope = self.partial_lower_boundary_to_envelope(boundary)
+        envelope = self.fill_boundary_to_envelope(boundary, is_upper=False)
         forest_with_envelope = ForestWithEnvelope(self, envelope)
 
         for step in range(1, self.n_steps):
@@ -58,7 +77,7 @@ class Forest:
 
             if state.get_prob() <= remaining_allowable_error:
                 boundary.append(boundary[-1] + 1)
-                envelope = self.partial_lower_boundary_to_envelope(boundary)
+                envelope = self.fill_boundary_to_envelope(boundary, is_upper=False)
                 forest_with_envelope.update_envelope_suffix(envelope[step:])
 
                 remaining_allowable_error -= state.get_prob()
