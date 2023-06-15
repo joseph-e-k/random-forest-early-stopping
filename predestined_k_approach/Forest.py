@@ -141,7 +141,7 @@ class ForestWithEnvelope:
         prob_error = 0
         expected_runtime = 0
 
-        for n_seen in range(self.n_steps):
+        for n_seen in range(self.n_steps - 1):
             lower_bound, upper_bound = self.envelope[n_seen]
             terminal_states = [self[n_seen, lower_bound-1], self[n_seen, upper_bound+1]]
 
@@ -150,6 +150,10 @@ class ForestWithEnvelope:
 
                 if state.result != self.result:
                     prob_error += state.get_prob()
+
+        for n_seen_positive in range(self.n_total_positive + 1):
+            state = self[self.n_total, n_seen_positive]
+            expected_runtime += self.n_total * state.get_prob()
 
         return ForestAnalysis(
             prob_error=prob_error,
