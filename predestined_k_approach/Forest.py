@@ -43,9 +43,9 @@ class Forest:
         ]
         return list(zip([0] * self.n_steps, naively_extrapolated_boundary))
 
-    def get_optimal_lower_boundary(self, allowable_error) -> list[int]:
+    def get_greedy_lower_boundary(self, allowable_error) -> list[int]:
         if not self.result:
-            raise ValueError("get_optimal_lower_boundary() should only be called when the correct result is positive")
+            raise ValueError("get_greedy_lower_boundary() should only be called when the correct result is positive")
 
         remaining_allowable_error = allowable_error
 
@@ -68,10 +68,10 @@ class Forest:
 
         return boundary
 
-    def get_optimal_upper_boundary(self, allowable_error) -> list[int]:
-        # TODO: Reduce code duplication between this function and get_optimal_lower_boundary
+    def get_greedy_upper_boundary(self, allowable_error) -> list[int]:
+        # TODO: Reduce code duplication between this function and get_greedy_lower_boundary
         if self.result:
-            raise ValueError("get_optimal_upper_boundary() should only be called when the correct result is negative")
+            raise ValueError("get_greedy_upper_boundary() should only be called when the correct result is negative")
 
         remaining_allowable_error = allowable_error
 
