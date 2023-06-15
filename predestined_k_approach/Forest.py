@@ -4,6 +4,8 @@ import dataclasses
 from itertools import zip_longest
 from typing import TypeAlias
 
+import numpy as np
+
 from .ForestState import ForestState, ImpossibleForestState
 
 Envelope: TypeAlias = list[tuple[int, int]]
@@ -158,3 +160,9 @@ class ForestWithEnvelope:
         index = len(self.envelope) - len(envelope_suffix)
         self.envelope[index:] = envelope_suffix
         self._initialize_states(index)
+
+    def get_state_probs(self):
+        return np.array([
+            [self[n_seen, n_seen_positive].get_prob() for n_seen_positive in range(self.n_total_positive + 1)]
+            for n_seen in range(self.n_steps)
+        ])
