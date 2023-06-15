@@ -68,31 +68,21 @@ class Forest:
 
         return boundary
 
+    @staticmethod
+    def get_mirror_boundary(boundary: list[int]) -> list[int]:
+        return [
+            i_step - bound
+            for i_step, bound
+            in enumerate(boundary)
+        ]
+
     def get_greedy_upper_boundary(self, allowable_error) -> list[int]:
-        # TODO: Reduce code duplication between this function and get_greedy_lower_boundary
         if self.result:
             raise ValueError("get_greedy_upper_boundary() should only be called when the correct result is negative")
 
-        remaining_allowable_error = allowable_error
-
-        boundary = [0]
-        envelope = self.partial_upper_boundary_to_envelope(boundary)
-        forest_with_envelope = ForestWithEnvelope(self, envelope)
-
-        for step in range(1, self.n_steps):
-            state = forest_with_envelope[step, boundary[-1] + 1]
-
-            if state.get_prob() <= remaining_allowable_error:
-                boundary.append(boundary[-1])
-                envelope = self.partial_upper_boundary_to_envelope(boundary)
-                forest_with_envelope.update_envelope_suffix(envelope[step:])
-
-                remaining_allowable_error -= state.get_prob()
-
-            else:
-                boundary.append(envelope[step][1])
-
-        return boundary
+        mirror_forest = Forest(self.n_total, self.n_total - self.n_total_positive)
+        mirror_boundary = mirror_forest.get_greedy_lower_boundary(allowable_error)
+        return self.get_mirror_boundary(mirror_boundary)
 
 
 @dataclasses.dataclass

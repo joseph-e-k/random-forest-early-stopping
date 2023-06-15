@@ -27,7 +27,7 @@ def describe_envelope(envelope):
 
 
 def main():
-    n_total = 1001
+    n_total = 101
     sys.setrecursionlimit(max(sys.getrecursionlimit(), 2 * n_total))
     envelope = get_greedy_envelope(n_total, 0.05)
 
