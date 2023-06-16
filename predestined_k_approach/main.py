@@ -1,17 +1,21 @@
 import math
 import sys
 
-from predestined_k_approach.Forest import ForestWithEnvelope, Forest
+from predestined_k_approach.Forest import ForestWithEnvelope, Forest, ErrorBudgetMetric
 
 
-def get_greedy_envelope(n_total, error_rate):
+def get_greedy_envelope(n_total, metric):
     n_majority = math.ceil(n_total / 2 + 1 / 2)
     n_minority = math.ceil(n_total / 2 - 1 / 2)
 
-    upper_boundary = Forest(n_total, n_minority).get_greedy_upper_boundary(error_rate)
-    lower_boundary = Forest(n_total, n_majority).get_greedy_lower_boundary(error_rate)
+    upper_boundary = Forest(n_total, n_minority).get_greedy_upper_boundary(metric)
+    lower_boundary = Forest(n_total, n_majority).get_greedy_lower_boundary(metric)
 
     return list(zip(lower_boundary, upper_boundary))
+
+
+def get_error_budget_envelope(n_total, allowable_error):
+    return get_greedy_envelope(n_total, ErrorBudgetMetric(allowable_error))
 
 
 def describe_envelope(envelope):
@@ -30,7 +34,7 @@ def main():
     n_total = 101
     allowable_error = 0.05
     sys.setrecursionlimit(max(sys.getrecursionlimit(), 2 * n_total))
-    envelope = get_greedy_envelope(n_total, 0.05)
+    envelope = get_error_budget_envelope(n_total, 0.05)
 
     print(f"Base score: {1 / n_total}")
     print(f"Envelope: stop if {describe_envelope(envelope)}")

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+import copy
 import dataclasses
-from itertools import zip_longest
 from typing import TypeAlias
 
 import numpy as np
@@ -15,6 +15,21 @@ Envelope: TypeAlias = list[tuple[int, int]]
 class ForestAnalysis:
     prob_error: float
     expected_runtime: float
+
+
+@dataclasses.dataclass
+class ErrorBudgetMetric:
+    allowable_error: float
+    remaining_allowable_error: float = dataclasses.field(init=False)
+    
+    def __post_init__(self):
+        self.remaining_allowable_error = self.allowable_error
+    
+    def __call__(self, forest_with_envelope: ForestWithEnvelope, state: ForestState) -> bool:
+        if state.get_prob() <= self.remaining_allowable_error:
+            self.remaining_allowable_error -= state.get_prob()
+            return True
+        return False
 
 
 @dataclasses.dataclass(frozen=True)
@@ -62,11 +77,11 @@ class Forest:
 
         return list(zip(lower_boundary, upper_boundary))
 
-    def get_greedy_lower_boundary(self, allowable_error) -> list[int]:
+    def get_greedy_lower_boundary(self, metric) -> list[int]:
         if not self.result:
             raise ValueError("get_greedy_lower_boundary() should only be called when the correct result is positive")
 
-        remaining_allowable_error = allowable_error
+        metric = copy.copy(metric)
 
         boundary = [0]
         envelope = self.fill_boundary_to_envelope(boundary, is_upper=False)
@@ -75,13 +90,10 @@ class Forest:
         for step in range(1, self.n_steps):
             state = forest_with_envelope[step, boundary[-1]]
 
-            if state.get_prob() <= remaining_allowable_error:
+            if metric(forest_with_envelope, state):
                 boundary.append(boundary[-1] + 1)
                 envelope = self.fill_boundary_to_envelope(boundary, is_upper=False)
                 forest_with_envelope.update_envelope_suffix(envelope[step:])
-
-                remaining_allowable_error -= state.get_prob()
-
             else:
                 boundary.append(envelope[step][0])
 
@@ -95,12 +107,12 @@ class Forest:
             in enumerate(boundary)
         ]
 
-    def get_greedy_upper_boundary(self, allowable_error) -> list[int]:
+    def get_greedy_upper_boundary(self, metric) -> list[int]:
         if self.result:
             raise ValueError("get_greedy_upper_boundary() should only be called when the correct result is negative")
 
         mirror_forest = Forest(self.n_total, self.n_total - self.n_total_positive)
-        mirror_boundary = mirror_forest.get_greedy_lower_boundary(allowable_error)
+        mirror_boundary = mirror_forest.get_greedy_lower_boundary(metric)
         return self.get_mirror_boundary(mirror_boundary)
 
 
