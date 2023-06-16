@@ -1,5 +1,6 @@
 import math
 import sys
+import time
 
 from predestined_k_approach.Forest import ForestWithEnvelope, Forest, ErrorBudgetMetric
 
@@ -41,10 +42,12 @@ def main():
     for n_positive in range(0, n_total + 1):
         forest_with_envelope = ForestWithEnvelope.create(n_total, n_positive, envelope)
         analysis = forest_with_envelope.analyse()
+        score = forest_with_envelope.get_score(allowable_error)
         print(f"{n_positive} positive / {n_total}: "
               f"error rate = {analysis.prob_error}, "
               f"expected runtime = {analysis.expected_runtime}, "
-              f"score = {forest_with_envelope.get_score(allowable_error)}")
+              f"score = {score}, "
+              f"score ratio = {score * n_total}")
 
 
 if __name__ == "__main__":
