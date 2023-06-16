@@ -6,7 +6,7 @@ from typing import TypeAlias
 
 import numpy as np
 
-from .ForestState import ForestState, ImpossibleForestState
+from .utils import shift_array
 
 Envelope: TypeAlias = list[tuple[int, int]]
 
@@ -25,9 +25,10 @@ class ErrorBudgetMetric:
     def __post_init__(self):
         self.remaining_allowable_error = self.allowable_error
     
-    def __call__(self, forest_with_envelope: ForestWithEnvelope, state: ForestState) -> bool:
-        if state.get_prob() <= self.remaining_allowable_error:
-            self.remaining_allowable_error -= state.get_prob()
+    def __call__(self, forest_with_envelope: ForestWithEnvelope, n_seen: int, n_seen_good: int) -> bool:
+        prob_state = forest_with_envelope.state_probabilities[n_seen][n_seen_good]
+        if prob_state <= self.remaining_allowable_error:
+            self.remaining_allowable_error -= prob_state
             return True
         return False
 
@@ -88,9 +89,7 @@ class Forest:
         forest_with_envelope = ForestWithEnvelope(self, envelope)
 
         for step in range(1, self.n_steps):
-            state = forest_with_envelope[step, boundary[-1]]
-
-            if metric(forest_with_envelope, state):
+            if metric(forest_with_envelope, step, boundary[-1]):
                 boundary.append(boundary[-1] + 1)
                 envelope = self.fill_boundary_to_envelope(boundary, is_upper=False)
                 forest_with_envelope.update_envelope_suffix(envelope[step:])
@@ -121,19 +120,36 @@ class ForestWithEnvelope:
     forest: Forest
     envelope: Envelope
 
-    _states: list[list[ForestState | None]] = dataclasses.field(init=False, repr=False, compare=False, hash=False)
+    state_probabilities: list[np.ndarray] = dataclasses.field(init=False, repr=False, compare=False, hash=False)
 
     n_total = property(lambda self: self.forest.n_total)
     n_total_positive = property(lambda self: self.forest.n_total_positive)
     result = property(lambda self: self.forest.result)
     n_steps = property(lambda self: self.forest.n_steps)
 
-    def _initialize_states(self, starting_index=0):
-        self._states[starting_index:] = [[None] * self.n_steps for _ in range(starting_index, self.n_steps)]
-
     def __post_init__(self):
-        self._states = []
-        self._initialize_states()
+        self._n_steps = self.n_total + 1
+        self._n_values = self.n_total + 1
+
+        self._n_bad = self.n_total - self.n_total_positive
+
+        self._n_seen = np.row_stack([np.full(self._n_values, i_step) for i_step in range(self._n_steps)])
+        self._n_seen_good = np.column_stack([np.full(self._n_steps, i_value) for i_value in range(self._n_values)])
+
+        self._n_unseen = self.n_total - self._n_seen
+        self._n_seen_bad = self._n_seen - self._n_seen_good
+        self._n_unseen_good = self.n_total_positive - self._n_seen_good
+        self._n_unseen_bad = self._n_bad - self._n_seen_bad
+
+        self._prob_see_good = self._n_unseen_good / self._n_unseen
+        self._prob_see_bad = self._n_unseen_bad / self._n_unseen
+
+        self._is_nonterminal = []
+
+        self.state_probabilities = [np.zeros(shape=self.n_total + 1)]
+        self.state_probabilities[0][0] = 1
+
+        self._recompute_state_probabilities()
 
     @classmethod
     def create(cls, n_total, n_total_positive, envelope=None):
@@ -144,19 +160,31 @@ class ForestWithEnvelope:
 
         return cls(forest, envelope)
 
-    def __getitem__(self, index):
-        n_seen, n_seen_positive = index
+    def _recompute_state_probabilities(self, starting_index=0):
+        self._is_nonterminal[starting_index:] = [
+            np.concatenate((
+                np.zeros(lower_bound),
+                np.ones(upper_bound + 1 - lower_bound),
+                np.zeros(self.n_total - upper_bound),
+            ))
+            for (lower_bound, upper_bound) in self.envelope[starting_index:]
+        ]
 
-        if 0 <= n_seen_positive <= n_seen <= self.n_total and n_seen_positive <= self.n_total_positive:
-            state = self._states[n_seen][n_seen_positive]
+        del self.state_probabilities[starting_index + 1:]
 
-            if state is None:
-                state = ForestState(self, n_seen, n_seen_positive)
-                self._states[n_seen][n_seen_positive] = state
+        for i_step in range(starting_index + 1, self._n_steps):
+            nonterminal_prev_prob = self.state_probabilities[-1] * self._is_nonterminal[i_step - 1]
+            prob_by_bad_observation = nonterminal_prev_prob * self._prob_see_bad[i_step - 1, :]
+            prob_by_good_observation = shift_array(
+                nonterminal_prev_prob * self._prob_see_good[i_step - 1, :],
+                1,
+                fill_value=0
+            )
+            self.state_probabilities.append(prob_by_bad_observation + prob_by_good_observation)
 
-            return state
-
-        return ImpossibleForestState(self, n_seen, n_seen_positive)
+    @staticmethod
+    def get_state_result(n_seen, n_seen_good):
+        return n_seen_good > n_seen / 2
 
     def analyse(self) -> ForestAnalysis:
         prob_error = 0
@@ -164,17 +192,17 @@ class ForestWithEnvelope:
 
         for n_seen in range(self.n_steps - 1):
             lower_bound, upper_bound = self.envelope[n_seen]
-            terminal_states = [self[n_seen, lower_bound-1], self[n_seen, upper_bound+1]]
+            terminal_values = [lower_bound - 1, upper_bound + 1]
 
-            for state in terminal_states:
-                expected_runtime += n_seen * state.get_prob()
+            for n_seen_positive in terminal_values:
+                prob_state = self.state_probabilities[n_seen][n_seen_positive]
+                expected_runtime += n_seen * prob_state
 
-                if state.result != self.result:
-                    prob_error += state.get_prob()
+                if self.get_state_result(n_seen, n_seen_positive) != self.result:
+                    prob_error += prob_state
 
         for n_seen_positive in range(self.n_total_positive + 1):
-            state = self[self.n_total, n_seen_positive]
-            expected_runtime += self.n_total * state.get_prob()
+            expected_runtime += self.n_total * self.state_probabilities[self.n_total][n_seen_positive]
 
         return ForestAnalysis(
             prob_error=prob_error,
@@ -190,10 +218,4 @@ class ForestWithEnvelope:
     def update_envelope_suffix(self, envelope_suffix: Envelope):
         index = len(self.envelope) - len(envelope_suffix)
         self.envelope[index:] = envelope_suffix
-        self._initialize_states(index)
-
-    def get_state_probs(self):
-        return np.array([
-            [self[n_seen, n_seen_positive].get_prob() for n_seen_positive in range(self.n_total_positive + 1)]
-            for n_seen in range(self.n_steps)
-        ])
+        self._recompute_state_probabilities(starting_index=index)

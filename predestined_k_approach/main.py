@@ -31,9 +31,8 @@ def describe_envelope(envelope):
 
 
 def main():
-    n_total = 101
+    n_total = 1001
     allowable_error = 0.05
-    sys.setrecursionlimit(max(sys.getrecursionlimit(), 2 * n_total))
     envelope = get_error_budget_envelope(n_total, 0.05)
 
     print(f"Base score: {1 / n_total}")
