@@ -28,16 +28,20 @@ def describe_envelope(envelope):
 
 def main():
     n_total = 101
+    allowable_error = 0.05
     sys.setrecursionlimit(max(sys.getrecursionlimit(), 2 * n_total))
     envelope = get_greedy_envelope(n_total, 0.05)
 
+    print(f"Base score: {1 / n_total}")
     print(f"Envelope: stop if {describe_envelope(envelope)}")
 
     for n_positive in range(0, n_total + 1):
         forest_with_envelope = ForestWithEnvelope.create(n_total, n_positive, envelope)
         analysis = forest_with_envelope.analyse()
         print(f"{n_positive} positive / {n_total}: "
-              f"error rate = {analysis.prob_error}, expected runtime = {analysis.expected_runtime}")
+              f"error rate = {analysis.prob_error}, "
+              f"expected runtime = {analysis.expected_runtime}, "
+              f"score = {forest_with_envelope.get_score(allowable_error)}")
 
 
 if __name__ == "__main__":

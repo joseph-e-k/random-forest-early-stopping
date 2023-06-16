@@ -146,7 +146,7 @@ class ForestWithEnvelope:
 
         return ImpossibleForestState(self, n_seen, n_seen_positive)
 
-    def analyse(self):
+    def analyse(self) -> ForestAnalysis:
         prob_error = 0
         expected_runtime = 0
 
@@ -168,6 +168,12 @@ class ForestWithEnvelope:
             prob_error=prob_error,
             expected_runtime=expected_runtime
         )
+
+    def get_score(self, allowable_error: float) -> float:
+        analysis = self.analyse()
+        error_weight = (1 / allowable_error) - 1
+        expected_points_per_run = (1 - analysis.prob_error) - error_weight * analysis.prob_error
+        return expected_points_per_run / analysis.expected_runtime
 
     def update_envelope_suffix(self, envelope_suffix: Envelope):
         index = len(self.envelope) - len(envelope_suffix)
