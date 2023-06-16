@@ -1,6 +1,4 @@
 import math
-import sys
-import time
 
 from predestined_k_approach.Forest import ForestWithEnvelope, Forest, ErrorBudgetMetric
 
