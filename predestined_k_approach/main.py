@@ -1,5 +1,5 @@
-from predestined_k_approach.optimization import get_envelope_greedy_eb
 from predestined_k_approach.ForestWithEnvelope import ForestWithEnvelope
+from predestined_k_approach.optimization import get_envelope_by_eb_greedily
 
 
 def describe_envelope(envelope):
@@ -18,19 +18,7 @@ def main():
     n_total = 101
     allowable_error = 0.05
 
-    # with TimerContext("Greedy"):
-    #     greedy_score_envelope = get_score_envelope(n_total, 0.05)
-    # with TimerContext("Exponential"):
-    #     max_score_envelope = find_max_score_envelope(n_total, 0.05)
-    #
-    # print(f"Greedy: {envelope_to_lower_bound_selected_indices(greedy_score_envelope)}")
-    # print(f"Exponential: {envelope_to_lower_bound_selected_indices(max_score_envelope)}")
-    #
-    # forest = Forest(n_total, math.ceil(n_total / 2))
-    # print(f"Greedy min score: {ForestWithEnvelope(forest, greedy_score_envelope).get_score(allowable_error)}")
-    # print(f"Exponential min score: {ForestWithEnvelope(forest, max_score_envelope).get_score(allowable_error)}")
-
-    envelope = get_envelope_greedy_eb(n_total, allowable_error)
+    envelope = get_envelope_by_eb_greedily(n_total, allowable_error)
 
     print(f"Envelope: stop if {describe_envelope(envelope)}")
 

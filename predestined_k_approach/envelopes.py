@@ -60,3 +60,23 @@ def get_mirror_boundary(boundary: list[int]) -> list[int]:
         for i_step, bound
         in enumerate(boundary)
     ]
+
+
+def envelope_to_lower_bound_increments(envelope):
+    increments = []
+
+    for i in range(1, len(envelope)):
+        if envelope[i][0] > envelope[i-1][0]:
+            increments.append(i)
+
+    return increments
+
+
+def increments_to_symmetric_envelope(n_total, increments):
+    lower_boundary = [0]
+
+    for index in increments:
+        last_bound = lower_boundary[-1]
+        lower_boundary += [last_bound] * (index - len(lower_boundary)) + [last_bound + 1]
+
+    return fill_boundary_to_envelope(n_total, lower_boundary, is_upper=False, symmetrical=True)

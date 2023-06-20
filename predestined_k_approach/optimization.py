@@ -3,17 +3,17 @@ from __future__ import annotations
 import math
 
 from .Forest import Forest
-from .envelopes import fill_boundary_to_envelope, fill_envelope, Envelope
+from .envelopes import fill_envelope, Envelope, increments_to_symmetric_envelope
 from .ForestWithEnvelope import ForestWithEnvelope
 from .utils import powerset
 
 
-def get_envelope_greedy_eb(n_total, allowable_error) -> Envelope:
+def get_envelope_by_eb_greedily(n_total, allowable_error) -> Envelope:
     increments = []
 
     n_good = math.ceil((n_total + 1) / 2)
 
-    envelope = selected_indices_to_symmetric_envelope(n_total, increments)
+    envelope = increments_to_symmetric_envelope(n_total, increments)
     forest_with_envelope = ForestWithEnvelope.create(n_total, n_good, envelope)
 
     for step in range(1, n_total + 1):
@@ -21,13 +21,13 @@ def get_envelope_greedy_eb(n_total, allowable_error) -> Envelope:
         if prob_state <= allowable_error:
             allowable_error -= prob_state
             increments.append(step)
-            envelope = selected_indices_to_symmetric_envelope(n_total, increments)
+            envelope = increments_to_symmetric_envelope(n_total, increments)
             forest_with_envelope.update_envelope_suffix(envelope[step:])
 
     return envelope
 
 
-def get_score_envelope(n_total, allowable_error):
+def get_envelope_by_score_greedily(n_total, allowable_error):
     forest_with_envelope = ForestWithEnvelope.create(n_total, math.ceil((n_total + 1) / 2))
 
     for step in range(1, forest_with_envelope.n_steps):
@@ -46,35 +46,15 @@ def get_score_envelope(n_total, allowable_error):
     return forest_with_envelope.envelope
 
 
-def envelope_to_lower_bound_selected_indices(envelope):
-    increments = []
-
-    for i in range(1, len(envelope)):
-        if envelope[i][0] > envelope[i-1][0]:
-            increments.append(i)
-
-    return increments
-
-
-def selected_indices_to_symmetric_envelope(n_total, indices):
-    lower_boundary = [0]
-
-    for index in indices:
-        last_bound = lower_boundary[-1]
-        lower_boundary += [last_bound] * (index - len(lower_boundary)) + [last_bound + 1]
-
-    return fill_boundary_to_envelope(n_total, lower_boundary, is_upper=False, symmetrical=True)
-
-
-def find_max_score_envelope(n_total, allowable_error):
-    indices = list(range(1, n_total - 1))
+def get_envelope_by_score_combinatorically(n_total, allowable_error):
+    indices = list(range(1, n_total))
     forests = [
         Forest(n_total, n_good)
         for n_good in [math.ceil((n_total + 1) / 2), math.ceil((n_total - 1) / 2)]
     ]
 
     envelopes = (
-        selected_indices_to_symmetric_envelope(n_total, selected_indices)
+        increments_to_symmetric_envelope(n_total, selected_indices)
         for selected_indices in powerset(indices, max_size=math.ceil(len(indices) / 2))
     )
 
