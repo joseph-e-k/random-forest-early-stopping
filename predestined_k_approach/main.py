@@ -1,7 +1,10 @@
 import itertools
 import math
 
-from predestined_k_approach.Forest import ForestWithEnvelope, Forest, ErrorBudgetMetric
+from predestined_k_approach.Forest import Forest
+from predestined_k_approach.envelopes import fill_envelope, fill_boundary_to_envelope
+from predestined_k_approach.optimization import ErrorBudgetMetric, get_greedy_upper_boundary, get_greedy_lower_boundary
+from predestined_k_approach.ForestWithEnvelope import ForestWithEnvelope
 from predestined_k_approach.utils import TimerContext
 
 
@@ -9,8 +12,8 @@ def get_greedy_envelope(n_total, metric):
     n_majority = math.ceil(n_total / 2 + 1 / 2)
     n_minority = math.ceil(n_total / 2 - 1 / 2)
 
-    upper_boundary = Forest(n_total, n_minority).get_greedy_upper_boundary(metric)
-    lower_boundary = Forest(n_total, n_majority).get_greedy_lower_boundary(metric)
+    upper_boundary = get_greedy_upper_boundary(Forest(n_total, n_minority), metric)
+    lower_boundary = get_greedy_lower_boundary(Forest(n_total, n_majority), metric)
 
     return list(zip(lower_boundary, upper_boundary))
 
@@ -26,7 +29,7 @@ def get_score_envelope(n_total, allowable_error):
         old_envelope = list(forest_with_envelope.envelope)
         prev_lower_bound, prev_upper_bound = old_envelope[step - 1]
         new_envelope_prefix = old_envelope[:step] + [(prev_lower_bound + 1, prev_upper_bound)]
-        new_envelope = forest_with_envelope.forest.fill_envelope(new_envelope_prefix)
+        new_envelope = fill_envelope(n_total, new_envelope_prefix)
 
         old_score = forest_with_envelope.get_score(allowable_error)
         forest_with_envelope.update_envelope_suffix(new_envelope[step:])
@@ -67,7 +70,7 @@ def selected_indices_to_symmetric_envelope(n_total, indices):
         last_bound = lower_boundary[-1]
         lower_boundary += [last_bound] * (index - len(lower_boundary)) + [last_bound + 1]
 
-    return Forest(n_total, 0).fill_boundary_to_envelope(lower_boundary, is_upper=False, symmetrical=True)
+    return fill_boundary_to_envelope(n_total, lower_boundary, is_upper=False, symmetrical=True)
 
 
 def powerset(iterable, max_size=None):
@@ -117,8 +120,8 @@ def main():
     print(f"Greedy min score: {ForestWithEnvelope(forest, greedy_score_envelope).get_score(allowable_error)}")
     print(f"Exponential min score: {ForestWithEnvelope(forest, max_score_envelope).get_score(allowable_error)}")
 
-    # envelope = get_error_budget_envelope(n_total, 0.0005)
-
+    # envelope = get_error_budget_envelope(n_total, allowable_error)
+    #
     # print(f"Base score: {1 / n_total}")
     # print(f"Envelope: stop if {describe_envelope(envelope)}")
     #
