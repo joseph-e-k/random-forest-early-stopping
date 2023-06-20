@@ -1,4 +1,5 @@
 import dataclasses
+import itertools
 import time
 
 import numpy as np
@@ -40,3 +41,14 @@ class TimerContext:
             message = f"Time ({self.tag})" if self.tag is not None else "Time"
             message += f": {self.elapsed_time}s"
             print(message)
+
+
+def powerset(iterable, max_size=None):
+    items = list(iterable)
+
+    if max_size is None:
+        max_size = len(items)
+
+    return itertools.chain.from_iterable(
+        itertools.combinations(items, n) for n in range(max_size + 1)
+    )
