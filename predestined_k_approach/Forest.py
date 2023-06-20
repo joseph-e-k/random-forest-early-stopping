@@ -78,6 +78,15 @@ class Forest:
 
         return list(zip(lower_boundary, upper_boundary))
 
+    def fill_envelope(self, partial_envelope: Envelope) -> Envelope:
+        partial_lower_boundary = [l for (l, u) in partial_envelope]
+        partial_upper_boundary = [u for (l, u) in partial_envelope]
+
+        lower_boundary = self.fill_lower_boundary(partial_lower_boundary)
+        upper_boundary = self.fill_upper_boundary(partial_upper_boundary)
+
+        return list(zip(lower_boundary, upper_boundary))
+
     def get_greedy_lower_boundary(self, metric) -> list[int]:
         if not self.result:
             raise ValueError("get_greedy_lower_boundary() should only be called when the correct result is positive")
@@ -162,11 +171,7 @@ class ForestWithEnvelope:
 
     def _recompute_state_probabilities(self, starting_index=0):
         self._is_nonterminal[starting_index:] = [
-            np.concatenate((
-                np.zeros(lower_bound),
-                np.ones(upper_bound + 1 - lower_bound),
-                np.zeros(self.n_total - upper_bound),
-            ))
+            np.array([int(lower_bound <= v <= upper_bound) for v in range(self._n_values)])
             for (lower_bound, upper_bound) in self.envelope[starting_index:]
         ]
 
