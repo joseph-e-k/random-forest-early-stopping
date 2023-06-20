@@ -52,3 +52,16 @@ def powerset(iterable, max_size=None):
     return itertools.chain.from_iterable(
         itertools.combinations(items, n) for n in range(max_size + 1)
     )
+
+
+def iter_unique_combinations(iterable, length):
+    items = list(iterable)
+
+    if length == 0:
+        yield ()
+        return
+
+    last_index = len(items) - length
+    for index, item in enumerate(items[:last_index + 1]):
+        for combination in iter_unique_combinations(items[index + 1:], length - 1):
+            yield (item,) + combination
