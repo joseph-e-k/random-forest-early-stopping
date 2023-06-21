@@ -28,22 +28,25 @@ def get_envelope_by_eb_greedily(n_total, allowable_error) -> Envelope:
 
 
 def get_envelope_by_score_greedily(n_total, allowable_error):
-    forest_with_envelope = ForestWithEnvelope.create(n_total, math.ceil((n_total + 1) / 2))
+    increments = []
 
-    for step in range(1, forest_with_envelope.n_steps):
-        old_envelope = list(forest_with_envelope.envelope)
-        prev_lower_bound, prev_upper_bound = old_envelope[step - 1]
-        new_envelope_prefix = old_envelope[:step] + [(prev_lower_bound + 1, prev_upper_bound)]
-        new_envelope = fill_envelope(n_total, new_envelope_prefix)
+    n_good = math.ceil((n_total + 1) / 2)
 
-        old_score = forest_with_envelope.get_score(allowable_error)
-        forest_with_envelope.update_envelope_suffix(new_envelope[step:])
-        new_score = forest_with_envelope.get_score(allowable_error)
+    envelope = increments_to_symmetric_envelope(n_total, increments)
+    forest_with_envelope = ForestWithEnvelope.create(n_total, n_good, envelope)
+    score = forest_with_envelope.get_score(allowable_error)
 
-        if new_score <= old_score:
-            forest_with_envelope.update_envelope_suffix(old_envelope[step:])
+    for step in range(1, n_total + 1):
+        increments.append(step)
+        envelope = increments_to_symmetric_envelope(n_total, increments)
+        forest_with_envelope.update_envelope_suffix(envelope[step:])
 
-    return forest_with_envelope.envelope
+        if forest_with_envelope.get_score(allowable_error) <= score:
+            increments.pop()
+            envelope = increments_to_symmetric_envelope(n_total, increments)
+            forest_with_envelope.update_envelope_suffix(envelope[step:])
+
+    return envelope
 
 
 def get_envelope_by_score_combinatorically(n_total, allowable_error):
