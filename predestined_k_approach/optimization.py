@@ -17,7 +17,7 @@ def get_envelope_by_eb_greedily(n_total, allowable_error) -> Envelope:
     forest_with_envelope = ForestWithEnvelope.create(n_total, n_good, envelope)
 
     for step in range(1, n_total + 1):
-        prob_state = forest_with_envelope.state_probabilities[step][envelope[step][0]]
+        prob_state = forest_with_envelope.get_state_probability(step, envelope[step][0])
         if prob_state <= allowable_error:
             allowable_error -= prob_state
             increments.append(step)
