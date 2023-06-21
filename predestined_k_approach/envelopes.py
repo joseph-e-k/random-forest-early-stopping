@@ -80,3 +80,15 @@ def increments_to_symmetric_envelope(n_total, increments):
         lower_boundary += [last_bound] * (index - len(lower_boundary)) + [last_bound + 1]
 
     return fill_boundary_to_envelope(n_total, lower_boundary, is_upper=False, symmetrical=True)
+
+
+def describe_envelope(envelope):
+    lower_boundary = [bounds[0] for bounds in envelope]
+
+    shifts = []
+
+    for i in range(1, len(lower_boundary)):
+        if lower_boundary[i] > lower_boundary[i-1]:
+            shifts.append((i, lower_boundary[i]))
+
+    return ", ".join(f"< {value} / {index}" for (index, value) in shifts)
