@@ -3,6 +3,7 @@ import itertools
 import time
 
 import numpy as np
+from sklearn.utils import Bunch
 
 
 def shift_array(arr, num, fill_value=np.nan):
@@ -65,3 +66,16 @@ def iter_unique_combinations(iterable, length):
     for index, item in enumerate(items[:last_index + 1]):
         for combination in iter_unique_combinations(items[index + 1:], length - 1):
             yield (item,) + combination
+
+
+def covariates_response_split(dataset, response_column=-1):
+    match dataset:
+        case (_, _):
+            return dataset
+        case Bunch():
+            return dataset.data, dataset.target
+        case np.ndarray():
+            covariate_columns = tuple(j for j in range(dataset.shape[1]) if j != response_column)
+            return dataset[:, covariate_columns], dataset[:, response_column]
+        case _:
+            raise TypeError(f"expected dataset to be a Bunch, ndarray, or pair; got {dataset!r} instead")

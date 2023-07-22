@@ -4,7 +4,8 @@ import matplotlib.pyplot as plt
 from sklearn import datasets
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.utils import Bunch
+
+from predestined_k_approach.utils import covariates_response_split
 
 
 def to_binary_classifications(classifications):
@@ -19,20 +20,10 @@ def to_binary_classifications(classifications):
     return np.isin(classifications, positive_classes)
 
 
-def estimate_positive_tree_distribution(dataset, target_column=-1, n_trees=100, test_proportion=0.2):
-    if isinstance(dataset, tuple) and len(dataset) == 2:
-        X, y = dataset
-    elif isinstance(dataset, Bunch):
-        X, y = dataset.data, dataset.target
-    elif isinstance(dataset, np.ndarray):
-        X_columns = tuple(j for j in range(dataset.shape[1]) if j != target_column)
-        X = dataset[:, X_columns]
-        y = dataset[:, target_column]
-    else:
-        raise TypeError(f"expected dataset to be a Bunch, ndarray, or pair; got {dataset!r} instead")
-
+def estimate_positive_tree_distribution(dataset, n_trees=100, test_proportion=0.2, *, response_column=-1):
+    # Processing: get covariates and responses, convert responses to binary classes, and split into train and test sets
+    X, y = covariates_response_split(dataset, response_column)
     y = to_binary_classifications(y)
-
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_proportion)
 
     # Train a random forest classifier
@@ -41,9 +32,7 @@ def estimate_positive_tree_distribution(dataset, target_column=-1, n_trees=100, 
 
     # Count number of "positive" trees for each testing observation, and add them up
     tree_predictions = np.column_stack([tree.predict(X_test) for tree in rf_classifier.estimators_])
-    n_positive_trees = np.sum(tree_predictions, axis=1)
-
-    return n_positive_trees
+    return np.sum(tree_predictions, axis=1)
 
 
 if __name__ == "__main__":
