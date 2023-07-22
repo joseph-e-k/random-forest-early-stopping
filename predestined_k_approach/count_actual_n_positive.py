@@ -22,7 +22,7 @@ def to_binary_classifications(classifications):
 def estimate_positive_tree_distribution(dataset, target_column=-1, n_trees=100, test_proportion=0.2):
     if isinstance(dataset, tuple) and len(dataset) == 2:
         X, y = dataset
-    if isinstance(dataset, Bunch):
+    elif isinstance(dataset, Bunch):
         X, y = dataset.data, dataset.target
     elif isinstance(dataset, np.ndarray):
         X_columns = tuple(j for j in range(dataset.shape[1]) if j != target_column)
