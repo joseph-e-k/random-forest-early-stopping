@@ -30,12 +30,22 @@ def estimate_positive_tree_distribution(dataset, n_trees=100, test_proportion=0.
     rf_classifier = RandomForestClassifier(n_estimators=n_trees)
     rf_classifier.fit(X_train, y_train)
 
+    X_test_pos = X_test[y_test]
+    X_test_neg = X_test[np.logical_not(y_test)]
+
     # Count number of "positive" trees for each testing observation, and add them up
     tree_predictions = np.column_stack([tree.predict(X_test) for tree in rf_classifier.estimators_])
-    return np.sum(tree_predictions, axis=1)
+    tree_predictions_for_pos = np.column_stack([tree.predict(X_test_pos) for tree in rf_classifier.estimators_])
+    tree_predictions_for_neg = np.column_stack([tree.predict(X_test_neg) for tree in rf_classifier.estimators_])
+    return (
+        np.sum(tree_predictions, axis=1),
+        np.sum(tree_predictions_for_pos, axis=1),
+        np.sum(tree_predictions_for_neg, axis=1)
+    )
 
 
 if __name__ == "__main__":
+    n_trees = 1000
     datasets = {
         "Banknotes": np.loadtxt(fname=r"..\data\data_banknote_authentication.txt", delimiter=","),
         "Breast Cancer": datasets.load_breast_cancer(),
@@ -44,14 +54,15 @@ if __name__ == "__main__":
         "Digits": datasets.load_digits()
     }
 
-    n_forests_per_dataset = 3
-
-    fig, axs = plt.subplots(len(datasets), n_forests_per_dataset, tight_layout=True)
+    fig, axs = plt.subplots(len(datasets), 3, tight_layout=True)
 
     for i_dataset, (dataset_name, dataset) in enumerate(datasets.items()):
-        for i_forest in range(n_forests_per_dataset):
-            distribution = estimate_positive_tree_distribution(dataset)
-            axs[i_dataset, i_forest].hist(distribution)
-            axs[i_dataset, i_forest].title.set_text(f"{dataset_name} ({i_forest + 1})")
+        distributions = estimate_positive_tree_distribution(dataset, n_trees=n_trees)
+
+        for i_distribution, title_suffix in enumerate(["", " (positive observations)", " (negative observations)"]):
+            ax = axs[i_dataset, i_distribution]
+            ax.hist(distributions[i_distribution])
+            ax.title.set_text(f"{dataset_name}{title_suffix}")
+            ax.set_xlim((0, n_trees))
 
     plt.show()
