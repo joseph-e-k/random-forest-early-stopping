@@ -75,6 +75,8 @@ def covariates_response_split(dataset, response_column=-1):
         case Bunch():
             return dataset.data, dataset.target
         case np.ndarray():
+            if response_column < 0:
+                response_column = dataset.shape[1] + response_column
             covariate_columns = tuple(j for j in range(dataset.shape[1]) if j != response_column)
             return dataset[:, covariate_columns], dataset[:, response_column]
         case _:
