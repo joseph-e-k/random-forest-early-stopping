@@ -5,6 +5,56 @@ from predestined_k_approach.ForestWithEnvelope import ForestWithEnvelope
 from predestined_k_approach.optimization import get_envelope_by_eb_greedily
 
 
+def plot_runtime_for_different_sized_forests(values_of_n_total, allowable_error, ax):
+    for n_total in values_of_n_total:
+        envelope = get_envelope_by_eb_greedily(n_total, allowable_error)
+        runtimes = []
+        min_n_positive = 0
+        max_n_positive = n_total // 2
+        values_of_n_positive = list(range(min_n_positive, max_n_positive + 1))
+
+        for n_positive in values_of_n_positive:
+            forest = Forest(n_total, n_positive)
+            fwe = ForestWithEnvelope(forest, envelope)
+            runtimes.append(fwe.analyse().expected_runtime)
+
+        ax.plot(
+            [n_positive / n_total for n_positive in values_of_n_positive],
+            [runtime / n_total for runtime in runtimes],
+            label=f"{n_total} trees"
+        )
+
+    ax.title.set_text(f"Runtime (α={allowable_error})")
+    ax.legend()
+
+
+def plot_runtime_for_allowable_error_rates(n_total, allowable_error_rates, ax):
+    runtimes = {
+        aer: []
+        for aer in allowable_error_rates
+    }
+
+    envelopes = {
+        aer: get_envelope_by_eb_greedily(n_total, aer)
+        for aer in allowable_error_rates
+    }
+
+    values_of_n_positive = list(range(n_total // 2))
+
+    for n_positive in values_of_n_positive:
+        forest = Forest(n_total, n_positive)
+
+        for aer in allowable_error_rates:
+            fwe = ForestWithEnvelope(forest, envelopes[aer])
+            runtimes[aer].append(fwe.analyse().expected_runtime)
+
+    for aer in allowable_error_rates:
+        ax.plot(values_of_n_positive, runtimes[aer], label=f"α={aer}")
+
+    ax.title.set_text(f"Runtime ({n_total} trees, various α)")
+    ax.legend()
+
+
 def plot_runtime_and_error(n_total, allowable_error, ax_runtime, ax_error):
     greedy_envelope = get_envelope_by_eb_greedily(n_total, allowable_error)
     null_envelope = get_envelope_by_eb_greedily(n_total, 0)
@@ -43,13 +93,12 @@ def plot_runtime_and_error(n_total, allowable_error, ax_runtime, ax_error):
 
 
 def main():
-    allowable_error_rates = [0.05, 0.01, 0.001]
-
-    fig, axs = plt.subplots(2, len(allowable_error_rates), tight_layout=True)
-
-    for i, allowable_error in enumerate(allowable_error_rates):
-        plot_runtime_and_error(101, allowable_error, axs[0, i], axs[1, i])
-
+    ax = plt.subplot()
+    plot_runtime_for_different_sized_forests(
+        values_of_n_total=[200 * i + 1 for i in range(1, 6)],
+        allowable_error=10**-4,
+        ax=ax
+    )
     plt.show()
 
 
