@@ -2,6 +2,7 @@ import dataclasses
 import itertools
 import time
 
+import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.utils import Bunch
 
@@ -81,3 +82,44 @@ def covariates_response_split(dataset, response_column=-1):
             return dataset[:, covariate_columns], dataset[:, response_column]
         case _:
             raise TypeError(f"expected dataset to be a Bunch, ndarray, or pair; got {dataset!r} instead")
+
+
+def plot_function(ax, x_axis_arg_name, function, function_kwargs=None, plot_kwargs=None):
+    function_kwargs = function_kwargs or {}
+    plot_kwargs = plot_kwargs or {}
+
+    x_axis_arg_values = function_kwargs.pop(x_axis_arg_name)
+
+    ax.set_xlabel(x_axis_arg_name)
+
+    title = function.__name__
+    if function_kwargs:
+        title += " ("
+        title += ", ".join(f"{arg_name}={arg_value!r}" for (arg_name, arg_value) in function_kwargs.items())
+        title += ")"
+    ax.set_title(title)
+
+    results = [None] * len(x_axis_arg_values)
+
+    for i, x_axis_arg_value in enumerate(x_axis_arg_values):
+        results[i] = function(**(function_kwargs | {x_axis_arg_name: x_axis_arg_value}))
+
+    ax.plot(x_axis_arg_values, results, **plot_kwargs)
+
+
+def plot_function_many_curves(ax, x_axis_arg_name, distinct_curves_arg_name, function, function_kwargs, plot_kwargs):
+    function_kwargs = function_kwargs or {}
+    plot_kwargs = plot_kwargs or {}
+
+    distinct_curves_arg_values = function_kwargs.pop(distinct_curves_arg_name)
+
+    for distinct_curves_arg_value in distinct_curves_arg_values:
+        plot_function(
+            ax,
+            x_axis_arg_name,
+            function,
+            function_kwargs | {distinct_curves_arg_name: distinct_curves_arg_value},
+            plot_kwargs | dict(label=f"{distinct_curves_arg_name}={distinct_curves_arg_value}")
+        )
+
+    ax.legend()

@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+import functools
 import math
 
 from .Forest import Forest
-from .envelopes import fill_envelope, Envelope, increments_to_symmetric_envelope, get_null_envelope
+from .envelopes import Envelope, increments_to_symmetric_envelope, get_null_envelope
 from .ForestWithEnvelope import ForestWithEnvelope
 from .utils import powerset
 
 
+@functools.lru_cache()
 def get_envelope_by_eb_greedily(n_total, allowable_error) -> Envelope:
     increments = []
 
