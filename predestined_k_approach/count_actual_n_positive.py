@@ -4,8 +4,9 @@ from itertools import product
 
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
 
-from sklearn import datasets
+from sklearn import datasets as sklearn_datasets
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 
@@ -27,9 +28,18 @@ def to_binary_classifications(classifications):
     return np.isin(classifications, positive_classes)
 
 
-def estimate_positive_tree_distribution(dataset, n_trees=100, test_proportion=0.2, *, response_column=-1):
+def coerce_nonnumeric_columns_to_numeric(df: pd.DataFrame):
+    object_columns = df.select_dtypes(["object"]).columns
+    df[object_columns] = df[object_columns].astype("category")
+    category_columns = df.select_dtypes(["category"]).columns
+    df[category_columns] = df[category_columns].apply(lambda x: x.cat.codes)
+    return df
+
+
+def estimate_positive_tree_distribution(dataset: pd.DataFrame, n_trees=100, test_proportion=0.2, *, response_column=-1):
     # Processing: get covariates and responses, convert responses to binary classes, and split into train and test sets
     X, y = covariates_response_split(dataset, response_column)
+    X = coerce_nonnumeric_columns_to_numeric(X)
     y = to_binary_classifications(y)
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_proportion)
 
@@ -45,23 +55,31 @@ def estimate_positive_tree_distribution(dataset, n_trees=100, test_proportion=0.
     tree_predictions_for_pos = np.column_stack([tree.predict(X_test_pos) for tree in rf_classifier.estimators_])
     tree_predictions_for_neg = np.column_stack([tree.predict(X_test_neg) for tree in rf_classifier.estimators_])
     return (
+        len(y),
         np.sum(tree_predictions, axis=1),
         np.sum(tree_predictions_for_pos, axis=1),
         np.sum(tree_predictions_for_neg, axis=1)
     )
 
 
-if __name__ == "__main__":
-    n_trees = 1001
-    datasets = {
-        "Banknotes": np.loadtxt(fname=r"..\data\data_banknote_authentication.txt", delimiter=","),
-        "Breast Cancer": datasets.load_breast_cancer(),
-        "Iris": datasets.load_iris(),
-        "Wine": datasets.load_wine(),
-        "Digits": datasets.load_digits()
-    }
+def show_n_positive_distributions(n_trees, datasets):
+    fig, axs = plt.subplots(len(datasets), 3, tight_layout=True)
 
-    allowable_error_rates = [0, 0.0001, 0.001, 0.01, 0.05]
+    for i_dataset, (dataset_name, dataset) in enumerate(datasets.items()):
+        n_observations, *distributions = estimate_positive_tree_distribution(dataset, n_trees=n_trees)
+
+        for i_distribution, title_suffix in enumerate(
+                [f": {n_observations} observations", " (positive observations)", " (negative observations)"]
+        ):
+            ax = axs[i_dataset, i_distribution]
+            ax.hist(distributions[i_distribution])
+            ax.title.set_text(f"{dataset_name}{title_suffix}")
+            ax.set_xlim((0, n_trees))
+
+    plt.show()
+
+
+def show_error_rates_and_runtimes(n_trees, datasets, allowable_error_rates):
     envelopes = {
         aer: get_envelope_by_eb_greedily(n_trees, aer)
         for aer in allowable_error_rates
@@ -82,7 +100,7 @@ if __name__ == "__main__":
     cached_analyses = {}
 
     for i_dataset, (dataset_name, dataset) in enumerate(datasets.items()):
-        positive_tree_distribution, _, _ = estimate_positive_tree_distribution(dataset, n_trees=n_trees)
+        _, positive_tree_distribution, _, _ = estimate_positive_tree_distribution(dataset, n_trees=n_trees)
         weights = Counter(positive_tree_distribution)
 
         for n_positive_trees in range(n_trees + 1):
@@ -129,3 +147,18 @@ if __name__ == "__main__":
         )
 
     plt.show()
+
+
+def main():
+    n_trees = 1001
+    datasets = {
+        "Banknotes": pd.read_csv(r"..\data\data_banknote_authentication.txt"),
+        "Heart Attacks": pd.read_csv(r"..\data\heart_attack.csv"),
+        "Bank Loans": pd.read_excel(r"..\data\bank_loans.xlsb")
+    }
+
+    show_n_positive_distributions(n_trees, datasets)
+
+
+if __name__ == "__main__":
+    main()

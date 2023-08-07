@@ -2,9 +2,8 @@ import dataclasses
 import itertools
 import time
 
-import matplotlib.pyplot as plt
 import numpy as np
-from sklearn.utils import Bunch
+import pandas as pd
 
 
 def shift_array(arr, num, fill_value=np.nan):
@@ -69,19 +68,11 @@ def iter_unique_combinations(iterable, length):
             yield (item,) + combination
 
 
-def covariates_response_split(dataset, response_column=-1):
-    match dataset:
-        case (_, _):
-            return dataset
-        case Bunch():
-            return dataset.data, dataset.target
-        case np.ndarray():
-            if response_column < 0:
-                response_column = dataset.shape[1] + response_column
-            covariate_columns = tuple(j for j in range(dataset.shape[1]) if j != response_column)
-            return dataset[:, covariate_columns], dataset[:, response_column]
-        case _:
-            raise TypeError(f"expected dataset to be a Bunch, ndarray, or pair; got {dataset!r} instead")
+def covariates_response_split(dataset: pd.DataFrame, response_column=-1):
+    if response_column < 0:
+        response_column = dataset.shape[1] + response_column
+    covariate_columns = [j for j in range(dataset.shape[1]) if j != response_column]
+    return dataset.iloc[:, covariate_columns], dataset.iloc[:, response_column]
 
 
 def plot_function(ax, x_axis_arg_name, function, function_kwargs=None, plot_kwargs=None):
