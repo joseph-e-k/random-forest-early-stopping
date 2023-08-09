@@ -1,5 +1,3 @@
-import os
-
 import numpy as np
 from matplotlib import pyplot as plt
 from diskcache import Cache
@@ -38,17 +36,23 @@ def get_expected_run_proportion(n_total, prop_positive, allowable_error):
     return runtime / n_total
 
 
+def get_lower_envelope_at_proportion(n_total, proportional_step, allowable_error):
+    envelope = get_envelope_by_eb_greedily(n_total, allowable_error)
+    step = int(proportional_step * n_total)
+    return envelope[step][0] / step
+
+
 def main():
     ax = plt.subplot()
 
     plot_function_many_curves(
         ax=ax,
-        x_axis_arg_name="prop_positive",
+        x_axis_arg_name="proportional_step",
         distinct_curves_arg_name="n_total",
-        function=get_expected_run_proportion,
+        function=get_lower_envelope_at_proportion,
         function_kwargs=dict(
             n_total=[101, 1001],
-            prop_positive=np.linspace(0, 1, 1002),
+            proportional_step=np.linspace(1/101, 0.5, 1000),
             allowable_error=10**-3,
         ),
         plot_kwargs=None
