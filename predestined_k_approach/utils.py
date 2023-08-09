@@ -1,6 +1,7 @@
 import dataclasses
 import itertools
 import time
+from typing import Callable
 
 import numpy as np
 import pandas as pd
@@ -75,6 +76,13 @@ def covariates_response_split(dataset: pd.DataFrame, response_column=-1):
     return dataset.iloc[:, covariate_columns], dataset.iloc[:, response_column]
 
 
+def stringify_kwargs(kwargs: dict) -> str:
+    if not kwargs:
+        return ""
+
+    return ", ".join(f"{key}={value!r}" for key, value in kwargs.items())
+
+
 def plot_function(ax, x_axis_arg_name, function, function_kwargs=None, plot_kwargs=None):
     function_kwargs = function_kwargs or {}
     plot_kwargs = plot_kwargs or {}
@@ -85,9 +93,7 @@ def plot_function(ax, x_axis_arg_name, function, function_kwargs=None, plot_kwar
 
     title = function.__name__
     if function_kwargs:
-        title += " ("
-        title += ", ".join(f"{arg_name}={arg_value!r}" for (arg_name, arg_value) in function_kwargs.items())
-        title += ")"
+        title += f" ({stringify_kwargs(function_kwargs)})"
     ax.set_title(title)
 
     results = [None] * len(x_axis_arg_values)
@@ -112,5 +118,12 @@ def plot_function_many_curves(ax, x_axis_arg_name, distinct_curves_arg_name, fun
             function_kwargs | {distinct_curves_arg_name: distinct_curves_arg_value},
             plot_kwargs | dict(label=f"{distinct_curves_arg_name}={distinct_curves_arg_value}")
         )
+
+    title = function.__name__
+    if function_kwargs:
+        title_kwargs = function_kwargs
+        title_kwargs.pop(x_axis_arg_name)
+        title += f" ({stringify_kwargs(title_kwargs)})"
+    ax.set_title(title)
 
     ax.legend()
