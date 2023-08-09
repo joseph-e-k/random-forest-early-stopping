@@ -1,18 +1,13 @@
 from collections import Counter
-from functools import lru_cache
 from itertools import product
 
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
-
-from sklearn import datasets as sklearn_datasets
-from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
 
-from predestined_k_approach.Forest import Forest
-from predestined_k_approach.ForestWithEnvelope import ForestWithEnvelope
-from predestined_k_approach.optimization import get_envelope_by_eb_greedily
+from predestined_k_approach.eb_experiments import analyse_fwe_or_get_cached
 from predestined_k_approach.utils import covariates_response_split
 
 
@@ -80,11 +75,6 @@ def show_n_positive_distributions(n_trees, datasets):
 
 
 def show_error_rates_and_runtimes(n_trees, datasets, allowable_error_rates):
-    envelopes = {
-        aer: get_envelope_by_eb_greedily(n_trees, aer)
-        for aer in allowable_error_rates
-    }
-
     runtimes = {
         (i_dataset, aer): 0
         for (i_dataset, aer) in product(range(len(datasets)), allowable_error_rates)
@@ -97,8 +87,6 @@ def show_error_rates_and_runtimes(n_trees, datasets, allowable_error_rates):
 
     fig, axs = plt.subplots(2, 1, tight_layout=True)
 
-    cached_analyses = {}
-
     for i_dataset, (dataset_name, dataset) in enumerate(datasets.items()):
         _, positive_tree_distribution, _, _ = estimate_positive_tree_distribution(dataset, n_trees=n_trees)
         weights = Counter(positive_tree_distribution)
@@ -109,14 +97,7 @@ def show_error_rates_and_runtimes(n_trees, datasets, allowable_error_rates):
                 continue
 
             for allowable_error_rate in allowable_error_rates:
-                analysis_key = n_trees, n_positive_trees, allowable_error_rate
-                try:
-                    analysis = cached_analyses[analysis_key]
-                except KeyError:
-                    fwe = ForestWithEnvelope.create(n_trees, n_positive_trees, envelopes[allowable_error_rate])
-                    analysis = fwe.analyse()
-                    cached_analyses[analysis_key] = analysis
-
+                analysis = analyse_fwe_or_get_cached(n_trees, n_positive_trees, allowable_error_rate)
                 runtimes[i_dataset, allowable_error_rate] += analysis.expected_runtime * weight / weights.total()
                 error_rates[i_dataset, allowable_error_rate] += analysis.prob_error * weight / weights.total()
 
@@ -157,7 +138,7 @@ def main():
         "Bank Loans": pd.read_excel(r"..\data\bank_loans.xlsb")
     }
 
-    show_n_positive_distributions(n_trees, datasets)
+    show_error_rates_and_runtimes(n_trees, datasets, [0, 10**-4, 10**-3, 10**-2])
 
 
 if __name__ == "__main__":

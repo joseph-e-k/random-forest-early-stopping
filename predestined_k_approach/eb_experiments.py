@@ -2,7 +2,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from diskcache import Cache
 
-from predestined_k_approach.ForestWithEnvelope import ForestWithEnvelope
+from predestined_k_approach.ForestWithEnvelope import ForestWithEnvelope, ForestAnalysis
 from predestined_k_approach.optimization import get_envelope_by_eb_greedily
 from predestined_k_approach.utils import plot_function_many_curves
 
@@ -11,10 +11,18 @@ cache = Cache("./.cache")
 
 
 @cache.memoize()
-def get_expected_runtime(n_total, n_positive, allowable_error):
+def analyse_fwe_or_get_cached(n_total, n_positive, allowable_error) -> ForestAnalysis:
     envelope = get_envelope_by_eb_greedily(n_total, allowable_error)
     fwe = ForestWithEnvelope.create(n_total, n_positive, envelope)
-    return fwe.analyse().expected_runtime
+    return fwe.analyse()
+
+
+def get_expected_runtime(n_total, n_positive, allowable_error):
+    return analyse_fwe_or_get_cached(n_total, n_positive, allowable_error).expected_runtime
+
+
+def get_prob_error(n_total, n_positive, allowable_error):
+    return analyse_fwe_or_get_cached(n_total, n_positive, allowable_error).prob_error
 
 
 def get_expected_run_proportion(n_total, prop_positive, allowable_error):
@@ -47,12 +55,12 @@ def main():
 
     plot_function_many_curves(
         ax=ax,
-        x_axis_arg_name="proportional_step",
+        x_axis_arg_name="prop_positive",
         distinct_curves_arg_name="n_total",
-        function=get_lower_envelope_at_proportion,
+        function=get_expected_run_proportion,
         function_kwargs=dict(
             n_total=[101, 1001],
-            proportional_step=np.linspace(1/101, 0.5, 1000),
+            prop_positive=np.linspace(1/101, 0.5, 1000),
             allowable_error=10**-3,
         ),
         plot_kwargs=None
