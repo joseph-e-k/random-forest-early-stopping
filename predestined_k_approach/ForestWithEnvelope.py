@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import random
 
 import numpy as np
 
@@ -118,6 +119,24 @@ class ForestWithEnvelope:
         update_start_index = len(self.envelope) - len(envelope_suffix)
         self.envelope[update_start_index:] = envelope_suffix
         self._invalidate_state_probabilities(start_index=update_start_index)
+
+    def simulate(self) -> tuple[int, bool]:
+        trees = np.zeros(self.n_total)
+        which_positive = random.sample(range(self.n_total), self.n_total_positive)
+        trees[which_positive] = 1
+
+        n_positive_seen = 0
+
+        for n_seen, next_tree in enumerate(trees):
+            lower_bound, upper_bound = self.envelope[n_seen]
+            if n_positive_seen < lower_bound:
+                return n_seen, False
+            if n_positive_seen > upper_bound:
+                return n_seen, True
+
+            n_positive_seen += next_tree
+
+        return self.n_total, (n_positive_seen > self.n_total / 2)
 
 
 @dataclasses.dataclass(frozen=True)

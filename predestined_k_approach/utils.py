@@ -145,3 +145,7 @@ def plot_function_many_curves(ax, x_axis_arg_name, distinct_curves_arg_name, fun
 
 def rolling_average(numbers, window_length):
     return np.convolve(numbers, np.ones(window_length), "valid") / window_length
+
+
+def is_deviant_value(expectation, reality, prop_deviation=0.1):
+    return not (expectation * (1 - prop_deviation) < reality < expectation * (1 + prop_deviation))
