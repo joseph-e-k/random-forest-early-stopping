@@ -4,13 +4,13 @@ from diskcache import Cache
 
 from predestined_k_approach.ForestWithEnvelope import ForestWithEnvelope, ForestAnalysis
 from predestined_k_approach.optimization import get_envelope_by_eb_greedily
-from predestined_k_approach.utils import plot_function_many_curves
-
+from predestined_k_approach.utils import plot_function_many_curves, plot_function, timed, rolling_average
 
 cache = Cache("./.cache")
 
 
 @cache.memoize()
+@timed
 def analyse_fwe_or_get_cached(n_total, n_positive, allowable_error) -> ForestAnalysis:
     envelope = get_envelope_by_eb_greedily(n_total, allowable_error)
     fwe = ForestWithEnvelope.create(n_total, n_positive, envelope)
@@ -53,18 +53,23 @@ def get_lower_envelope_at_proportion(n_total, proportional_step, allowable_error
 def main():
     ax = plt.subplot()
 
-    plot_function_many_curves(
+    window_length = 100
+
+    plot_function(
         ax=ax,
-        x_axis_arg_name="prop_positive",
-        distinct_curves_arg_name="n_total",
+        x_axis_arg_name="n_total",
         function=get_expected_run_proportion,
         function_kwargs=dict(
-            n_total=[101, 1001],
-            prop_positive=np.linspace(1/101, 0.5, 1000),
+            n_total=list(range(101, 5_001 + 1, 2)),
+            prop_positive=0.1,
             allowable_error=10**-3,
         ),
-        plot_kwargs=None
+        plot_kwargs=None,
+        results_transform=lambda ys: rolling_average(ys, window_length),
+        x_axis_values_transform=lambda xs: xs[window_length-1:]
     )
+
+    ax.grid(visible=True)
 
     plt.show()
 

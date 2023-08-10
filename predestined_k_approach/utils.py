@@ -1,7 +1,8 @@
 import dataclasses
+import functools
+import inspect
 import itertools
 import time
-from typing import Callable
 
 import numpy as np
 import pandas as pd
@@ -45,6 +46,15 @@ class TimerContext:
             print(message)
 
 
+def timed(function):
+    @functools.wraps(function)
+    def function_wrapper(*args, **kwargs):
+        bound_sig = inspect.signature(function).bind(*args, **kwargs)
+        with TimerContext(f"{function.__name__}({stringify_kwargs(bound_sig.arguments)})"):
+            return function(*args, **kwargs)
+    return function_wrapper
+
+
 def powerset(iterable, max_size=None):
     items = list(iterable)
 
@@ -83,11 +93,12 @@ def stringify_kwargs(kwargs: dict) -> str:
     return ", ".join(f"{key}={value!r}" for key, value in kwargs.items())
 
 
-def plot_function(ax, x_axis_arg_name, function, function_kwargs=None, plot_kwargs=None):
+def plot_function(ax, x_axis_arg_name, function, function_kwargs=None, plot_kwargs=None, results_transform=lambda y: y,
+                  x_axis_values_transform=lambda x: x):
     function_kwargs = function_kwargs or {}
     plot_kwargs = plot_kwargs or {}
 
-    x_axis_arg_values = function_kwargs.pop(x_axis_arg_name)
+    x_axis_values = function_kwargs.pop(x_axis_arg_name)
 
     ax.set_xlabel(x_axis_arg_name)
 
@@ -96,12 +107,15 @@ def plot_function(ax, x_axis_arg_name, function, function_kwargs=None, plot_kwar
         title += f" ({stringify_kwargs(function_kwargs)})"
     ax.set_title(title)
 
-    results = [None] * len(x_axis_arg_values)
+    results = np.zeros(len(x_axis_values))
 
-    for i, x_axis_arg_value in enumerate(x_axis_arg_values):
-        results[i] = function(**(function_kwargs | {x_axis_arg_name: x_axis_arg_value}))
+    for i, x_axis_value in enumerate(x_axis_values):
+        results[i] = function(**(function_kwargs | {x_axis_arg_name: x_axis_value}))
 
-    ax.plot(x_axis_arg_values, results, **plot_kwargs)
+    results = results_transform(results)
+    x_axis_values = x_axis_values_transform(x_axis_values)
+
+    ax.plot(x_axis_values, results, **plot_kwargs)
 
 
 def plot_function_many_curves(ax, x_axis_arg_name, distinct_curves_arg_name, function, function_kwargs, plot_kwargs):
@@ -127,3 +141,7 @@ def plot_function_many_curves(ax, x_axis_arg_name, distinct_curves_arg_name, fun
     ax.set_title(title)
 
     ax.legend()
+
+
+def rolling_average(numbers, window_length):
+    return np.convolve(numbers, np.ones(window_length), "valid") / window_length
