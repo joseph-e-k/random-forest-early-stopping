@@ -73,8 +73,11 @@ class ForestWithEnvelope:
                 1,
                 fill_value=-np.inf
             )
-            next_log_state_probabilities = np.logaddexp(log_prob_by_bad_observation, log_prob_by_good_observation)
-            self._log_state_probabilities[i_step, :] = next_log_state_probabilities
+            np.logaddexp(
+                log_prob_by_bad_observation,
+                log_prob_by_good_observation,
+                out=self._log_state_probabilities[i_step, :]
+            )
 
         self._i_last_valid_state_probabilities = end_index
 
