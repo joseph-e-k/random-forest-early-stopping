@@ -45,8 +45,6 @@ class ForestWithEnvelope:
         self._log_state_probabilities[0, 0] = np.log(1)
         self._i_last_valid_state_probabilities = 0
 
-        self._recompute_state_probabilities()
-
     @classmethod
     def create(cls, n_total, n_total_positive, envelope=None):
         forest = Forest(n_total, n_total_positive)
@@ -67,9 +65,12 @@ class ForestWithEnvelope:
 
         for i_step in range(start_index, end_index + 1):
             prev_lower_bound, prev_upper_bound = self.envelope[i_step - 1]
-            log_prev_is_nonterminal = np.log(np.array(
-                [(int(prev_lower_bound <= v <= prev_upper_bound)) for v in range(self._n_values)]
-            ))
+            prev_is_nonterminal = np.concatenate([
+                np.zeros(prev_lower_bound),
+                np.ones(prev_upper_bound - prev_lower_bound + 1),
+                np.zeros(self._n_values - 1 - prev_upper_bound)
+            ])
+            log_prev_is_nonterminal = np.log(prev_is_nonterminal)
             nonterminal_prev_log_prob = self._log_state_probabilities[i_step - 1] + log_prev_is_nonterminal
             log_prob_by_bad_observation = nonterminal_prev_log_prob + self._log_prob_see_bad[i_step - 1, :]
             log_prob_by_good_observation = shift_array(
