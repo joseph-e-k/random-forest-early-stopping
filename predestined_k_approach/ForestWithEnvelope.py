@@ -24,7 +24,7 @@ class ForestWithEnvelope:
 
     def __post_init__(self):
         self._n_steps = self.n_total + 1
-        self._n_values = self.n_total + 1
+        self._n_values = self.n_total_positive + 1
 
         self._n_good = self.n_total_positive
         self._n_bad = self.n_total - self._n_good
@@ -64,12 +64,7 @@ class ForestWithEnvelope:
             end_index = self._n_steps - 1
 
         for i_step in range(start_index, end_index + 1):
-            prev_lower_bound, prev_upper_bound = self.envelope[i_step - 1]
-            prev_is_nonterminal = np.concatenate([
-                np.zeros(prev_lower_bound),
-                np.ones(prev_upper_bound - prev_lower_bound + 1),
-                np.zeros(self._n_values - 1 - prev_upper_bound)
-            ])
+            prev_is_nonterminal = self._get_mask_for_bounds(self._n_values, *self.envelope[i_step - 1])
             log_prev_is_nonterminal = np.log(prev_is_nonterminal)
             nonterminal_prev_log_prob = self._log_state_probabilities[i_step - 1] + log_prev_is_nonterminal
             log_prob_by_bad_observation = nonterminal_prev_log_prob + self._log_prob_see_bad[i_step - 1, :]
@@ -83,7 +78,32 @@ class ForestWithEnvelope:
 
         self._i_last_valid_state_probabilities = end_index
 
+    @staticmethod
+    def _get_mask_for_bounds(size, lower, upper):
+        effective_lower = np.clip(lower, 0, size)
+        lower_mask = np.concatenate([
+            np.zeros(effective_lower),
+            np.ones(size - effective_lower)
+        ])
+
+        effective_upper = np.clip(upper, -1, size - 1)
+        upper_mask = np.concatenate([
+            np.ones(effective_upper + 1),
+            np.zeros(size - effective_upper - 1)
+        ])
+
+        return np.logical_and(lower_mask, upper_mask)
+
     def get_state_probability(self, n_seen, n_seen_good):
+        if any([
+            n_seen < 0,
+            n_seen_good < 0,
+            n_seen > self.n_total,
+            n_seen_good > self.n_total_positive,
+            n_seen_good > n_seen
+        ]):
+            return 0
+
         self._recompute_state_probabilities(n_seen)
         return np.exp(self._log_state_probabilities[n_seen, n_seen_good])
 
@@ -99,18 +119,15 @@ class ForestWithEnvelope:
 
         for n_seen in range(self.n_steps - 1):
             lower_bound, upper_bound = self.envelope[n_seen]
-            terminal_values = []
-            if lower_bound > 0:
-                terminal_values.append(lower_bound - 1)
-            if upper_bound < self.n_steps:
-                terminal_values.append(upper_bound + 1)
+            terminal_values = [lower_bound - 1, upper_bound + 1]
 
             for n_seen_positive in terminal_values:
-                prob_state = np.exp(self._log_state_probabilities[n_seen][n_seen_positive])
-                expected_runtime += n_seen * prob_state
+                if 0 <= n_seen_positive <= self.n_total_positive:
+                    prob_state = np.exp(self._log_state_probabilities[n_seen, n_seen_positive])
+                    expected_runtime += n_seen * prob_state
 
-                if self.get_state_result(n_seen, n_seen_positive) != self.result:
-                    prob_error += prob_state
+                    if self.get_state_result(n_seen, n_seen_positive) != self.result:
+                        prob_error += prob_state
 
         for n_seen_positive in range(self.n_total_positive + 1):
             expected_runtime += self.n_total * np.exp(self._log_state_probabilities[self.n_total, n_seen_positive])
