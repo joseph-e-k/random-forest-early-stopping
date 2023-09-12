@@ -40,8 +40,10 @@ class ForestWithEnvelope:
         self._log_prob_see_good = np.log(self._n_unseen_good / self._n_unseen)
         self._log_prob_see_bad = np.log(self._n_unseen_bad / self._n_unseen)
 
-        self._log_state_probabilities = [np.log(np.zeros(shape=self.n_total + 1))]
-        self._log_state_probabilities[0][0] = np.log(1)
+        self._log_state_probabilities = np.empty(shape=(self._n_steps, self._n_values))
+        self._log_state_probabilities[0, :] = np.log(np.zeros(shape=self._n_values))
+        self._log_state_probabilities[0, 0] = np.log(1)
+        self._i_last_valid_state_probabilities = 0
 
         self._recompute_state_probabilities()
 
@@ -55,20 +57,20 @@ class ForestWithEnvelope:
         return cls(forest, envelope)
 
     def _invalidate_state_probabilities(self, start_index=0):
-        del self._log_state_probabilities[start_index + 1:]
+        self._i_last_valid_state_probabilities = start_index
 
     def _recompute_state_probabilities(self, end_index=None):
-        start_index = len(self._log_state_probabilities)
+        start_index = self._i_last_valid_state_probabilities + 1
 
         if end_index is None:
-            end_index = self._n_steps
+            end_index = self._n_steps - 1
 
-        for i_step in range(start_index, end_index):
-            prev_lower_bound, prev_upper_bound = self.envelope[i_step-1]
-            log_prev_is_nonterminal = np.array(
-                [np.log(int(prev_lower_bound <= v <= prev_upper_bound)) for v in range(self._n_values)]
-            )
-            nonterminal_prev_log_prob = self._log_state_probabilities[-1] + log_prev_is_nonterminal
+        for i_step in range(start_index, end_index + 1):
+            prev_lower_bound, prev_upper_bound = self.envelope[i_step - 1]
+            log_prev_is_nonterminal = np.log(np.array(
+                [(int(prev_lower_bound <= v <= prev_upper_bound)) for v in range(self._n_values)]
+            ))
+            nonterminal_prev_log_prob = self._log_state_probabilities[i_step - 1] + log_prev_is_nonterminal
             log_prob_by_bad_observation = nonterminal_prev_log_prob + self._log_prob_see_bad[i_step - 1, :]
             log_prob_by_good_observation = shift_array(
                 nonterminal_prev_log_prob + self._log_prob_see_good[i_step - 1, :],
@@ -76,11 +78,13 @@ class ForestWithEnvelope:
                 fill_value=-np.inf
             )
             next_log_state_probabilities = np.logaddexp(log_prob_by_bad_observation, log_prob_by_good_observation)
-            self._log_state_probabilities.append(next_log_state_probabilities)
+            self._log_state_probabilities[i_step, :] = next_log_state_probabilities
+
+        self._i_last_valid_state_probabilities = end_index
 
     def get_state_probability(self, n_seen, n_seen_good):
-        self._recompute_state_probabilities(n_seen + 1)
-        return np.exp(self._log_state_probabilities[n_seen][n_seen_good])
+        self._recompute_state_probabilities(n_seen)
+        return np.exp(self._log_state_probabilities[n_seen, n_seen_good])
 
     @staticmethod
     def get_state_result(n_seen, n_seen_good):
@@ -108,7 +112,7 @@ class ForestWithEnvelope:
                     prob_error += prob_state
 
         for n_seen_positive in range(self.n_total_positive + 1):
-            expected_runtime += self.n_total * np.exp(self._log_state_probabilities[self.n_total][n_seen_positive])
+            expected_runtime += self.n_total * np.exp(self._log_state_probabilities[self.n_total, n_seen_positive])
 
         return ForestAnalysis(
             prob_error=prob_error,
