@@ -118,7 +118,8 @@ def plot_function(ax, x_axis_arg_name, function, function_kwargs=None, plot_kwar
     ax.plot(x_axis_values, results, **plot_kwargs)
 
 
-def plot_function_many_curves(ax, x_axis_arg_name, distinct_curves_arg_name, function, function_kwargs, plot_kwargs):
+def plot_function_many_curves(ax, x_axis_arg_name, distinct_curves_arg_name, function,
+                              function_kwargs=None, plot_kwargs=None):
     function_kwargs = function_kwargs or {}
     plot_kwargs = plot_kwargs or {}
 
