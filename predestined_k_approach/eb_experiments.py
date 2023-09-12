@@ -1,10 +1,13 @@
+import random
+
 import numpy as np
 from matplotlib import pyplot as plt
 from diskcache import Cache
 
 from predestined_k_approach.ForestWithEnvelope import ForestWithEnvelope, ForestAnalysis
 from predestined_k_approach.optimization import get_envelope_by_eb_greedily
-from predestined_k_approach.utils import plot_function_many_curves, plot_function, timed, rolling_average
+from predestined_k_approach.utils import plot_function_many_curves, plot_function, timed, rolling_average, TimerContext, \
+    is_deviant_value
 
 cache = Cache("./.cache")
 
@@ -50,30 +53,66 @@ def get_lower_envelope_at_proportion(n_total, proportional_step, allowable_error
     return envelope[step][0] / step
 
 
-def main():
-    ax = plt.subplot()
+def simulation_scatterplot():
+    random.seed(10259)
 
-    window_length = 1
-    n_total_min = 11
-    n_total_max = 9001
-    prop_positive = 0.25
-    allowable_error_rates = [0]
+    fig, (ax_runtimes, ax_error_rates) = plt.subplots(1, 2)
 
-    plot_function_many_curves(
-        ax=ax,
-        x_axis_arg_name="n_total",
-        distinct_curves_arg_name="allowable_error",
-        function=get_expected_run_proportion,
-        function_kwargs=dict(
-            n_total=list(range(n_total_min, n_total_max + 1, 2)),
-            prop_positive=prop_positive,
-            allowable_error=allowable_error_rates,
-        ),
-    )
+    n_forests = 100
+    n_simulations_per_forest = 10_000
+    min_n_trees = 11
+    max_n_trees = 1001
 
-    ax.grid(visible=True)
+    expected_runtimes = np.zeros(n_forests)
+    expected_error_rates = np.zeros(n_forests)
+    observed_mean_runtimes = np.zeros(n_forests)
+    observed_error_rates = np.zeros(n_forests)
+
+    for i_forest in range(n_forests):
+        with TimerContext(f"Forest #{i_forest + 1}"):
+            n_trees = random.choice(range(min_n_trees, max_n_trees + 1, 2))
+            n_positive_trees = random.choice(range(n_trees))
+            allowable_error = random.random() * 0.05
+
+            print(f"Forest {i_forest + 1} / {n_forests}: {n_trees=}, {n_positive_trees=}, {allowable_error=}")
+
+            envelope = get_envelope_by_eb_greedily(n_trees, allowable_error)
+
+            fwe = ForestWithEnvelope.create(n_trees, n_positive_trees, envelope)
+
+            correct_result = (n_positive_trees > n_trees / 2)
+
+            runtimes = np.zeros(n_simulations_per_forest)
+            results = np.zeros(n_simulations_per_forest)
+
+            expected_runtime = expected_runtimes[i_forest] = fwe.analyse().expected_runtime
+            expected_error_rate = expected_error_rates[i_forest] = fwe.analyse().prob_error
+
+            for i_simulation in range(n_simulations_per_forest):
+                runtimes[i_simulation], results[i_simulation] = fwe.simulate()
+
+            observed_mean_runtime = observed_mean_runtimes[i_forest] = np.mean(runtimes)
+            observed_error_rate = observed_error_rates[i_forest] = np.mean(results != correct_result)
+
+            is_runtime_deviant = is_deviant_value(expected_runtime, observed_mean_runtime)
+            is_error_rate_deviant = is_deviant_value(expected_error_rate, observed_error_rate)
+
+            print(f"  {'* ' if is_runtime_deviant else ''}Runtime: E = {expected_runtime}, O = {observed_mean_runtime}")
+            print(f"  {'* ' if is_error_rate_deviant else ''}Error rate: E = {expected_error_rate}, O = {observed_error_rate}")
+
+    ax_runtimes.title.set_text("Runtimes")
+    ax_runtimes.scatter(expected_runtimes, observed_mean_runtimes)
+    ax_runtimes.plot([min_n_trees, max_n_trees], [min_n_trees, max_n_trees], linestyle="-")
+
+    ax_error_rates.title.set_text("Error Rates")
+    ax_error_rates.scatter(expected_error_rates, observed_error_rates)
+    ax_error_rates.plot([0, max(expected_error_rates)], [0, max(expected_error_rates)], linestyle="-")
 
     plt.show()
+
+
+def main():
+    simulation_scatterplot()
 
 
 if __name__ == "__main__":
