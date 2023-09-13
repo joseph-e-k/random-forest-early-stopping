@@ -1,65 +1,36 @@
 from __future__ import annotations
 
-from typing import TypeAlias
+import numpy as np
 
-Envelope: TypeAlias = list[tuple[int, int]]
+from typing import TypeAlias, Iterable
 
-
-def get_null_envelope(n_total) -> Envelope:
-    return fill_boundary_to_envelope(n_total, [0], is_upper=False)
-
-
-def fill_lower_boundary(n_total, partial_boundary: list[int]) -> list[int]:
-    n_steps = n_total + 1
-    return partial_boundary + [partial_boundary[-1]] * (n_steps - len(partial_boundary))
+Envelope: TypeAlias = np.ndarray  # array of nonnegative ints with shape (n, 2) for some n
+Boundary: TypeAlias = np.ndarray  # 1-d array of nonnegative ints
 
 
-def fill_upper_boundary(n_total, partial_boundary: list[int]) -> list[int]:
-    n_steps = n_total + 1
-    return partial_boundary + [
-        partial_boundary[-1] + i + 1
-        for i in range(n_steps - len(partial_boundary))
-    ]
+def fill_lower_boundary(partial_boundary: Boundary, n_valid_bounds: int) -> None:
+    partial_boundary[n_valid_bounds:] = partial_boundary[n_valid_bounds - 1]
 
 
-def fill_boundary(n_total, partial_boundary: list[int], is_upper: bool) -> list[int]:
+def fill_upper_boundary(partial_boundary: Boundary, n_valid_bounds: int) -> None:
+    bump = partial_boundary[n_valid_bounds - 1] + 1
+    partial_boundary[n_valid_bounds:] = np.arange(len(partial_boundary) - n_valid_bounds) + bump
+
+
+def fill_boundary(partial_boundary: Boundary, n_valid_bounds: int, is_upper: bool) -> None:
     if is_upper:
-        return fill_upper_boundary(n_total, partial_boundary)
-    return fill_lower_boundary(n_total, partial_boundary)
-
-
-def fill_boundary_to_envelope(n_total, partial_boundary: list[int], is_upper: bool, symmetrical: bool = False) -> Envelope:
-    boundary = fill_boundary(n_total, partial_boundary, is_upper)
-
-    if symmetrical:
-        other_boundary = get_mirror_boundary(boundary)
+        fill_upper_boundary(partial_boundary, n_valid_bounds)
     else:
-        other_boundary = fill_boundary(n_total, [0], not is_upper)
-
-    if is_upper:
-        lower_boundary, upper_boundary = other_boundary, boundary
-    else:
-        lower_boundary, upper_boundary = boundary, other_boundary
-
-    return list(zip(lower_boundary, upper_boundary))
+        fill_lower_boundary(partial_boundary, n_valid_bounds)
 
 
-def fill_envelope(n_total, partial_envelope: Envelope) -> Envelope:
-    partial_lower_boundary = [l for (l, u) in partial_envelope]
-    partial_upper_boundary = [u for (l, u) in partial_envelope]
-
-    lower_boundary = fill_lower_boundary(n_total, partial_lower_boundary)
-    upper_boundary = fill_upper_boundary(n_total, partial_upper_boundary)
-
-    return list(zip(lower_boundary, upper_boundary))
+def fill_envelope_by_partial_lower_boundary(envelope: Envelope, n_valid_bounds: int) -> None:
+    fill_boundary(envelope[:, 0], n_valid_bounds, is_upper=False)
+    fill_mirror_boundary(envelope[:, 1], envelope[:, 0])
 
 
-def get_mirror_boundary(boundary: list[int]) -> list[int]:
-    return [
-        i_step - bound
-        for i_step, bound
-        in enumerate(boundary)
-    ]
+def fill_mirror_boundary(dst: Boundary, src: Boundary) -> None:
+    dst[:] = np.arange(len(src)) - src
 
 
 def envelope_to_lower_bound_increments(envelope):
@@ -72,14 +43,20 @@ def envelope_to_lower_bound_increments(envelope):
     return increments
 
 
-def increments_to_symmetric_envelope(n_total, increments):
-    lower_boundary = [0]
+def increments_to_symmetric_envelope(n_total: int, increments: Iterable[int]) -> Envelope:
+    envelope = np.empty((n_total + 1, 2), dtype=int)
+    lower_boundary = envelope[:, 0]
+    lower_boundary[0] = 0
+    i_bound = 1
 
-    for index in increments:
-        last_bound = lower_boundary[-1]
-        lower_boundary += [last_bound] * (index - len(lower_boundary)) + [last_bound + 1]
+    for i_increment in increments:
+        last_bound = lower_boundary[i_bound - 1]
+        lower_boundary[i_bound:i_increment] = last_bound
+        lower_boundary[i_increment] = last_bound + 1
+        i_bound = i_increment + 1
 
-    return fill_boundary_to_envelope(n_total, lower_boundary, is_upper=False, symmetrical=True)
+    fill_envelope_by_partial_lower_boundary(envelope, i_bound)
+    return envelope
 
 
 def describe_envelope(envelope):

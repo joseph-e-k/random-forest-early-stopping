@@ -6,7 +6,7 @@ import random
 import numpy as np
 
 from .Forest import Forest
-from .envelopes import Envelope, get_null_envelope
+from .envelopes import Envelope
 from .utils import shift_array
 
 
@@ -48,10 +48,6 @@ class ForestWithEnvelope:
     @classmethod
     def create(cls, n_total, n_total_positive, envelope=None):
         forest = Forest(n_total, n_total_positive)
-
-        if envelope is None:
-            envelope = get_null_envelope(n_total)
-
         return cls(forest, envelope)
 
     def _invalidate_state_probabilities(self, start_index=0):
