@@ -8,6 +8,13 @@ Envelope: TypeAlias = np.ndarray  # array of nonnegative ints with shape (n, 2) 
 Boundary: TypeAlias = np.ndarray  # 1-d array of nonnegative ints
 
 
+def get_null_envelope(n_total) -> Envelope:
+    envelope = np.empty((n_total + 1, 2), dtype=int)
+    envelope[0, 0] = 0
+    fill_envelope_by_partial_lower_boundary(envelope, 1)
+    return envelope
+
+
 def fill_lower_boundary(partial_boundary: Boundary, n_valid_bounds: int) -> None:
     partial_boundary[n_valid_bounds:] = partial_boundary[n_valid_bounds - 1]
 
@@ -48,12 +55,13 @@ def increments_to_symmetric_envelope(n_total: int, increments: Iterable[int]) ->
     lower_boundary = envelope[:, 0]
     lower_boundary[0] = 0
     i_bound = 1
+    last_bound = 0
 
     for i_increment in increments:
-        last_bound = lower_boundary[i_bound - 1]
         lower_boundary[i_bound:i_increment] = last_bound
         lower_boundary[i_increment] = last_bound + 1
         i_bound = i_increment + 1
+        last_bound += 1
 
     fill_envelope_by_partial_lower_boundary(envelope, i_bound)
     return envelope
