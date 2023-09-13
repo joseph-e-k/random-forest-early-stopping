@@ -67,6 +67,11 @@ def increments_to_symmetric_envelope(n_total: int, increments: Iterable[int]) ->
     return envelope
 
 
+def add_increment_to_envelope(envelope: Envelope, increment_index: int) -> None:
+    envelope[increment_index:, 0] += 1
+    envelope[increment_index:, 1] -= 1
+
+
 def describe_envelope(envelope):
     lower_boundary = [bounds[0] for bounds in envelope]
 

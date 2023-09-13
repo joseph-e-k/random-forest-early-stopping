@@ -4,9 +4,10 @@ import dataclasses
 import random
 
 import numpy as np
+from scipy.special import logsumexp
 
 from .Forest import Forest
-from .envelopes import Envelope, get_null_envelope
+from .envelopes import Envelope, get_null_envelope, add_increment_to_envelope
 from .utils import shift_array
 
 
@@ -65,7 +66,7 @@ class ForestWithEnvelope:
         for i_step in range(start_index, end_index + 1):
             prev_is_nonterminal = self._get_mask_for_bounds(self._n_values, *self.envelope[i_step - 1])
             log_prev_is_nonterminal = np.log(prev_is_nonterminal)
-            nonterminal_prev_log_prob = self._log_state_probabilities[i_step - 1] + log_prev_is_nonterminal
+            nonterminal_prev_log_prob = self._log_state_probabilities[i_step - 1, :] + log_prev_is_nonterminal
             log_prob_by_bad_observation = nonterminal_prev_log_prob + self._log_prob_see_bad[i_step - 1, :]
             log_prob_by_good_observation = shift_array(
                 nonterminal_prev_log_prob + self._log_prob_see_good[i_step - 1, :],
@@ -96,7 +97,7 @@ class ForestWithEnvelope:
 
         return np.logical_and(lower_mask, upper_mask)
 
-    def get_state_probability(self, n_seen, n_seen_good):
+    def get_log_state_probability(self, n_seen, n_seen_good):
         if any([
             n_seen < 0,
             n_seen_good < 0,
@@ -104,10 +105,10 @@ class ForestWithEnvelope:
             n_seen_good > self.n_total_positive,
             n_seen_good > n_seen
         ]):
-            return 0
+            return -np.inf
 
         self._recompute_state_probabilities(n_seen)
-        return np.exp(self._log_state_probabilities[n_seen, n_seen_good])
+        return self._log_state_probabilities[n_seen, n_seen_good]
 
     @staticmethod
     def get_state_result(n_seen, n_seen_good):
@@ -116,8 +117,8 @@ class ForestWithEnvelope:
     def analyse(self) -> ForestAnalysis:
         self._recompute_state_probabilities()
 
-        prob_error = 0
-        expected_runtime = 0
+        state_weights_runtime = np.zeros_like(self._log_state_probabilities)
+        state_weights_error = np.zeros_like(self._log_state_probabilities)
 
         for n_seen in range(self.n_steps - 1):
             lower_bound, upper_bound = self.envelope[n_seen]
@@ -125,18 +126,19 @@ class ForestWithEnvelope:
 
             for n_seen_positive in terminal_values:
                 if 0 <= n_seen_positive <= self.n_total_positive:
-                    prob_state = np.exp(self._log_state_probabilities[n_seen, n_seen_positive])
-                    expected_runtime += n_seen * prob_state
+                    state_weights_runtime[n_seen, n_seen_positive] = n_seen
 
                     if self.get_state_result(n_seen, n_seen_positive) != self.result:
-                        prob_error += prob_state
+                        state_weights_error[n_seen, n_seen_positive] = 1
 
-        for n_seen_positive in range(self.n_total_positive + 1):
-            expected_runtime += self.n_total * np.exp(self._log_state_probabilities[self.n_total, n_seen_positive])
+        state_weights_runtime[self.n_total, :] = self.n_total
+
+        log_prob_error = logsumexp(self._log_state_probabilities, b=state_weights_error)
+        log_expected_runtime = logsumexp(self._log_state_probabilities, b=state_weights_runtime)
 
         return ForestAnalysis(
-            prob_error=prob_error,
-            expected_runtime=expected_runtime
+            prob_error=np.exp(log_prob_error),
+            expected_runtime=np.exp(log_expected_runtime)
         )
 
     def get_score(self, allowable_error: float) -> float:
@@ -145,10 +147,9 @@ class ForestWithEnvelope:
         expected_points_per_run = (1 - analysis.prob_error) - error_weight * analysis.prob_error
         return expected_points_per_run / analysis.expected_runtime
 
-    def update_envelope_suffix(self, envelope_suffix: Envelope):
-        update_start_index = len(self.envelope) - len(envelope_suffix)
-        self.envelope[update_start_index:] = envelope_suffix
-        self._invalidate_state_probabilities(start_index=update_start_index)
+    def add_increment_to_envelope(self, increment_index: int):
+        add_increment_to_envelope(self.envelope, increment_index)
+        self._invalidate_state_probabilities(start_index=increment_index)
 
     def simulate(self) -> tuple[int, bool]:
         trees = np.zeros(self.n_total)
