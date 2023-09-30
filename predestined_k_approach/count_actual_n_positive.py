@@ -51,6 +51,7 @@ def estimate_positive_tree_distribution(dataset: pd.DataFrame, n_trees=100, test
     tree_predictions_for_neg = np.column_stack([tree.predict(X_test_neg) for tree in rf_classifier.estimators_])
     return (
         len(y),
+        sum(y),
         np.sum(tree_predictions, axis=1),
         np.sum(tree_predictions_for_pos, axis=1),
         np.sum(tree_predictions_for_neg, axis=1)
@@ -61,11 +62,13 @@ def show_n_positive_distributions(n_trees, datasets):
     fig, axs = plt.subplots(len(datasets), 3, tight_layout=True)
 
     for i_dataset, (dataset_name, dataset) in enumerate(datasets.items()):
-        n_observations, *distributions = estimate_positive_tree_distribution(dataset, n_trees=n_trees)
+        n_observations, n_positive_observations, *distributions = estimate_positive_tree_distribution(dataset, n_trees)
 
-        for i_distribution, title_suffix in enumerate(
-                [f": {n_observations} observations", " (positive observations)", " (negative observations)"]
-        ):
+        for i_distribution, title_suffix in enumerate([
+            f": {n_observations} observations (of which {n_positive_observations} positive)",
+            " (positive observations)",
+            " (negative observations)"
+        ]):
             ax = axs[i_dataset, i_distribution]
             ax.hist(distributions[i_distribution])
             ax.title.set_text(f"{dataset_name}{title_suffix}")
@@ -88,7 +91,7 @@ def show_error_rates_and_runtimes(n_trees, datasets, allowable_error_rates):
     fig, axs = plt.subplots(2, 1, tight_layout=True)
 
     for i_dataset, (dataset_name, dataset) in enumerate(datasets.items()):
-        _, positive_tree_distribution, _, _ = estimate_positive_tree_distribution(dataset, n_trees=n_trees)
+        _, _, positive_tree_distribution, _, _ = estimate_positive_tree_distribution(dataset, n_trees=n_trees)
         weights = Counter(positive_tree_distribution)
 
         for n_positive_trees in range(n_trees + 1):
@@ -135,10 +138,11 @@ def main():
     datasets = {
         "Banknotes": pd.read_csv(r"..\data\data_banknote_authentication.txt"),
         "Heart Attacks": pd.read_csv(r"..\data\heart_attack.csv"),
-        "Bank Loans": pd.read_excel(r"..\data\bank_loans.xlsb")
+        "Salaries": pd.read_csv(r"..\data\adult.data"),
+        "Dry Beans": pd.read_excel(r"..\data\dry_beans.xlsx")
     }
 
-    show_error_rates_and_runtimes(n_trees, datasets, [0, 10**-4, 10**-3, 10**-2])
+    show_n_positive_distributions(n_trees, datasets)
 
 
 if __name__ == "__main__":
