@@ -118,6 +118,25 @@ def plot_function(ax, x_axis_arg_name, function, function_kwargs=None, plot_kwar
     ax.plot(x_axis_values, results, **plot_kwargs)
 
 
+def plot_functions(ax, x_axis_arg_name, functions, function_kwargs=None, plot_kwargs=None,
+                   results_transform=lambda y: y,
+                   x_axis_values_transform=lambda x: x):
+    if plot_kwargs is None:
+        plot_kwargs = {}
+
+    for function in functions:
+        plot_function(ax, x_axis_arg_name, function, dict(function_kwargs), plot_kwargs | dict(label=function.__name__),
+                      results_transform, x_axis_values_transform)
+
+    title = ", ".join(function.__name__ for function in functions)
+    if function_kwargs:
+        function_kwargs.pop(x_axis_arg_name)
+        title += f" ({stringify_kwargs(function_kwargs)})"
+    ax.set_title(title)
+
+    ax.legend()
+
+
 def plot_function_many_curves(ax, x_axis_arg_name, distinct_curves_arg_name, function,
                               function_kwargs=None, plot_kwargs=None):
     function_kwargs = function_kwargs or {}
@@ -136,7 +155,7 @@ def plot_function_many_curves(ax, x_axis_arg_name, distinct_curves_arg_name, fun
 
     title = function.__name__
     if function_kwargs:
-        title_kwargs = function_kwargs
+        title_kwargs = dict(function_kwargs)
         title_kwargs.pop(x_axis_arg_name)
         title += f" ({stringify_kwargs(title_kwargs)})"
     ax.set_title(title)
