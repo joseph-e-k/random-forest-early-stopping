@@ -16,8 +16,6 @@ class ForestWithEnvelope:
     forest: Forest
     envelope: Envelope
 
-    _state_probabilities: list[np.ndarray] = dataclasses.field(init=False, repr=False, compare=False, hash=False)
-
     n_total = property(lambda self: self.forest.n_total)
     n_total_positive = property(lambda self: self.forest.n_total_positive)
     result = property(lambda self: self.forest.result)
