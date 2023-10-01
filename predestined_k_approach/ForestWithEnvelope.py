@@ -108,6 +108,10 @@ class ForestWithEnvelope:
         self._recompute_state_probabilities(n_seen)
         return self._log_state_probabilities[n_seen, n_seen_good]
 
+    def get_lowest_finite_log_probability(self):
+        self._recompute_state_probabilities()
+        return np.min(self._log_state_probabilities[np.isfinite(self._log_state_probabilities)])
+
     @staticmethod
     def get_state_result(n_seen, n_seen_good):
         return n_seen_good > n_seen / 2

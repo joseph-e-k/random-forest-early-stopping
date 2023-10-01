@@ -2,12 +2,13 @@ import os
 import random
 
 import numpy as np
-from matplotlib import pyplot as plt
+from matplotlib import pyplot as plt, colors
 from diskcache import Cache
 from scipy.special import logsumexp
 from scipy.stats import nhypergeom, binom, bernoulli
 
 from predestined_k_approach.ForestWithEnvelope import ForestWithEnvelope, ForestAnalysis
+from predestined_k_approach.envelopes import get_null_envelope
 from predestined_k_approach.optimization import get_envelope_by_eb_greedily
 from predestined_k_approach.utils import plot_function_many_curves, plot_function, timed, TimerContext, is_deviant_value
 
@@ -175,29 +176,68 @@ def get_expected_run_proportion_approx_3(n_total, prop_positive, allowable_error
     return base * (my_entropy / base_entropy)
 
 
-def main():
-    ax = plt.subplot()
-    ax.grid(visible=True)
+def plot_state_probabilities_and_envelope(fwe: ForestWithEnvelope, ax, envelope=None, min_value=None):
+    if envelope is None:
+        envelope = fwe.envelope
 
-    prop_positive = 0.25
+    data = np.array([
+        [fwe.get_log_state_probability(n_seen, n_seen_good) for n_seen_good in range(fwe.n_total_positive + 1)]
+        for n_seen in range(fwe.n_steps)
+    ]).T
 
-    n_total_min = 101
-    n_total_max = 3400
-    allowable_error = 10**-3
+    masked_data = np.ma.array(data, mask=np.isinf(data))
 
-    plot_function_many_curves(
-        ax=ax,
-        x_axis_arg_name="n_total",
-        distinct_curves_arg_name="allowable_error",
-        function=get_expected_run_proportion,
-        function_kwargs=dict(
-            n_total=list(range(n_total_min, n_total_max + 2, 2)),
-            prop_positive=prop_positive,
-            allowable_error=[10**-2, 10**-3]
-        ),
-    )
+    cmap = plt.get_cmap("viridis")
+    cmap.set_bad(color="k")
+
+    im = ax.imshow(masked_data, cmap=cmap, interpolation='nearest', origin='lower', vmin=min_value)
+
+    ax.plot(envelope[:, 0] - 0.5, color="red")
+
+    plt.colorbar(im, ax=ax)
+
+    return ax
+
+
+def show_state_probabilities_and_envelopes_separately(n_total, n_positive, allowable_error_rates):
+    n_rows = len(allowable_error_rates)
+    n_columns = 2
+
+    fig, axs = plt.subplots(nrows=n_rows, ncols=n_columns)
+
+    null_fwe = ForestWithEnvelope.create(n_total, n_positive, get_null_envelope(n_total))
+    fwes = [
+        ForestWithEnvelope.create(n_total, n_positive, get_envelope_by_eb_greedily(n_total, aer))
+        for aer in allowable_error_rates
+    ]
+
+    min_value = min(fwe.get_lowest_finite_log_probability() for fwe in (fwes + [null_fwe]))
+
+    for i, fwe in enumerate(fwes):
+        plot_state_probabilities_and_envelope(fwes[0], axs[i, 0], envelope=fwe.envelope, min_value=min_value)
+        plot_state_probabilities_and_envelope(fwe, axs[i, 1], min_value=min_value)
 
     plt.show()
+
+
+def show_base_forest_state_probabilities_with_envelopes(n_total, n_positive, allowable_error_rates):
+    null_fwe = ForestWithEnvelope.create(n_total, n_positive, get_null_envelope(n_total))
+    fwes = [
+        ForestWithEnvelope.create(n_total, n_positive, get_envelope_by_eb_greedily(n_total, aer))
+        for aer in allowable_error_rates
+    ]
+
+    ax = plt.subplot()
+    plot_state_probabilities_and_envelope(null_fwe, ax)
+
+    for fwe in fwes:
+        ax.plot(fwe.envelope[:, 0] - 0.5)
+
+    plt.show()
+
+
+def main():
+    show_base_forest_state_probabilities_with_envelopes(1000, 500, [0, 10**-3, 10**-6])
 
 
 if __name__ == "__main__":
