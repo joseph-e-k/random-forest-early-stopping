@@ -10,7 +10,8 @@ from scipy.stats import nhypergeom, binom, bernoulli
 from predestined_k_approach.ForestWithEnvelope import ForestWithEnvelope, ForestAnalysis
 from predestined_k_approach.envelopes import get_null_envelope
 from predestined_k_approach.optimization import get_envelope_by_eb_greedily
-from predestined_k_approach.utils import plot_function_many_curves, plot_function, timed, TimerContext, is_deviant_value
+from predestined_k_approach.utils import plot_function_many_curves, plot_function, timed, TimerContext, \
+    is_deviant_value, plot_functions
 
 cache = Cache(os.path.join(os.path.dirname(__file__), ".cache"))
 
@@ -36,7 +37,7 @@ def get_prob_error(n_total, n_positive, allowable_error):
     return analyse_fwe_or_get_cached(n_total, n_positive, allowable_error).prob_error
 
 
-def get_expected_run_proportion(n_total, prop_positive, allowable_error):
+def get_expected_run_proportion_with_interpolation(n_total, prop_positive, allowable_error):
     f_positive = n_total * prop_positive
     n_positive_lower = int(f_positive)
 
@@ -53,6 +54,10 @@ def get_expected_run_proportion(n_total, prop_positive, allowable_error):
         runtime = lower_runtime * lower_weight + upper_runtime * upper_weight
 
     return runtime / n_total
+
+
+def get_expected_run_proportion_without_interpolation(n_total, prop_positive, allowable_error):
+    return get_expected_runtime(n_total, int(n_total * prop_positive), allowable_error) / n_total
 
 
 def get_lower_envelope_at_proportion(n_total, proportional_step, allowable_error):
@@ -125,7 +130,7 @@ def forest_with_zero_envelope(n_total, n_positive):
 
 
 def get_expected_run_proportion_approx_1(n_total, prop_positive, allowable_error, n_stops=1):
-    base = get_expected_run_proportion(n_total, prop_positive, 0)
+    base = get_expected_run_proportion_with_interpolation(n_total, prop_positive, 0)
     log_half = -np.log(2)
     log_aer_remaining = np.log(allowable_error)
     stop_steps = []
@@ -169,7 +174,7 @@ def get_expected_run_proportion_approx_2(n_total, prop_positive, allowable_error
 
 
 def get_expected_run_proportion_approx_3(n_total, prop_positive, allowable_error):
-    base = get_expected_run_proportion(n_total, 1/2, allowable_error)
+    base = get_expected_run_proportion_with_interpolation(n_total, 1 / 2, allowable_error)
     base_entropy = bernoulli(0.5).entropy()
     my_entropy = bernoulli(prop_positive).entropy()
 
@@ -237,7 +242,7 @@ def show_base_forest_state_probabilities_with_envelopes(n_total, n_positive, all
 
 
 def main():
-    show_base_forest_state_probabilities_with_envelopes(1000, 500, [0, 10**-3, 10**-6])
+    show_state_probabilities_and_envelopes_separately(1000, 500, [0, 10**-3, 10**-6])
 
 
 if __name__ == "__main__":
