@@ -153,9 +153,12 @@ class ForestWithEnvelope:
         add_increment_to_envelope(self.envelope, increment_index)
         self._invalidate_state_probabilities(start_index=increment_index)
 
-    def simulate(self) -> tuple[int, bool]:
+    def simulate(self, rng=None) -> tuple[int, bool]:
+        if rng is None:
+            rng = random.Random()
+
         trees = np.zeros(self.n_total)
-        which_positive = random.sample(range(self.n_total), self.n_total_positive)
+        which_positive = rng.sample(range(self.n_total), self.n_total_positive)
         trees[which_positive] = 1
 
         n_positive_seen = 0

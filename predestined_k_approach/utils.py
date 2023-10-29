@@ -6,6 +6,7 @@ import time
 
 import numpy as np
 import pandas as pd
+from scipy import stats
 
 
 def shift_array(arr, num, fill_value=np.nan):
@@ -167,5 +168,9 @@ def rolling_average(numbers, window_length):
     return np.convolve(numbers, np.ones(window_length), "valid") / window_length
 
 
-def is_deviant_value(expectation, reality, prop_deviation=0.1):
-    return not (expectation * (1 - prop_deviation) < reality < expectation * (1 + prop_deviation))
+def is_mean_surprising(observations, expected_mean, confidence_level=0.9):
+    return stats.ttest_1samp(observations, expected_mean).pvalue < 1 - confidence_level
+
+
+def is_proportion_surprising(observations, expected_proportion, confidence_level=0.9):
+    return stats.binomtest(sum(observations), len(observations), expected_proportion).pvalue < 1 - confidence_level
