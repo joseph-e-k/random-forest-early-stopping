@@ -10,7 +10,6 @@ from scipy.stats import nhypergeom, binom, bernoulli
 
 from predestined_k_approach.ForestWithEnvelope import ForestWithEnvelope, ForestAnalysis
 from predestined_k_approach.envelopes import get_null_envelope
-from predestined_k_approach.optimization import get_envelope_by_eb_greedily
 from predestined_k_approach.utils import plot_function_many_curves, plot_function, timed, TimerContext, \
     plot_functions, is_mean_surprising, is_proportion_surprising
 
@@ -20,8 +19,7 @@ cache = Cache(os.path.join(os.path.dirname(__file__), ".cache"))
 @cache.memoize()
 @timed
 def analyse_fwe_or_get_cached(n_total, n_positive, allowable_error) -> ForestAnalysis:
-    envelope = get_envelope_by_eb_greedily(n_total, allowable_error)
-    fwe = ForestWithEnvelope.create(n_total, n_positive, envelope)
+    fwe = ForestWithEnvelope.create_greedy(n_total, n_positive, allowable_error)
     return fwe.analyse()
 
 
@@ -62,7 +60,7 @@ def get_expected_run_proportion_without_interpolation(n_total, prop_positive, al
 
 
 def get_lower_envelope_at_proportion(n_total, proportional_step, allowable_error):
-    envelope = get_envelope_by_eb_greedily(n_total, allowable_error)
+    envelope = ForestWithEnvelope.create_greedy(n_total, 0, allowable_error).envelope
     step = int(proportional_step * n_total)
     return envelope[step][0] / step
 
@@ -82,9 +80,7 @@ def simulate_forest(n_trees, n_positive_trees, allowable_error, n_simulations, r
     rng = random.Random()
     rng.seed(random_seed)
 
-    envelope = get_envelope_by_eb_greedily(n_trees, allowable_error)
-
-    fwe = ForestWithEnvelope.create(n_trees, n_positive_trees, envelope)
+    fwe = ForestWithEnvelope.create_greedy(n_trees, n_positive_trees, allowable_error)
 
     runtimes = np.zeros(n_simulations)
     results = np.zeros(n_simulations)
@@ -125,9 +121,7 @@ def simulation_scatterplot(n_forests, n_simulations_per_forest, min_n_trees, max
 
             print(f"Forest {i_forest + 1} / {n_forests}: {n_trees=}, {n_positive_trees=}, {allowable_error=}")
 
-            envelope = get_envelope_by_eb_greedily(n_trees, allowable_error)
-
-            fwe = ForestWithEnvelope.create(n_trees, n_positive_trees, envelope)
+            fwe = ForestWithEnvelope.create_greedy(n_trees, n_positive_trees, allowable_error)
 
             expected_runtime = expected_runtimes[i_forest] = fwe.analyse().expected_runtime
             expected_error_rate = expected_error_rates[i_forest] = fwe.analyse().prob_error
@@ -168,8 +162,7 @@ def simulation_scatterplot(n_forests, n_simulations_per_forest, min_n_trees, max
 
 
 def forest_with_zero_envelope(n_total, n_positive):
-    envelope = get_envelope_by_eb_greedily(n_total, 0)
-    return ForestWithEnvelope.create(n_total, n_positive, envelope)
+    return ForestWithEnvelope.create_greedy(n_total, n_positive, 0)
 
 
 def get_expected_run_proportion_approx_1(n_total, prop_positive, allowable_error, n_stops=1):
@@ -255,7 +248,7 @@ def show_state_probabilities_and_envelopes_separately(n_total, n_positive, allow
 
     null_fwe = ForestWithEnvelope.create(n_total, n_positive, get_null_envelope(n_total))
     fwes = [
-        ForestWithEnvelope.create(n_total, n_positive, get_envelope_by_eb_greedily(n_total, aer))
+        ForestWithEnvelope.create_greedy(n_total, n_positive, aer)
         for aer in allowable_error_rates
     ]
 
@@ -271,7 +264,7 @@ def show_state_probabilities_and_envelopes_separately(n_total, n_positive, allow
 def show_base_forest_state_probabilities_with_envelopes(n_total, n_positive, allowable_error_rates):
     null_fwe = ForestWithEnvelope.create(n_total, n_positive, get_null_envelope(n_total))
     fwes = [
-        ForestWithEnvelope.create(n_total, n_positive, get_envelope_by_eb_greedily(n_total, aer))
+        ForestWithEnvelope.create_greedy(n_total, n_positive, aer)
         for aer in allowable_error_rates
     ]
 

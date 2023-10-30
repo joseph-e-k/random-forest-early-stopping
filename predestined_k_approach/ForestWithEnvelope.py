@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import math
 import random
 
 import numpy as np
@@ -162,6 +163,21 @@ class ForestWithEnvelope(ForestWithStoppingStrategy):
 
         forest = Forest(n_total, n_total_positive)
         return cls(forest, envelope)
+
+    @classmethod
+    def create_greedy(cls, n_total, n_positive, allowable_error):
+        log_allowable_error = np.log(allowable_error)
+
+        envelope = get_null_envelope(n_total)
+        forest_with_envelope = cls.create(n_total, math.ceil((n_total + 1) / 2), envelope)
+
+        for i_step in range(1, n_total + 1):
+            log_prob_state = forest_with_envelope.get_log_state_probability(i_step, envelope[i_step][0])
+            if log_prob_state <= log_allowable_error:
+                log_allowable_error = logsumexp([log_allowable_error, log_prob_state], b=[1, -1])
+                forest_with_envelope.add_increment_to_envelope(i_step)
+
+        return ForestWithEnvelope.create(n_total, n_positive, envelope)
 
     def _invalidate_state_probabilities(self, start_index=0):
         self._i_last_valid_state_probabilities = start_index
