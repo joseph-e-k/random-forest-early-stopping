@@ -8,7 +8,8 @@ from diskcache import Cache
 from scipy.special import logsumexp
 from scipy.stats import nhypergeom, binom, bernoulli
 
-from predestined_k_approach.ForestWithEnvelope import ForestWithEnvelope, ForestAnalysis
+from predestined_k_approach.ForestWithEnvelope import ForestWithEnvelope
+from predestined_k_approach.ForestWithStoppingStrategy import ForestAnalysis
 from predestined_k_approach.envelopes import get_null_envelope
 from predestined_k_approach.utils import plot_function_many_curves, plot_function, timed, TimerContext, \
     plot_functions, is_mean_surprising, is_proportion_surprising
