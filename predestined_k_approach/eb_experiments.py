@@ -78,7 +78,6 @@ class ForestSimulationResults:
     conclusions: np.ndarray
 
 
-@cache.memoize()
 def simulate_forest(n_trees, n_positive_trees, allowable_error, n_simulations, random_seed) -> ForestSimulationResults:
     rng = random.Random()
     rng.seed(random_seed)
@@ -289,8 +288,8 @@ def main():
     simulation_scatterplot(
         n_forests=100,
         n_simulations_per_forest=1_000,
-        min_n_trees=6001,
-        max_n_trees=7001,
+        min_n_trees=1001,
+        max_n_trees=2001,
         random_seed=10259
     )
 
