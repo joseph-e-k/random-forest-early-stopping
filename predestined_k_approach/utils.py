@@ -37,6 +37,7 @@ class TimerContext:
 
     def __enter__(self):
         self.start_time = time.time()
+        return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.end_time = time.time()
@@ -95,7 +96,7 @@ def stringify_kwargs(kwargs: dict) -> str:
 
 
 def plot_function(ax, x_axis_arg_name, function, function_kwargs=None, plot_kwargs=None, results_transform=lambda y: y,
-                  x_axis_values_transform=lambda x: x):
+                  x_axis_values_transform=lambda x: x, verbose=False):
     function_kwargs = function_kwargs or {}
     plot_kwargs = plot_kwargs or {}
 
@@ -111,6 +112,8 @@ def plot_function(ax, x_axis_arg_name, function, function_kwargs=None, plot_kwar
     results = np.zeros(len(x_axis_values))
 
     for i, x_axis_value in enumerate(x_axis_values):
+        if verbose:
+            print(f"Computing {function.__name__} value at {x_axis_value!r}")
         results[i] = function(**(function_kwargs | {x_axis_arg_name: x_axis_value}))
 
     results = results_transform(results)
@@ -121,13 +124,16 @@ def plot_function(ax, x_axis_arg_name, function, function_kwargs=None, plot_kwar
 
 def plot_functions(ax, x_axis_arg_name, functions, function_kwargs=None, plot_kwargs=None,
                    results_transform=lambda y: y,
-                   x_axis_values_transform=lambda x: x):
+                   x_axis_values_transform=lambda x: x,
+                   verbose=False):
     if plot_kwargs is None:
         plot_kwargs = {}
 
     for function in functions:
+        if verbose:
+            print(f"Plotting {function.__name__}")
         plot_function(ax, x_axis_arg_name, function, dict(function_kwargs), plot_kwargs | dict(label=function.__name__),
-                      results_transform, x_axis_values_transform)
+                      results_transform, x_axis_values_transform, verbose)
 
     title = ", ".join(function.__name__ for function in functions)
     if function_kwargs:

@@ -79,6 +79,13 @@ class ForestWithStoppingStrategy:
                 out=self._log_state_probabilities[i_step, :]
             )
 
+            if np.any(np.isnan(self._log_state_probabilities[i_step, :])):
+                raise ValueError("NaN appeared in log-probability computation")
+
+            # Floating-point errors may occasionally cause us to compute "log-probabilities" that are slightly greater
+            # than 0. We just clamp these, as allowing them to persist will NaN-poison our entire program.
+            np.clip(self._log_state_probabilities[i_step, :], None, 0, out=self._log_state_probabilities[i_step, :])
+
         self._i_last_valid_state_probabilities = end_index
 
     def get_log_state_probability(self, n_seen, n_seen_good):
@@ -138,6 +145,36 @@ class ForestWithStoppingStrategy:
                 return n_seen, (n_positive_seen > n_seen / 2)
 
         raise ForestExecutionError("Fell off the end of a forest while executing. This should be impossible.", self)
+
+    def get_pi_and_pi_bar(self) -> tuple[np.ndarray, np.ndarray]:
+        theta = np.exp(self._get_log_prob_stop())
+        theta_bar = 1 - theta
+        pi = np.empty_like(theta)
+        pi_bar = np.empty_like(theta)
+
+        for c in range(theta.shape[1]):
+            pi[0, c] = theta[0, c]
+            pi_bar[0, c] = theta_bar[0, c]
+
+        for n in range(1, theta.shape[0]):
+            for c in range(theta.shape[1]):
+                combinatoric_factor = (c / n * pi_bar[n - 1, c - 1] + (n - c) / n * pi_bar[n - 1, c])
+                pi[n, c] = theta[n, c] * combinatoric_factor
+                pi_bar[n, c] = theta_bar[n, c] * combinatoric_factor
+
+        return pi, pi_bar
+
+
+@dataclasses.dataclass
+class ForestWithGivenStoppingStrategy(ForestWithStoppingStrategy):
+    stopping_strategy: np.ndarray
+
+    def __post_init__(self):
+        self.stopping_strategy = self.stopping_strategy[:self.n_total + 1, :self.n_total_positive + 1]
+        super().__post_init__()
+
+    def _get_log_prob_stop(self):
+        return np.log(self.stopping_strategy)
 
 
 @dataclasses.dataclass(frozen=True)
