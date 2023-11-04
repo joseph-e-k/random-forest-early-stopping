@@ -1,12 +1,18 @@
 from __future__ import annotations
 
 import itertools
+import os
 
 import numpy as np
+from diskcache import Cache
 from pulp import LpProblem, LpMinimize, LpVariable, lpSum, PULP_CBC_CMD
 from scipy import stats
 
 
+cache = Cache(os.path.join(os.path.dirname(__file__), ".cache"))
+
+
+@cache.memoize()
 def get_optimal_stopping_strategy(n_total, allowable_error):
     n_steps = n_total + 1
     n_values = n_steps
@@ -32,7 +38,6 @@ def get_optimal_stopping_strategy(n_total, allowable_error):
 
     _add_inherent_probability_constraints(problem, pi, pi_bar, prob_concrete_reach_cond)
     _add_max_runtime_constraints(problem, max_expected_runtime, prob_concrete_stop, n_cases, n_steps, n_values)
-
     _add_error_rate_constraints(problem, prob_concrete_stop, allowable_error, n_cases, n_good, n_steps, n_total,
                                 n_values)
 
