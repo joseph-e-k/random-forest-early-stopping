@@ -25,10 +25,12 @@ def get_optimal_stopping_strategy(n_total, allowable_error):
     problem += max_expected_runtime, "Objective: minimize maximal expected runtime"
 
     # Our decision variables are pi and pi_bar, which we later translate into actual stopping-probabilities
-    pi, pi_bar = _create_decision_variables(problem, n_steps, n_values)
+    pi, pi_bar = _create_decision_variables(n_steps, n_values)
 
-    prob_concrete_stop = _get_concrete_stop_probabilities(pi, pi_bar, prob_abstract)
+    prob_concrete_reach_cond = _get_probabilities_concrete_reach_conditional(pi, pi_bar)
+    prob_concrete_stop = _get_concrete_stop_probabilities(pi, pi_bar, prob_abstract, prob_concrete_reach_cond)
 
+    _add_inherent_probability_constraints(problem, pi, pi_bar, prob_concrete_reach_cond)
     _add_max_runtime_constraints(problem, max_expected_runtime, prob_concrete_stop, n_cases, n_steps, n_values)
 
     _add_error_rate_constraints(problem, prob_concrete_stop, allowable_error, n_cases, n_good, n_steps, n_total,
@@ -42,12 +44,15 @@ def get_optimal_stopping_strategy(n_total, allowable_error):
 
 
 def _recover_decision_variables(problem, n_steps, n_values):
-    variables_by_name = problem.variablesDict()
+    variable_values_by_name = {
+        name: variable.varValue
+        for (name, variable) in problem.variablesDict().items()
+    }
     pi = np.empty((n_steps, n_values))
     pi_bar = np.empty((n_steps, n_values))
-    for i_step, i_value in itertools.product(range(n_steps), range(n_values)):
-        pi[i_step, i_value] = variables_by_name[f"pi_{i_step}_{i_value}"].varValue
-        pi_bar[i_step, i_value] = variables_by_name[f"pi_bar_{i_step}_{i_value}"].varValue
+    for i_step, i_value in itertools.product(range(n_steps - 1), range(n_values)):
+        pi[i_step, i_value] = variable_values_by_name.get(f"pi_{i_step}_{i_value}", 0)
+        pi_bar[i_step, i_value] = variable_values_by_name.get(f"pi_bar_{i_step}_{i_value}", 1)
     return pi, pi_bar
 
 
@@ -87,10 +92,10 @@ def _add_max_runtime_constraints(problem, max_expected_runtime, prob_concrete_st
         )
 
 
-def _get_concrete_stop_probabilities(pi, pi_bar, prob_abstract):
+def _get_concrete_stop_probabilities(pi, pi_bar, prob_abstract, prob_concrete_reach_cond):
     # Define expressions for the probability of the concrete process reaching and stopping at a given state:
     #   $a_{n,c} \pi_{n,c}$ if $n < t$
-    #   $a_{n,c} (\pi_{n,c} + \bar\pi_{n,c})$ if $n = t$
+    #   $b_{n, c}$ if $n = t$
     # Note that these are expressions composed of existing variables, not new variables
 
     n_cases, n_steps, n_values = prob_abstract.shape
@@ -98,24 +103,23 @@ def _get_concrete_stop_probabilities(pi, pi_bar, prob_abstract):
     prob_concrete_stop = np.empty(shape=prob_abstract.shape, dtype=np.dtype(object))
 
     for i_case in range(n_cases):
-        for (i_step, i_value) in itertools.product(range(n_steps)[:-1], range(n_values)):
+        for (i_step, i_value) in itertools.product(range(pi.shape[0]), range(pi.shape[1])):
             prob_concrete_stop[i_case, i_step, i_value] = prob_abstract[i_case, i_step, i_value] * pi[i_step, i_value]
 
         for i_value in range(n_values):
             prob_concrete_stop[i_case, i_final_step, i_value] = (
-                    prob_abstract[i_case, i_final_step, i_value]
-                    * (pi[i_final_step, i_value] + pi_bar[i_final_step, i_value])
+                    prob_abstract[i_case, i_final_step, i_value] * prob_concrete_reach_cond[i_final_step, i_value]
             )
 
     return prob_concrete_stop
 
 
-def _create_decision_variables(problem, n_steps, n_values):
-    pi = np.empty((n_steps, n_values), np.dtype(object))
-    pi_bar = np.empty_like(pi)
+def _create_decision_variables(n_steps, n_values):
+    pi = np.zeros((n_steps - 1, n_values), np.dtype(object))
+    pi_bar = np.ones_like(pi)
 
-    for i_step in range(n_steps):
-        for i_value in range(n_values):
+    for i_step in range(pi.shape[0]):
+        for i_value in range(i_step + 1):
             pi[i_step, i_value] = LpVariable(
                 name=f"pi_{i_step}_{i_value}",
                 lowBound=0
@@ -126,33 +130,40 @@ def _create_decision_variables(problem, n_steps, n_values):
                 lowBound=0
             )
 
-    _add_inherent_probability_constraints(problem, pi, pi_bar, n_steps, n_values)
-
     return pi, pi_bar
 
 
-def _add_inherent_probability_constraints(problem, pi, pi_bar, n_steps, n_values):
+def _get_probabilities_concrete_reach_conditional(pi, pi_bar):
+    p = np.zeros((pi.shape[0] + 1, pi.shape[1]), np.dtype(object))
+
+    p[0, :] = 1
+
+    for i_step in range(1, pi.shape[0] + 1):
+        for i_value in range(i_step + 1):
+            p[i_step, i_value] = (i_step - i_value) / i_step * pi_bar[i_step - 1, i_value]
+
+            if i_value >= 1:
+                p[i_step, i_value] += i_value / i_step * pi_bar[i_step - 1, i_value - 1]
+
+    return p
+
+
+def _add_inherent_probability_constraints(problem, pi, pi_bar, prob_concrete_reach_cond):
     # In the first row, we have:
     #   $\pi_{0, c} = \theta_{0, c}$
     #   $\bar\pi_{0, c} = \bar\theta_{0, c} = 1 - \theta_{0, c}$
     # Therefore we constrain $\pi_{0, c} + \bar\pi_{0, c} = 1$
-    for i_value in range(n_values):
+    for i_value in range(pi.shape[1]):
         problem += (pi[0, i_value] + pi_bar[0, i_value] == 1), f"pi[0, {i_value}] + pi_bar[0, {i_value}] == 1"
 
     # In subsequent rows we have:
-    #   $b_{n, c} = a_{n, c} (\frac{c}{n} \bar\pi_{n-1, c-1} + \frac{n - c}{n} \bar\pi_{n-1, c})$
-    # But also:
-    #   $b_{n, c} = \beta_{n, c} + \bar\beta_{n, c} = a_{n, c} (\pi_{n, c} + \bar\pi_{n, c})$
-    # So we constrain:
-    #   $\pi_{n, c} + \bar\pi_{n, c} = \frac{c}{n} \bar\pi_{n-1, c-1} + \frac{n - c}{n} \bar\pi_{n-1, c}$
-    for i_step in range(n_steps)[1:]:
-        for i_value in range(n_values):
+    #   $a_{n, c} (\pi_{n, c} + \bar\pi_{n, c}) = b_{n, c}$
+    # Or in other words:
+    #  $\pi_{n, c} + \bar\pi_{n, c} = \frac{b_{n, c}}{a_{n, c}}$
+    for i_step in range(1, pi.shape[0]):
+        for i_value in range(i_step + 1):
             lhs = pi[i_step, i_value] + pi_bar[i_step, i_value]
-
-            rhs = (i_step - i_value) / i_step * pi_bar[i_step - 1, i_value]
-            if i_value >= 1:
-                rhs += i_value / i_step * pi_bar[i_step - 1, i_value - 1]
-
+            rhs = prob_concrete_reach_cond[i_step, i_value]
             problem += (lhs == rhs), f"pi[{i_step}, {i_value}] + pi_bar[{i_step}, {i_value}]"
 
 
@@ -169,12 +180,12 @@ def _get_abstract_probabilities(n_total, n_good):
 
 def _to_decision_probabilities(n_total, pi, pi_bar):
     n_steps = n_values = n_total + 1
-    decision_probability = np.empty((n_steps, n_values))
+    decision_probability = np.zeros((n_steps, n_values))
 
     decision_probability[0, :] = pi[0, :]
 
     for i_step in range(1, n_steps - 1):
-        for i_value in range(n_values):
+        for i_value in range(i_step + 1):
             if pi[i_step, i_value] == 0:
                 decision_probability[i_step, i_value] = 0
             else:
