@@ -59,20 +59,16 @@ def estimate_positive_tree_distribution(dataset: pd.DataFrame, n_trees=100, test
 
 
 def show_n_positive_distributions(n_trees, datasets):
-    fig, axs = plt.subplots(len(datasets), 3, tight_layout=True)
+    fig, axs = plt.subplots(nrows=1, ncols=len(datasets), tight_layout=True)
 
     for i_dataset, (dataset_name, dataset) in enumerate(datasets.items()):
         n_observations, n_positive_observations, *distributions = estimate_positive_tree_distribution(dataset, n_trees)
+        distribution_total, distribution_for_pos, distribution_for_neg = distributions
 
-        for i_distribution, title_suffix in enumerate([
-            f": {n_observations} observations (of which {n_positive_observations} positive)",
-            " (positive observations)",
-            " (negative observations)"
-        ]):
-            ax = axs[i_dataset, i_distribution]
-            ax.hist(distributions[i_distribution])
-            ax.title.set_text(f"{dataset_name}{title_suffix}")
-            ax.set_xlim((0, n_trees))
+        ax = axs[i_dataset]
+        ax.hist((distribution_for_pos, distribution_for_neg), stacked=True)
+        ax.title.set_text(f"{dataset_name} ({n_positive_observations} / {n_observations})")
+        ax.set_xlim((0, n_trees))
 
     plt.show()
 
