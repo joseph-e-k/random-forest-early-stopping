@@ -7,6 +7,7 @@ import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 
+from figure_utils import save_figure
 from predestined_k_approach.eb_experiments import analyse_fwe_or_get_cached
 from predestined_k_approach.utils import covariates_response_split
 
@@ -58,7 +59,7 @@ def estimate_positive_tree_distribution(dataset: pd.DataFrame, n_trees=100, test
     )
 
 
-def show_n_positive_distributions(n_trees, datasets):
+def plot_n_positive_distributions(n_trees, datasets):
     fig, axs = plt.subplots(nrows=1, ncols=len(datasets), tight_layout=True)
 
     for i_dataset, (dataset_name, dataset) in enumerate(datasets.items()):
@@ -70,7 +71,7 @@ def show_n_positive_distributions(n_trees, datasets):
         ax.title.set_text(f"{dataset_name} ({n_positive_observations} / {n_observations})")
         ax.set_xlim((0, n_trees))
 
-    plt.show()
+    return fig
 
 
 def show_error_rates_and_runtimes(n_trees, datasets, allowable_error_rates):
@@ -132,13 +133,14 @@ def show_error_rates_and_runtimes(n_trees, datasets, allowable_error_rates):
 def main():
     n_trees = 1001
     datasets = {
-        "Banknotes": pd.read_csv(r"..\data\data_banknote_authentication.txt"),
-        "Heart Attacks": pd.read_csv(r"..\data\heart_attack.csv"),
-        "Salaries": pd.read_csv(r"..\data\adult.data"),
-        "Dry Beans": pd.read_excel(r"..\data\dry_beans.xlsx")
+        "A": pd.read_csv(r"..\data\data_banknote_authentication.txt"),
+        "B": pd.read_csv(r"..\data\heart_attack.csv"),
+        "C": pd.read_csv(r"..\data\adult.data"),
+        "D": pd.read_excel(r"..\data\dry_beans.xlsx")
     }
 
-    show_n_positive_distributions(n_trees, datasets)
+    figure = plot_n_positive_distributions(n_trees, datasets)
+    save_figure(figure, "n_positive_empirical_distributions")
 
 
 if __name__ == "__main__":
