@@ -49,7 +49,7 @@ def main():
     n_total_max = 251
     n_total_step = 2
     prop_positive = 0.25
-    aer = 10**-3
+    aer = 10**-6
 
     plot_functions(
         ax=plt.subplot(),

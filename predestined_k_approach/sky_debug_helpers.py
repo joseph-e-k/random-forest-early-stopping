@@ -43,8 +43,13 @@ class DummyProblem:
 
 
 def get_pi_and_pi_bar_from_theta(theta: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    theta = np.copy(theta)
-    theta.resize((theta.shape[0], theta.shape[0]))
+    theta_orig = theta
+
+    theta = np.zeros((theta_orig.shape[0], theta_orig.shape[0]))
+
+    for i in range(theta_orig.shape[0]):
+        for j in range(theta_orig.shape[1]):
+            theta[i, j] = theta_orig[i, j]
 
     theta_bar = 1 - theta
     pi = np.zeros((theta.shape[0] - 1, theta.shape[0]))
@@ -64,7 +69,7 @@ def get_pi_and_pi_bar_from_theta(theta: np.ndarray) -> tuple[np.ndarray, np.ndar
 
 
 def get_expected_runtime_coefficients(t, t_plus):
-    m_pi = np.zeros((t, t_plus + 1))
+    m_pi = np.zeros((t, t + 1))
 
     for n in range(m_pi.shape[0]):
         for c in range(m_pi.shape[1]):
@@ -114,31 +119,42 @@ def get_greedy_fwe_pi_and_pi_bar():
     return get_pi_and_pi_bar_from_theta(np.exp(fwe._get_log_prob_stop()))
 
 
-def main():
-    aer = 0.001
+@dataclasses.dataclass
+class SecondaryOutputObject:
+    pi: np.ndarray = None
+    pi_bar: np.ndarray= None
 
-    for n_total in [185]:
+
+def main():
+    aer = 10**-6
+
+    for n_total in [223]:
         n_positive = n_total // 2
 
         forest = Forest(n_total, n_positive)
 
+        soo = SecondaryOutputObject()
+
         with TimerContext(f"find optimal stopping strategy ({n_total=}, {aer=})"):
-            optimal_stopping_strategy = get_optimal_stopping_strategy(n_total, aer)
+            optimal_stopping_strategy = get_optimal_stopping_strategy(n_total, aer, soo)
 
         fwss = ForestWithGivenStoppingStrategy(forest, optimal_stopping_strategy)
         fwe = ForestWithEnvelope.create_greedy(n_total, n_positive, aer)
 
-        fwss_analysis = fwss.analyse()
-        fwe_analysis = fwe.analyse()
-
-        print(f"{fwss_analysis=})")
-        print(f"{fwe_analysis=})")
+        print(f"{fwss.analyse().expected_runtime=})")
+        print(f"{fwe.analyse().expected_runtime=})")
 
         fwss_pi, fwss_pi_bar = get_pi_and_pi_bar_from_theta(fwss.stopping_strategy)
+
+        # assert soo.pi == fwss_pi
+        # assert soo.pi_bar == fwss_pi_bar
+
         fwe_pi, fwe_pi_bar = get_pi_and_pi_bar_from_theta(np.exp(fwe._get_log_prob_stop()))
 
         print(f"{get_expected_runtime(n_total, n_total // 2, fwss_pi, fwss_pi_bar)=}")
         print(f"{get_expected_runtime(n_total, n_total // 2, fwe_pi, fwe_pi_bar)=}")
+        print(f"{get_expected_runtime(n_total, n_total // 2 + 1, fwss_pi, fwss_pi_bar)=}")
+        print(f"{get_expected_runtime(n_total, n_total // 2 + 1, fwe_pi, fwe_pi_bar)=}")
 
 
 if __name__ == "__main__":

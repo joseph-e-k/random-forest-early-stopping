@@ -13,7 +13,7 @@ cache = Cache(os.path.join(os.path.dirname(__file__), ".cache"))
 
 
 @cache.memoize()
-def get_optimal_stopping_strategy(n_total, allowable_error):
+def get_optimal_stopping_strategy(n_total, allowable_error, secondary_output_object=None):
     n_steps = n_total + 1
     n_values = n_steps
 
@@ -45,6 +45,10 @@ def get_optimal_stopping_strategy(n_total, allowable_error):
 
     pi, pi_bar = _recover_decision_variables(problem, n_steps, n_values)
 
+    if secondary_output_object is not None:
+        secondary_output_object.pi = pi
+        secondary_output_object.pi_bar = pi_bar
+
     return _to_decision_probabilities(n_total, pi, pi_bar)
 
 
@@ -53,9 +57,9 @@ def _recover_decision_variables(problem, n_steps, n_values):
         name: variable.varValue
         for (name, variable) in problem.variablesDict().items()
     }
-    pi = np.empty((n_steps, n_values))
-    pi_bar = np.empty((n_steps, n_values))
-    for i_step, i_value in itertools.product(range(n_steps - 1), range(n_values)):
+    pi = np.empty((n_steps - 1, n_values))
+    pi_bar = np.empty_like(pi)
+    for i_step, i_value in itertools.product(range(pi.shape[0]), range(pi.shape[1])):
         pi[i_step, i_value] = variable_values_by_name.get(f"pi_{i_step}_{i_value}", 0)
         pi_bar[i_step, i_value] = variable_values_by_name.get(f"pi_bar_{i_step}_{i_value}", 1)
     return pi, pi_bar

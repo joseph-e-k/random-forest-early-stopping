@@ -9,8 +9,11 @@ from sklearn.model_selection import train_test_split
 
 from figure_utils import save_figure, RCPARAMS_LATEX_DOUBLE_COLUMN, RCPARAMS_LATEX_SINGLE_COLUMN_WIDE, \
     RCPARAMS_ONE_TIME_THING
+from predestined_k_approach.Forest import Forest
+from predestined_k_approach.ForestWithStoppingStrategy import ForestWithGivenStoppingStrategy
 from predestined_k_approach.eb_experiments import analyse_fwe_or_get_cached, cache
-from predestined_k_approach.utils import covariates_response_split
+from predestined_k_approach.optimization import get_optimal_stopping_strategy
+from predestined_k_approach.utils import covariates_response_split, timed
 
 
 def to_binary_classifications(classifications):
@@ -33,6 +36,7 @@ def coerce_nonnumeric_columns_to_numeric(df: pd.DataFrame):
     return df
 
 
+@timed
 @cache.memoize()
 def estimate_positive_tree_distribution(dataset: pd.DataFrame, n_trees=100, test_proportion=0.2, *, response_column=-1):
     # Processing: get covariates and responses, convert responses to binary classes, and split into train and test sets
@@ -82,18 +86,13 @@ def plot_n_positive_distributions(n_trees, datasets, nrows=None, ncols=None):
     return fig
 
 
-def show_error_rates_and_runtimes(n_trees, datasets, allowable_error_rates):
-    runtimes = {
-        (i_dataset, aer): 0
-        for (i_dataset, aer) in product(range(len(datasets)), allowable_error_rates)
-    }
+def show_error_rates_and_runtimes(n_trees, datasets, allowable_error_rates, analysis_getters):
+    n_analyses = len(analysis_getters)
 
-    error_rates = {
-        (i_dataset, aer): 0
-        for (i_dataset, aer) in product(range(len(datasets)), allowable_error_rates)
-    }
+    runtimes = np.zeros((len(datasets), len(allowable_error_rates), len(analysis_getters)))
+    error_rates = np.zeros_like(runtimes)
 
-    fig, axs = plt.subplots(2, 1, tight_layout=True)
+    fig, axs = plt.subplots(2, n_analyses, tight_layout=True)
 
     for i_dataset, (dataset_name, dataset) in enumerate(datasets.items()):
         _, _, positive_tree_distribution, _, _ = estimate_positive_tree_distribution(dataset, n_trees=n_trees)
@@ -104,42 +103,53 @@ def show_error_rates_and_runtimes(n_trees, datasets, allowable_error_rates):
             if weight == 0:
                 continue
 
-            for allowable_error_rate in allowable_error_rates:
-                analysis = analyse_fwe_or_get_cached(n_trees, n_positive_trees, allowable_error_rate)
-                runtimes[i_dataset, allowable_error_rate] += analysis.expected_runtime * weight / weights.total()
-                error_rates[i_dataset, allowable_error_rate] += analysis.prob_error * weight / weights.total()
+            for i_aer, allowable_error_rate in enumerate(allowable_error_rates):
+                for i_analysis, get_analysis in enumerate(analysis_getters):
+                    analysis = get_analysis(n_trees, n_positive_trees, allowable_error_rate)
+                    runtimes[i_dataset, i_aer, i_analysis] += analysis.expected_runtime * weight / weights.total()
+                    error_rates[i_dataset, i_aer, i_analysis] += analysis.prob_error * weight / weights.total()
 
     fig.patch.set_visible(False)
 
-    table_specs = zip(
-        ["Expected Runtime", "Error Rate"],
-        axs,
-        [runtimes, error_rates],
-        [2, 6]
-    )
-
-    for (title, ax, table_content, precision) in table_specs:
-        ax.axis("off")
-        ax.axis("tight")
-        ax.title.set_text(title)
-
-        cell_format = f"{{:.{precision}f}}"
-
-        ax.table(
-            cellText=[
-                [cell_format.format(table_content[i_dataset, aer]) for aer in allowable_error_rates]
-                for i_dataset in range(len(datasets))
-            ],
-            rowLabels=list(datasets.keys()),
-            colLabels=[str(aer) for aer in allowable_error_rates],
-            loc="center"
+    for i_analysis in range(n_analyses):
+        name = analysis_getters[i_analysis].__name__
+        table_specs = zip(
+            [f"Expected Runtime ({name})", f"Error Rate ({name})"],
+            axs[:, i_analysis],
+            [runtimes[:, :, i_analysis], error_rates[:, :, i_analysis]],
+            [2, 6]
         )
+
+        for (title, ax, table_content, precision) in table_specs:
+            ax.axis("off")
+            ax.axis("tight")
+            ax.title.set_text(title)
+
+            cell_format = f"{{:.{precision}f}}"
+
+            ax.table(
+                cellText=[
+                    [cell_format.format(table_content[i_dataset, i_aer]) for (i_aer, aer) in enumerate(allowable_error_rates)]
+                    for i_dataset in range(len(datasets))
+                ],
+                rowLabels=list(datasets.keys()),
+                colLabels=[str(aer) for aer in allowable_error_rates],
+                loc="center"
+            )
 
     plt.show()
 
 
+@timed
+@cache.memoize()
+def analyse_optimal_fwss_or_get_cached(n_total, n_positive, allowable_error):
+    optimal_stopping_strategy = get_optimal_stopping_strategy(n_total, allowable_error)
+    fwss = ForestWithGivenStoppingStrategy(Forest(n_total, n_positive), optimal_stopping_strategy)
+    return fwss.analyse()
+
+
 def main():
-    n_trees = 101
+    n_trees = 1001
     datasets = {
         "Banknotes": pd.read_csv(r"..\data\data_banknote_authentication.txt"),
         "Heart Attacks": pd.read_csv(r"..\data\heart_attack.csv"),
@@ -147,9 +157,13 @@ def main():
         "Dry Beans": pd.read_excel(r"..\data\dry_beans.xlsx")
     }
 
-    with plt.rc_context(rc=RCPARAMS_ONE_TIME_THING):
-        figure = plot_n_positive_distributions(n_trees, datasets, nrows=2, ncols=2)
-        save_figure(figure, "n_positive_empirical_distributions_v5")
+    # with plt.rc_context(rc=RCPARAMS_ONE_TIME_THING):
+    #     figure = plot_n_positive_distributions(n_trees, datasets, nrows=2, ncols=2)
+    #     save_figure(figure, "n_positive_empirical_distributions_v5")
+    show_error_rates_and_runtimes(n_trees, datasets, [10 ** -3, 10 ** -6, 0], [
+        analyse_fwe_or_get_cached,
+        analyse_optimal_fwss_or_get_cached
+    ])
 
 
 if __name__ == "__main__":

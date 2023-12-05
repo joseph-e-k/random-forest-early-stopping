@@ -17,8 +17,8 @@ from predestined_k_approach.utils import plot_function_many_curves, plot_functio
 cache = Cache(os.path.join(os.path.dirname(__file__), ".cache"))
 
 
-@cache.memoize()
 @timed
+@cache.memoize()
 def analyse_fwe_or_get_cached(n_total, n_positive, allowable_error) -> ForestAnalysis:
     fwe = ForestWithEnvelope.create_greedy(n_total, n_positive, allowable_error)
     return fwe.analyse()
