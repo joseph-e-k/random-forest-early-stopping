@@ -7,8 +7,9 @@ import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 
-from figure_utils import save_figure
-from predestined_k_approach.eb_experiments import analyse_fwe_or_get_cached
+from figure_utils import save_figure, RCPARAMS_LATEX_DOUBLE_COLUMN, RCPARAMS_LATEX_SINGLE_COLUMN_WIDE, \
+    RCPARAMS_ONE_TIME_THING
+from predestined_k_approach.eb_experiments import analyse_fwe_or_get_cached, cache
 from predestined_k_approach.utils import covariates_response_split
 
 
@@ -32,6 +33,7 @@ def coerce_nonnumeric_columns_to_numeric(df: pd.DataFrame):
     return df
 
 
+@cache.memoize()
 def estimate_positive_tree_distribution(dataset: pd.DataFrame, n_trees=100, test_proportion=0.2, *, response_column=-1):
     # Processing: get covariates and responses, convert responses to binary classes, and split into train and test sets
     X, y = covariates_response_split(dataset, response_column)
@@ -59,17 +61,23 @@ def estimate_positive_tree_distribution(dataset: pd.DataFrame, n_trees=100, test
     )
 
 
-def plot_n_positive_distributions(n_trees, datasets):
-    fig, axs = plt.subplots(nrows=1, ncols=len(datasets), tight_layout=True)
+def plot_n_positive_distributions(n_trees, datasets, nrows=None, ncols=None):
+    nrows = nrows or 1
+    ncols = ncols or len(datasets) // nrows
+    if ncols * nrows != len(datasets):
+        raise ValueError("Datasets do not divide evenly into given number of rows")
+
+    fig, axs = plt.subplots(nrows=nrows, ncols=ncols, tight_layout=True)
 
     for i_dataset, (dataset_name, dataset) in enumerate(datasets.items()):
         n_observations, n_positive_observations, *distributions = estimate_positive_tree_distribution(dataset, n_trees)
         distribution_total, distribution_for_pos, distribution_for_neg = distributions
 
-        ax = axs[i_dataset]
-        ax.hist((distribution_for_pos, distribution_for_neg), stacked=True)
-        ax.title.set_text(f"{dataset_name} ({n_positive_observations} / {n_observations})")
+        ax = axs[i_dataset // nrows, i_dataset % nrows]
+        ax.hist(distribution_total)
+        ax.title.set_text(f"{dataset_name}")
         ax.set_xlim((0, n_trees))
+        ax.set_yticks([])
 
     return fig
 
@@ -131,16 +139,17 @@ def show_error_rates_and_runtimes(n_trees, datasets, allowable_error_rates):
 
 
 def main():
-    n_trees = 1001
+    n_trees = 101
     datasets = {
-        "A": pd.read_csv(r"..\data\data_banknote_authentication.txt"),
-        "B": pd.read_csv(r"..\data\heart_attack.csv"),
-        "C": pd.read_csv(r"..\data\adult.data"),
-        "D": pd.read_excel(r"..\data\dry_beans.xlsx")
+        "Banknotes": pd.read_csv(r"..\data\data_banknote_authentication.txt"),
+        "Heart Attacks": pd.read_csv(r"..\data\heart_attack.csv"),
+        "Salaries": pd.read_csv(r"..\data\adult.data"),
+        "Dry Beans": pd.read_excel(r"..\data\dry_beans.xlsx")
     }
 
-    figure = plot_n_positive_distributions(n_trees, datasets)
-    save_figure(figure, "n_positive_empirical_distributions")
+    with plt.rc_context(rc=RCPARAMS_ONE_TIME_THING):
+        figure = plot_n_positive_distributions(n_trees, datasets, nrows=2, ncols=2)
+        save_figure(figure, "n_positive_empirical_distributions_v5")
 
 
 if __name__ == "__main__":
