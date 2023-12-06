@@ -173,10 +173,10 @@ def analyse_optimal_fwss_or_get_cached(n_total, n_positive, allowable_error):
 def main():
     n_trees = 501
     datasets = {
-        "Banknotes": pd.read_csv(r"..\data\data_banknote_authentication.txt"),
-        "Heart Attacks": pd.read_csv(r"..\data\heart_attack.csv"),
-        "Salaries": pd.read_csv(r"..\data\adult.data"),
-        "Dry Beans": pd.read_excel(r"..\data\dry_beans.xlsx")
+        "Banknotes": pd.read_csv(r"../data/data_banknote_authentication.txt"),
+        "Heart Attacks": pd.read_csv(r"../data/heart_attack.csv"),
+        "Salaries": pd.read_csv(r"../data/adult.data"),
+        "Dry Beans": pd.read_excel(r"../data/dry_beans.xlsx")
     }
 
     get_and_show_error_rates_and_runtimes(n_trees, datasets, [10 ** -3, 10 ** -6, 0], [
