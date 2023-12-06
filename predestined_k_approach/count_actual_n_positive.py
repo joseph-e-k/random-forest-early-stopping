@@ -86,13 +86,9 @@ def plot_n_positive_distributions(n_trees, datasets, nrows=None, ncols=None):
     return fig
 
 
-def show_error_rates_and_runtimes(n_trees, datasets, allowable_error_rates, analysis_getters):
-    n_analyses = len(analysis_getters)
-
+def get_error_rates_and_runtimes(n_trees, datasets, allowable_error_rates, analysis_getters):
     runtimes = np.zeros((len(datasets), len(allowable_error_rates), len(analysis_getters)))
     error_rates = np.zeros_like(runtimes)
-
-    fig, axs = plt.subplots(2, n_analyses, tight_layout=True)
 
     for i_dataset, (dataset_name, dataset) in enumerate(datasets.items()):
         _, _, positive_tree_distribution, _, _ = estimate_positive_tree_distribution(dataset, n_trees=n_trees)
@@ -109,10 +105,23 @@ def show_error_rates_and_runtimes(n_trees, datasets, allowable_error_rates, anal
                     runtimes[i_dataset, i_aer, i_analysis] += analysis.expected_runtime * weight / weights.total()
                     error_rates[i_dataset, i_aer, i_analysis] += analysis.prob_error * weight / weights.total()
 
+    return error_rates, runtimes
+
+
+def show_error_rates_and_runtimes(error_rates, runtimes, dataset_names, allowable_error_rates, analysis_names):
+    assert error_rates.shape == runtimes.shape
+
+    n_datasets, n_aers, n_analyses = error_rates.shape
+
+    assert len(dataset_names) == n_datasets
+    assert len(allowable_error_rates) == n_aers
+    assert len(analysis_names) == n_analyses
+
+    fig, axs = plt.subplots(2, n_analyses, tight_layout=True)
     fig.patch.set_visible(False)
 
     for i_analysis in range(n_analyses):
-        name = analysis_getters[i_analysis].__name__
+        name = analysis_names[i_analysis]
         table_specs = zip(
             [f"Expected Runtime ({name})", f"Error Rate ({name})"],
             axs[:, i_analysis],
@@ -130,14 +139,27 @@ def show_error_rates_and_runtimes(n_trees, datasets, allowable_error_rates, anal
             ax.table(
                 cellText=[
                     [cell_format.format(table_content[i_dataset, i_aer]) for (i_aer, aer) in enumerate(allowable_error_rates)]
-                    for i_dataset in range(len(datasets))
+                    for i_dataset in range(n_datasets)
                 ],
-                rowLabels=list(datasets.keys()),
+                rowLabels=list(dataset_names),
                 colLabels=[str(aer) for aer in allowable_error_rates],
                 loc="center"
             )
 
     plt.show()
+
+
+def get_and_show_error_rates_and_runtimes(n_trees, datasets, allowable_error_rates, analysis_getters):
+    error_rates, runtimes = get_error_rates_and_runtimes(
+        n_trees, datasets, allowable_error_rates, analysis_getters
+    )
+    show_error_rates_and_runtimes(
+        error_rates,
+        runtimes,
+        datasets.keys(),
+        allowable_error_rates,
+        [func.__name__ for func in analysis_getters]
+    )
 
 
 @timed
@@ -149,7 +171,7 @@ def analyse_optimal_fwss_or_get_cached(n_total, n_positive, allowable_error):
 
 
 def main():
-    n_trees = 1001
+    n_trees = 501
     datasets = {
         "Banknotes": pd.read_csv(r"..\data\data_banknote_authentication.txt"),
         "Heart Attacks": pd.read_csv(r"..\data\heart_attack.csv"),
@@ -157,10 +179,7 @@ def main():
         "Dry Beans": pd.read_excel(r"..\data\dry_beans.xlsx")
     }
 
-    # with plt.rc_context(rc=RCPARAMS_ONE_TIME_THING):
-    #     figure = plot_n_positive_distributions(n_trees, datasets, nrows=2, ncols=2)
-    #     save_figure(figure, "n_positive_empirical_distributions_v5")
-    show_error_rates_and_runtimes(n_trees, datasets, [10 ** -3, 10 ** -6, 0], [
+    get_and_show_error_rates_and_runtimes(n_trees, datasets, [10 ** -3, 10 ** -6, 0], [
         analyse_fwe_or_get_cached,
         analyse_optimal_fwss_or_get_cached
     ])
