@@ -141,8 +141,8 @@ def main():
         fwss = ForestWithGivenStoppingStrategy(forest, optimal_stopping_strategy)
         fwe = ForestWithEnvelope.create_greedy(n_total, n_positive, aer)
 
-        print(f"{fwss.analyse().expected_runtime=})")
-        print(f"{fwe.analyse().expected_runtime=})")
+        print(f"{fwss.analyse().expected_runtime=}")
+        print(f"{fwe.analyse().expected_runtime=}")
 
         fwss_pi, fwss_pi_bar = get_pi_and_pi_bar_from_theta(fwss.stopping_strategy)
 
