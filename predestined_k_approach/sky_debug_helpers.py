@@ -1,159 +1,75 @@
-import dataclasses
-
-import numpy as np
-from scipy import optimize, stats
+import gc
 
 from predestined_k_approach.Forest import Forest
-from predestined_k_approach.optimization import get_optimal_stopping_strategy
+from predestined_k_approach.optimization import *
 from predestined_k_approach.ForestWithEnvelope import ForestWithEnvelope
 from predestined_k_approach.ForestWithStoppingStrategy import ForestWithGivenStoppingStrategy
 from predestined_k_approach.utils import TimerContext
 
 
-def main1():
-    res = optimize.linprog(
-        c=-np.array([1, 2]),
-        A_ub=np.array([[1, 1]]),
-        b_ub=1
-    )
-    print(res.x)
-    print(-res.fun)
+def make_sky_from_truncated_theta(truncated_theta):
+    n = truncated_theta.shape[0] - 1
+    theta = np.ones((n + 1, n + 1))
+    theta[:, :truncated_theta.shape[1]] = truncated_theta
 
-
-def main2():
-    n_total = np.array([20, 30])
-    n_good = np.array([10, 5])
-    n_selected = np.array([3, 4])
-
-    rvs = stats.hypergeom(n_total, n_good, n_selected)
-    print(rvs)
-
-
-@dataclasses.dataclass
-class DummyProblem:
-    conditions_with_labels: list[tuple[bool, str]] = dataclasses.field(default_factory=list)
-
-    def __iadd__(self, condition_with_label: tuple[bool, str]):
-        self.conditions_with_labels.append(condition_with_label)
-        return self
-
-    def check_conditions(self):
-        for condition, label in self.conditions_with_labels:
-            assert condition, label
-
-
-def get_pi_and_pi_bar_from_theta(theta: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    theta_orig = theta
-
-    theta = np.zeros((theta_orig.shape[0], theta_orig.shape[0]))
-
-    for i in range(theta_orig.shape[0]):
-        for j in range(theta_orig.shape[1]):
-            theta[i, j] = theta_orig[i, j]
+    p = np.zeros_like(theta)
 
     theta_bar = 1 - theta
-    pi = np.zeros((theta.shape[0] - 1, theta.shape[0]))
-    pi_bar = np.ones_like(pi)
 
-    for c in range(pi.shape[1]):
-        pi[0, c] = theta[0, c]
-        pi_bar[0, c] = theta_bar[0, c]
+    p[0, 0] = 1
+    for i in range(n):
+        p[i + 1, 0] = p[i, 0] * theta_bar[i, 0]
 
-    for n in range(1, pi.shape[0]):
-        for c in range(pi.shape[1]):
-            combinatoric_factor = (c / n * pi_bar[n-1, c-1] + (n - c) / n * pi_bar[n-1, c])
-            pi[n, c] = theta[n, c] * combinatoric_factor
-            pi_bar[n, c] = theta_bar[n, c] * combinatoric_factor
+        for j in range(i + 1):
+            p[i + 1, j + 1] = (
+                ((i - j) / (i + 1)) * p[i, j + 1] * theta_bar[i, j + 1]
+                + ((j + 1) / (i + 1)) * p[i, j] * theta_bar[i, j]
+            )
 
-    return pi, pi_bar
-
-
-def get_expected_runtime_coefficients(t, t_plus):
-    m_pi = np.zeros((t, t + 1))
-
-    for n in range(m_pi.shape[0]):
-        for c in range(m_pi.shape[1]):
-            m_pi[n, c] = n * stats.hypergeom(t, t_plus, n).pmf(c)
-
-    return m_pi
-
-
-def get_expected_runtime(t, t_plus, pi, pi_bar):
-    assert pi.shape == pi_bar.shape
-
-    m_pi = get_expected_runtime_coefficients(t, t_plus)
-
-    r = np.sum(pi * m_pi)
-
-    for c in range(pi.shape[1]):
-        combinatoric_factor = (c / t * pi_bar[t - 1, c - 1] + (t - c) / t * pi_bar[t - 1, c])
-        r += combinatoric_factor * stats.hypergeom(t, t_plus, t).pmf(c) * t
-
-    return r
-
-def get_error_rate(t, t_plus, pi, pi_bar):
-    assert pi.shape == pi_bar.shape
-
-    is_error = np.empty_like(pi, dtype=bool)
-    for n in range(is_error.shape[0]):
-        for c in range(is_error.shape[1]):
-            is_error[n, c] = ((c > n / 2) != (t_plus > t / 2))
-
-    s = 0
-
-    for n in range(pi.shape[0]):
-        for c in range(pi.shape[1]):
-            if is_error[n, c]:
-                s += stats.hypergeom(t, t_plus, n).pmf(c) * pi[n, c]
-
-    for c in range(pi_bar.shape[1]):
-        if is_error[t, c]:
-            s += stats.hypergeom(t, t_plus, t).pmf(c) * pi_bar[t, c]
-
-    return s
-
-
-def get_greedy_fwe_pi_and_pi_bar():
-    n_total = 185
-    fwe = ForestWithEnvelope.create_greedy(n_total, n_total // 2, 0.001)
-    return get_pi_and_pi_bar_from_theta(np.exp(fwe._get_log_prob_stop()))
-
-
-@dataclasses.dataclass
-class SecondaryOutputObject:
-    pi: np.ndarray = None
-    pi_bar: np.ndarray= None
+    return Sky(p, p * theta, p * theta_bar)
 
 
 def main():
     aer = 10**-6
 
-    for n_total in range(11, 301, 2):
-        n_positive = n_total // 2
+    for n_total in [133]:
+        n_positive_low = n_total // 2
+        n_positive_high = n_positive_low + 1
 
-        forest = Forest(n_total, n_positive)
+        low_forest = Forest(n_total, n_positive_low)
+        high_forest = Forest(n_total, n_positive_high)
+
+        low_fwe = ForestWithEnvelope.create_greedy(n_total, n_positive_low, aer)
+        high_fwe = ForestWithEnvelope(forest=high_forest, envelope=low_fwe.envelope)
+        fwe_sky = make_sky_from_truncated_theta(low_fwe.get_prob_stop())
+        fwe_theta_reconstructed = make_theta_from_sky(fwe_sky)
+        fwe_theta_reconstructed_truncated = fwe_theta_reconstructed[:, :(n_positive_low + 1)]
+        assert np.all(np.abs(fwe_theta_reconstructed_truncated - low_fwe.get_prob_stop()) < 0.0001)
 
         with TimerContext(f"find optimal stopping strategy ({n_total=}, {aer=})"):
-            optimal_stopping_strategy = get_optimal_stopping_strategy(n_total, aer)
+            fwss_sky = make_and_solve_optimal_stopping_problem(n_total, aer)
+            optimal_stopping_strategy = make_theta_from_sky(fwss_sky)
 
-        fwss = ForestWithGivenStoppingStrategy(forest, optimal_stopping_strategy)
-        fwe = ForestWithEnvelope.create_greedy(n_total, n_positive, aer)
+        low_fwss = ForestWithGivenStoppingStrategy(low_forest, optimal_stopping_strategy)
+        high_fwss = ForestWithGivenStoppingStrategy(high_forest, optimal_stopping_strategy)
 
-        print(f"{n_total=}")
-        print(f"{fwss.analyse().expected_runtime=}")
-        print(f"{fwe.analyse().expected_runtime=}")
-        if fwss.analyse().expected_runtime > fwe.analyse().expected_runtime:
-            print("^-- *** PANIC TIME ***")
-        print()
+        low_fwss_time = low_fwss.analyse().expected_runtime
+        high_fwss_time = high_fwss.analyse().expected_runtime
+        low_fwe_time = low_fwe.analyse().expected_runtime
+        high_fwe_time = high_fwe.analyse().expected_runtime
 
-        # fwss_pi, fwss_pi_bar = get_pi_and_pi_bar_from_theta(fwss.stopping_strategy)
-        #
-        # fwe_pi, fwe_pi_bar = get_pi_and_pi_bar_from_theta(np.exp(fwe._get_log_prob_stop()))
-        #
-        # print(f"{get_expected_runtime(n_total, n_total // 2, fwss_pi, fwss_pi_bar)=}")
-        # print(f"{get_expected_runtime(n_total, n_total // 2, fwe_pi, fwe_pi_bar)=}")
-        # print(f"{get_expected_runtime(n_total, n_total // 2 + 1, fwss_pi, fwss_pi_bar)=}")
-        # print(f"{get_expected_runtime(n_total, n_total // 2 + 1, fwe_pi, fwe_pi_bar)=}")
+        a = make_abstract_probability_matrix(n_total, np.array([n_positive_low, n_positive_high]))
+
+        for label, sky in [("fwss", fwss_sky), ("fwe", fwe_sky)]:
+            beta = a * sky.pi
+            prob_B_equals = np.sum(beta, axis=2)
+            expected_B = np.sum(prob_B_equals * np.arange(n_total + 1), axis=1)
+            print(f"theoretical expected runtimes for {label}: {expected_B}")
+
+        if low_fwss_time > low_fwe_time and high_fwss_time > high_fwe_time:
+            print(f"* {n_total=}, {low_fwss_time=}, {low_fwe_time=}, {high_fwss_time=}, {high_fwe_time=}")
+
+        gc.collect()
 
 
 if __name__ == "__main__":

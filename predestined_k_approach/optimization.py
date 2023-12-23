@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import dataclasses
 import os
+from typing import Optional
 
 import numpy as np
 from diskcache import Cache
@@ -11,18 +13,25 @@ from scipy import stats
 cache = Cache(os.path.join(os.path.dirname(__file__), ".cache"))
 
 
+@dataclasses.dataclass(frozen=True)
+class Sky:
+    p: np.ndarray
+    pi: np.ndarray
+    pi_bar: np.ndarray
+
+
 def get_optimal_stopping_strategy(n_total, allowable_error):
-    p, pi, pi_bar = _make_and_solve_optimal_stopping_problem(n_total, allowable_error)
-    return _make_theta_from_p_and_pi(p, pi)
+    sky = make_and_solve_optimal_stopping_problem(n_total, allowable_error)
+    return make_theta_from_sky(sky)
 
 
 # @cache.memoize()
-def _make_and_solve_optimal_stopping_problem(n, alpha) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+def make_and_solve_optimal_stopping_problem(n: int, alpha: float) -> Sky:
     problem = LpProblem(sense=LpMinimize)
 
     p, pi, pi_bar = _make_decision_variables(n)
     n_plus = np.array([n // 2, n // 2 + 1])
-    a = _make_abstract_probability_matrix(n, n_plus)
+    a = make_abstract_probability_matrix(n, n_plus)
     beta = a * pi
 
     prob_B_equals = np.sum(beta, axis=2)
@@ -79,8 +88,9 @@ def _make_and_solve_optimal_stopping_problem(n, alpha) -> tuple[np.ndarray, np.n
 
 
     problem.solve(solver=PULP_CBC_CMD(msg=False))
+    print(f"{problem.status=}")
 
-    return (
+    return Sky(
         _get_decision_variable_values(p),
         _get_decision_variable_values(pi),
         _get_decision_variable_values(pi_bar)
@@ -107,7 +117,7 @@ def _make_decision_variable_matrix(n, variable_name) -> np.ndarray:
     return matrix
 
 
-def _make_abstract_probability_matrix(n, n_plus):
+def make_abstract_probability_matrix(n, n_plus):
     # Probability matrices for the abstract process. Shape is (len(n_plus), n + 1, n + 1).
     # The first index corresponds to the case (the value of n_plus); the second and third correspond
     # to i and j.
@@ -135,9 +145,9 @@ def _get_decision_variable_values(decision_variable_matrix):
     return values
 
 
-def _make_theta_from_p_and_pi(p, pi):
-    theta = np.ones_like(p)
-    np.divide(pi, p, out=theta, where=(p!=0))
+def make_theta_from_sky(sky):
+    theta = np.ones_like(sky.p)
+    np.divide(sky.pi, sky.p, out=theta, where=(sky.p!=0))
 
     # TODO: Find a less hacky way to deal with floating-point errors and decision variable values exceeding their bounds
     np.clip(theta, 0, 1, out=theta)

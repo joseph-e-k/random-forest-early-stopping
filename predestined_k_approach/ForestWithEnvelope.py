@@ -15,15 +15,17 @@ from .envelopes import Envelope, get_null_envelope, add_increment_to_envelope
 class ForestWithEnvelope(ForestWithStoppingStrategy):
     envelope: Envelope
 
-    def _get_log_prob_stop(self):
+    def get_prob_stop(self):
         prob_stop = np.empty_like(self._log_state_probabilities)
 
         for i_step in range(self.n_steps - 1):
             prob_stop[i_step, :] = 1 - self._get_mask_for_bounds(self._n_values, *self.envelope[i_step])
 
         prob_stop[self.n_steps - 1, :] = 1
+        return prob_stop
 
-        return np.log(prob_stop)
+    def _get_log_prob_stop(self):
+        return np.log(self.get_prob_stop())
 
     @classmethod
     def create(cls, n_total, n_total_positive, envelope=None):
