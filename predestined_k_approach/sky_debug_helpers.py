@@ -128,33 +128,32 @@ class SecondaryOutputObject:
 def main():
     aer = 10**-6
 
-    for n_total in [223]:
+    for n_total in range(11, 301, 2):
         n_positive = n_total // 2
 
         forest = Forest(n_total, n_positive)
 
-        soo = SecondaryOutputObject()
-
         with TimerContext(f"find optimal stopping strategy ({n_total=}, {aer=})"):
-            optimal_stopping_strategy = get_optimal_stopping_strategy(n_total, aer, soo)
+            optimal_stopping_strategy = get_optimal_stopping_strategy(n_total, aer)
 
         fwss = ForestWithGivenStoppingStrategy(forest, optimal_stopping_strategy)
         fwe = ForestWithEnvelope.create_greedy(n_total, n_positive, aer)
 
+        print(f"{n_total=}")
         print(f"{fwss.analyse().expected_runtime=}")
         print(f"{fwe.analyse().expected_runtime=}")
+        if fwss.analyse().expected_runtime > fwe.analyse().expected_runtime:
+            print("^-- *** PANIC TIME ***")
+        print()
 
-        fwss_pi, fwss_pi_bar = get_pi_and_pi_bar_from_theta(fwss.stopping_strategy)
-
-        # assert soo.pi == fwss_pi
-        # assert soo.pi_bar == fwss_pi_bar
-
-        fwe_pi, fwe_pi_bar = get_pi_and_pi_bar_from_theta(np.exp(fwe._get_log_prob_stop()))
-
-        print(f"{get_expected_runtime(n_total, n_total // 2, fwss_pi, fwss_pi_bar)=}")
-        print(f"{get_expected_runtime(n_total, n_total // 2, fwe_pi, fwe_pi_bar)=}")
-        print(f"{get_expected_runtime(n_total, n_total // 2 + 1, fwss_pi, fwss_pi_bar)=}")
-        print(f"{get_expected_runtime(n_total, n_total // 2 + 1, fwe_pi, fwe_pi_bar)=}")
+        # fwss_pi, fwss_pi_bar = get_pi_and_pi_bar_from_theta(fwss.stopping_strategy)
+        #
+        # fwe_pi, fwe_pi_bar = get_pi_and_pi_bar_from_theta(np.exp(fwe._get_log_prob_stop()))
+        #
+        # print(f"{get_expected_runtime(n_total, n_total // 2, fwss_pi, fwss_pi_bar)=}")
+        # print(f"{get_expected_runtime(n_total, n_total // 2, fwe_pi, fwe_pi_bar)=}")
+        # print(f"{get_expected_runtime(n_total, n_total // 2 + 1, fwss_pi, fwss_pi_bar)=}")
+        # print(f"{get_expected_runtime(n_total, n_total // 2 + 1, fwe_pi, fwe_pi_bar)=}")
 
 
 if __name__ == "__main__":
