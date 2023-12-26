@@ -80,7 +80,6 @@ def make_and_solve_optimal_stopping_problem(n: int, alpha: float) -> Sky:
 
 
     problem.solve(solver=PULP_CBC_CMD(msg=False))
-    print(f"{problem.status=}")
 
     return Sky(
         _get_decision_variable_values(p),
