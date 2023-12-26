@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import dataclasses
 import os
-from typing import Optional
 
 import numpy as np
 from diskcache import Cache

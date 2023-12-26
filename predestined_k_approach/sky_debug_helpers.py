@@ -58,6 +58,11 @@ def main():
         low_fwe_time = low_fwe.analyse().expected_runtime
         high_fwe_time = high_fwe.analyse().expected_runtime
 
+        print(f"{low_fwss.analyse().prob_error=}")
+        print(f"{high_fwss.analyse().prob_error=}")
+        print(f"{low_fwe.analyse().prob_error=}")
+        print(f"{high_fwe.analyse().prob_error=}")
+
         a = make_abstract_probability_matrix(n_total, np.array([n_positive_low, n_positive_high]))
 
         for label, sky in [("fwss", fwss_sky), ("fwe", fwe_sky)]:
