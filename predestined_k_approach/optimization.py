@@ -72,13 +72,6 @@ def make_and_solve_optimal_stopping_problem(n: int, alpha: float) -> Sky:
                 f" for {i=}, {j=}"
             )
 
-    for i in range(n + 1):
-        for j in range(n + 1):
-            problem += (
-                pi[i, j] + pi_bar[i, j] == p[i, j],
-                f"pi[i, j] + pi_bar[i, j] == p[i, j] where {i=}, {j=}"
-            )
-
     for j in range(n + 1):
         problem += (
             pi[n, j] == p[n, j],
@@ -97,11 +90,10 @@ def make_and_solve_optimal_stopping_problem(n: int, alpha: float) -> Sky:
 
 
 def _make_decision_variables(n) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    return (
-        _make_decision_variable_matrix(n, "p"),
-        _make_decision_variable_matrix(n, "pi"),
-        _make_decision_variable_matrix(n, "pi_bar"),
-    )
+    pi = _make_decision_variable_matrix(n, "pi")
+    pi_bar = _make_decision_variable_matrix(n, "pi_bar")
+    p = pi + pi_bar
+    return p, pi, pi_bar
 
 
 def _make_decision_variable_matrix(n, variable_name) -> np.ndarray:
