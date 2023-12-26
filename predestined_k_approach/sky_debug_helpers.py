@@ -32,7 +32,9 @@ def make_sky_from_truncated_theta(truncated_theta):
 def main():
     aer = 10**-6
 
-    for n_total in [133]:
+    for n_total in range(11, 1001, 2):
+        gc.collect()
+
         n_positive_low = n_total // 2
         n_positive_high = n_positive_low + 1
 
@@ -58,6 +60,12 @@ def main():
         low_fwe_time = low_fwe.analyse().expected_runtime
         high_fwe_time = high_fwe.analyse().expected_runtime
 
+        if low_fwss_time > low_fwe_time and high_fwss_time > high_fwe_time:
+            pass
+        else:
+            continue
+
+        print("***")
         print(f"{low_fwss.analyse().prob_error=}")
         print(f"{high_fwss.analyse().prob_error=}")
         print(f"{low_fwe.analyse().prob_error=}")
@@ -71,10 +79,10 @@ def main():
             expected_B = np.sum(prob_B_equals * np.arange(n_total + 1), axis=1)
             print(f"theoretical expected runtimes for {label}: {expected_B}")
 
-        if low_fwss_time > low_fwe_time and high_fwss_time > high_fwe_time:
-            print(f"* {n_total=}, {low_fwss_time=}, {low_fwe_time=}, {high_fwss_time=}, {high_fwe_time=}")
+            print(f"{n_total=}, {low_fwss_time=}, {low_fwe_time=}, {high_fwss_time=}, {high_fwe_time=}")
 
-        gc.collect()
+        print("***")
+        print()
 
 
 if __name__ == "__main__":
