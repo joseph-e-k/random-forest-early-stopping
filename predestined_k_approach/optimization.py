@@ -25,7 +25,7 @@ def get_optimal_stopping_strategy(n_total, allowable_error):
 
 
 # @cache.memoize()
-def make_and_solve_optimal_stopping_problem(n: int, alpha: float) -> Sky:
+def make_and_solve_optimal_stopping_problem(n: int, alpha: float, known_solution: Sky = None) -> Sky:
     problem = LpProblem(sense=LpMinimize)
 
     p, pi, pi_bar = _make_decision_variables(n)
@@ -78,8 +78,29 @@ def make_and_solve_optimal_stopping_problem(n: int, alpha: float) -> Sky:
             f"pi[n, {j}] == p[n, {j}]"
         )
 
+    if known_solution:
+        for i in range(n + 1):
+            for j in range(i + 1):
+                try:
+                    problem += (
+                        pi[i, j] == known_solution.pi[i, j],
+                        f"pi[{i}, {j}] == {known_solution.pi[i, j]} (known solution)"
+                    )
+                    problem += (
+                        pi_bar[i, j] == known_solution.pi_bar[i, j],
+                        f"pi_bar[{i}, {j}] == {known_solution.pi_bar[i, j]} (known solution)"
+                    )
+                    problem += (
+                        p[i, j] == known_solution.p[i, j],
+                        f"p[{i}, {j}] == {known_solution.p[i, j]} (known solution)"
+                    )
+                except:
+                    raise
+
 
     problem.solve(solver=PULP_CBC_CMD(msg=False))
+    if problem.status != 1:
+        raise Exception("Couldn't solve")
 
     return Sky(
         _get_decision_variable_values(p),

@@ -32,9 +32,7 @@ def make_sky_from_truncated_theta(truncated_theta):
 def main():
     aer = 10**-6
 
-    for n_total in range(11, 1001, 2):
-        gc.collect()
-
+    for n_total in [145]:
         n_positive_low = n_total // 2
         n_positive_high = n_positive_low + 1
 
@@ -80,6 +78,18 @@ def main():
             print(f"theoretical expected runtimes for {label}: {expected_B}")
 
             print(f"{n_total=}, {low_fwss_time=}, {low_fwe_time=}, {high_fwss_time=}, {high_fwe_time=}")
+
+        with TimerContext(f"find optimal stopping strategy with known solution ({n_total=}, {aer=})"):
+            fwss_sky_recomputed = make_and_solve_optimal_stopping_problem(n_total, aer, known_solution=fwe_sky)
+            optimal_stopping_strategy_recomputed = make_theta_from_sky(fwss_sky_recomputed)
+
+        low_fwss_recomputed = ForestWithGivenStoppingStrategy(low_forest, optimal_stopping_strategy_recomputed)
+        high_fwss_recomputed = ForestWithGivenStoppingStrategy(high_forest, optimal_stopping_strategy_recomputed)
+
+        print(f"{low_fwss_recomputed.analyse().expected_runtime=}")
+        print(f"{high_fwss_recomputed.analyse().expected_runtime=}")
+        print(f"{low_fwss_recomputed.analyse().prob_error=}")
+        print(f"{high_fwss_recomputed.analyse().prob_error=}")
 
         print("***")
         print()
