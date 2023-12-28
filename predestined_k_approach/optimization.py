@@ -43,6 +43,18 @@ def make_and_solve_optimal_stopping_problem(n: int, alpha: float, known_solution
             f"max_expected_runtime >= expected_B[{k}]"
         )
 
+    for decision_variable in [p, pi, pi_bar]:
+        for i in range(n + 1):
+            for j in range(i + 1):
+                problem += (
+                    decision_variable[i, j] >= 0,
+                    f"{decision_variable[i, j]} >= 0"
+                )
+                problem += (
+                    decision_variable[i, j] <= 1,
+                    f"{decision_variable[i, j]} <= 1"
+                )
+
     e = _make_error_mask(n, n_plus)
     prob_error = np.sum(e * beta, axis=(1, 2))
     for k in range(len(n_plus)):
@@ -121,9 +133,7 @@ def _make_decision_variable_matrix(n, variable_name) -> np.ndarray:
     for i in range(n + 1):
         for j in range(i + 1):
             matrix[i, j] = LpVariable(
-                f"{variable_name}_{i}_{j}",
-                lowBound=0,
-                upBound=1
+                f"{variable_name}_{i}_{j}"
             )
     return matrix
 
