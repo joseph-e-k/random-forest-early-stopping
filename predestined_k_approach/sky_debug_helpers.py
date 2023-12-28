@@ -32,7 +32,7 @@ def make_sky_from_truncated_theta(truncated_theta):
 def main():
     aer = 10**-6
 
-    for n_total in [145]:
+    for n_total in range(11, 1001, 2):
         n_positive_low = n_total // 2
         n_positive_high = n_positive_low + 1
 
