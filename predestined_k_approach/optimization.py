@@ -5,9 +5,9 @@ import os
 
 import numpy as np
 from diskcache import Cache
-from pulp import LpProblem, LpMinimize, LpVariable, PULP_CBC_CMD, pulp
 from scipy import stats
 
+from linear_programming_utils import Problem, OptimizationResult, ArithmeticExpression
 
 cache = Cache(os.path.join(os.path.dirname(__file__), ".cache"))
 
@@ -26,115 +26,75 @@ def get_optimal_stopping_strategy(n_total, allowable_error):
 
 # @cache.memoize()
 def make_and_solve_optimal_stopping_problem(n: int, alpha: float, known_solution: Sky = None) -> Sky:
-    problem = LpProblem(sense=LpMinimize)
+    problem = Problem()
 
-    p, pi, pi_bar = _make_decision_variables(n)
+    p, pi, pi_bar = _make_decision_variables(n, problem)
     n_plus = np.array([n // 2, n // 2 + 1])
     a = make_abstract_probability_matrix(n, n_plus)
     beta = a * pi
 
     prob_B_equals = np.sum(beta, axis=2)
     expected_B = np.sum(prob_B_equals * np.arange(n + 1), axis=1)
-    max_expected_B = LpVariable("max_expected_B")
-    problem += max_expected_B, "Objective: minimize maximal expected runtime"
+    max_expected_B = problem.add_variable("max_expected_B")
+    problem.set_objective(max_expected_B)
     for k in range(len(n_plus)):
-        problem += (
-            (max_expected_B >= expected_B[k]),
-            f"max_expected_runtime >= expected_B[{k}]"
-        )
+        problem.add_constraint(max_expected_B >= expected_B[k])
 
     for decision_variable in [p, pi, pi_bar]:
         for i in range(n + 1):
             for j in range(i + 1):
-                problem += (
-                    decision_variable[i, j] >= 0,
-                    f"{decision_variable[i, j]} >= 0"
-                )
-                problem += (
-                    decision_variable[i, j] <= 1,
-                    f"{decision_variable[i, j]} <= 1"
-                )
+                problem.add_constraint(decision_variable[i, j] >= 0)
+                problem.add_constraint(decision_variable[i, j] <= 1)
 
     e = _make_error_mask(n, n_plus)
     prob_error = np.sum(e * beta, axis=(1, 2))
     for k in range(len(n_plus)):
-        problem += (
-            (prob_error[k] <= alpha),
-            f"prob_error[{k}] <= alpha"
-        )
+        problem.add_constraint(prob_error[k] <= alpha)
 
-    problem += (
-        (p[0, 0] == 1),
-        "p[0, 0] == 1"
-    )
+    problem.add_constraint(p[0, 0] == 1)
 
     for i in range(n):
-        problem += (
-            (p[i + 1, 0] == pi_bar[i, 0]),
-            f"p[{i} + 1, 0] == pi_bar[{i}, 0]"
-        )
+        problem.add_constraint(p[i + 1, 0] == pi_bar[i, 0])
 
     for i in range(n):
         for j in range(i + 1):
-            problem += (
+            problem.add_constraint(
                 p[i + 1, j + 1] ==
                     ((i - j) / (i + 1)) * pi_bar[i, j + 1]
-                    + ((j + 1) / (i + 1)) * pi_bar[i, j],
-                f"p[i + 1, j + 1] == ((i - j) / (i + 1)) * pi_bar[i, j + 1] + ((j + 1) / (i + 1)) * pi_bar[i, j]"
-                f" for {i=}, {j=}"
+                    + ((j + 1) / (i + 1)) * pi_bar[i, j]
             )
 
     for j in range(n + 1):
-        problem += (
-            pi[n, j] == p[n, j],
-            f"pi[n, {j}] == p[n, {j}]"
-        )
+        problem.add_constraint(pi[n, j] == p[n, j])
 
     if known_solution:
         for i in range(n + 1):
             for j in range(i + 1):
-                try:
-                    problem += (
-                        pi[i, j] == known_solution.pi[i, j],
-                        f"pi[{i}, {j}] == {known_solution.pi[i, j]} (known solution)"
-                    )
-                    problem += (
-                        pi_bar[i, j] == known_solution.pi_bar[i, j],
-                        f"pi_bar[{i}, {j}] == {known_solution.pi_bar[i, j]} (known solution)"
-                    )
-                    problem += (
-                        p[i, j] == known_solution.p[i, j],
-                        f"p[{i}, {j}] == {known_solution.p[i, j]} (known solution)"
-                    )
-                except:
-                    raise
+                problem.add_constraint(pi[i, j] == known_solution.pi[i, j])
+                problem.add_constraint(pi_bar[i, j] == known_solution.pi_bar[i, j])
+                problem.add_constraint(p[i, j] == known_solution.p[i, j])
 
-
-    problem.solve(solver=PULP_CBC_CMD(msg=False))
-    if problem.status != 1:
-        raise Exception("Couldn't solve")
+    solution = problem.solve_with_pulp()
 
     return Sky(
-        _get_decision_variable_values(p),
-        _get_decision_variable_values(pi),
-        _get_decision_variable_values(pi_bar)
+        _get_decision_variable_values(solution, p),
+        _get_decision_variable_values(solution, pi),
+        _get_decision_variable_values(solution, pi_bar)
     )
 
 
-def _make_decision_variables(n) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    pi = _make_decision_variable_matrix(n, "pi")
-    pi_bar = _make_decision_variable_matrix(n, "pi_bar")
+def _make_decision_variables(n, problem) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    pi = _make_decision_variable_matrix(n, "pi", problem)
+    pi_bar = _make_decision_variable_matrix(n, "pi_bar", problem)
     p = pi + pi_bar
     return p, pi, pi_bar
 
 
-def _make_decision_variable_matrix(n, variable_name) -> np.ndarray:
+def _make_decision_variable_matrix(n, variable_name, problem: Problem) -> np.ndarray:
     matrix = np.zeros((n + 1, n + 1), dtype=object)
     for i in range(n + 1):
         for j in range(i + 1):
-            matrix[i, j] = LpVariable(
-                f"{variable_name}_{i}_{j}"
-            )
+            matrix[i, j] = problem.add_variable(f"{variable_name}_{i}_{j}")
     return matrix
 
 
@@ -158,11 +118,11 @@ def _make_error_mask(n, n_plus) -> np.ndarray:
     return e
 
 
-def _get_decision_variable_values(decision_variable_matrix):
+def _get_decision_variable_values(solution: OptimizationResult, decision_variable_matrix):
     values = np.empty_like(decision_variable_matrix, dtype=float)
     for i in range(decision_variable_matrix.shape[0]):
         for j in range(decision_variable_matrix.shape[1]):
-            values[i, j] = pulp.value(decision_variable_matrix[i, j])
+            values[i, j] = ArithmeticExpression.evaluate(decision_variable_matrix[i, j], solution)
     return values
 
 
