@@ -56,12 +56,13 @@ def get_expected_runtimes(n_total, aer=10**-6):
 def main():
     n_totals = range(11, 1001, 2)
     with TimerContext():
-        with mp.Pool(512) as pool:
+        with mp.Pool(64) as pool:
             for (args, times) in pool.imap(get_expected_runtimes, n_totals, ):
                 n_total, _ = args
                 low_fwss_time, high_fwss_time, low_fwe_time, high_fwe_time = times
                 if low_fwss_time > low_fwe_time and high_fwss_time > high_fwe_time:
                     print(n_total)
+
 
 if __name__ == "__main__":
     main()
