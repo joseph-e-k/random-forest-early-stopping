@@ -1,3 +1,5 @@
+import argparse
+import itertools
 import multiprocessing as mp
 
 from predestined_k_approach.Forest import Forest
@@ -53,16 +55,24 @@ def get_expected_runtimes(n_total, aer=10**-6):
     return (n_total, aer), (low_fwss_time, high_fwss_time, low_fwe_time, high_fwe_time)
 
 
-def main():
-    n_totals = range(11, 1001, 2)
+def search_for_impossibilities(n_processes):
+    n_totals = range(11, 201, 2)
+    aers = [1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 0]
     with TimerContext():
-        with mp.Pool(256) as pool:
-            for (args, times) in pool.imap(get_expected_runtimes, n_totals):
-                n_total, _ = args
+        with mp.Pool(n_processes) as pool:
+            for (args, times) in pool.starmap(get_expected_runtimes, itertools.product(n_totals, aers)):
+                n_total, aer = args
                 low_fwss_time, high_fwss_time, low_fwe_time, high_fwe_time = times
                 if low_fwss_time > low_fwe_time and high_fwss_time > high_fwe_time:
                     print(f"* {n_total=}, {low_fwss_time=}, {high_fwss_time=}, {low_fwe_time=}, {high_fwe_time=}")
 
 
+def _parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("n_processes", type=int)
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
-    main()
+    cmd_args = _parse_args()
+    search_for_impossibilities(cmd_args.n_processes)
