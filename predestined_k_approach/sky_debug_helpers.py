@@ -68,7 +68,7 @@ class Worker:
 
 
 def search_for_impossibilities(n_processes):
-    n_totals = range(11, 201, 2)
+    n_totals = range(11, 21, 2)
     aers = [1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 0]
     with TimerContext("total"):
         with mp.Pool(n_processes) as pool:
