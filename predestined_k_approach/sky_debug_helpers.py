@@ -1,6 +1,7 @@
 import argparse
 import itertools
 import multiprocessing as mp
+from typing import Callable
 
 from predestined_k_approach.Forest import Forest
 from predestined_k_approach.optimization import *
@@ -52,19 +53,35 @@ def get_expected_runtimes(n_total, aer=10**-6):
     low_fwe_time = low_fwe.analyse().expected_runtime
     high_fwe_time = high_fwe.analyse().expected_runtime
 
-    return (n_total, aer), (low_fwss_time, high_fwss_time, low_fwe_time, high_fwe_time)
+    return low_fwss_time, high_fwss_time, low_fwe_time, high_fwe_time
+
+@dataclasses.dataclass(frozen=True)
+class Worker:
+    function: Callable
+
+    def __call__(self, args):
+        try:
+            result = self.function(*args)
+        except Exception as e:
+            return args, False, e
+        return args, True, result
 
 
 def search_for_impossibilities(n_processes):
-    n_totals = range(11, 201, 2)
+    n_totals = range(11, 21, 2)
     aers = [1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 0]
-    with TimerContext():
+    with TimerContext("total"):
         with mp.Pool(n_processes) as pool:
-            for (args, times) in pool.starmap(get_expected_runtimes, itertools.product(n_totals, aers)):
+            for (args, success, result) in pool.imap(Worker(get_expected_runtimes), itertools.product(n_totals, aers)):
                 n_total, aer = args
-                low_fwss_time, high_fwss_time, low_fwe_time, high_fwe_time = times
-                if low_fwss_time > low_fwe_time and high_fwss_time > high_fwe_time:
-                    print(f"* {n_total=}, {low_fwss_time=}, {high_fwss_time=}, {low_fwe_time=}, {high_fwe_time=}")
+
+                if success:
+                    low_fwss_time, high_fwss_time, low_fwe_time, high_fwe_time = result
+                    if low_fwss_time > low_fwe_time and high_fwss_time > high_fwe_time:
+                        print(f"impossible: {n_total=}, {aer=}, {low_fwss_time=}, {high_fwss_time=}, {low_fwe_time=}, {high_fwe_time=}")
+
+                else:
+                    print(f"error: {n_total=}, {aer=}, error={result!r}")
 
 
 def _parse_args():
