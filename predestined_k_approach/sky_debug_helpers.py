@@ -67,8 +67,8 @@ class Worker:
         return args, True, result
 
 
-def search_for_impossibilities(n_processes):
-    n_totals = range(11, 21, 2)
+def search_for_impossibilities(n_processes, low_n_total, high_n_total):
+    n_totals = range(low_n_total, high_n_total, 2)
     aers = [1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 0]
     with TimerContext("total"):
         with mp.Pool(n_processes) as pool:
@@ -86,10 +86,12 @@ def search_for_impossibilities(n_processes):
 
 def _parse_args():
     parser = argparse.ArgumentParser()
+    parser.add_argument("low_n_total", type=int)
+    parser.add_argument("high_n_total", type=int)
     parser.add_argument("n_processes", type=int)
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     cmd_args = _parse_args()
-    search_for_impossibilities(cmd_args.n_processes)
+    search_for_impossibilities(cmd_args.n_processes, cmd_args.low_n_total, cmd_args.high_n_total)
