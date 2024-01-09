@@ -67,12 +67,21 @@ class Worker:
         return args, True, result
 
 
-def search_for_impossibilities(n_processes, low_n_total, high_n_total):
+def n_cycles(iterable, n):
+    """Return the sequence elements n times."""
+    return itertools.chain.from_iterable(itertools.repeat(tuple(iterable), n))
+
+
+def search_for_impossibilities(n_processes, low_n_total, high_n_total, repetitions=1):
     n_totals = range(low_n_total, high_n_total + 1, 2)
     aers = [1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 0]
     with TimerContext("total"):
         with mp.Pool(n_processes) as pool:
-            for (args, success, result) in pool.imap(Worker(get_expected_runtimes), itertools.product(n_totals, aers)):
+            imap = pool.imap(
+                Worker(get_expected_runtimes),
+                n_cycles(itertools.product(n_totals, aers), repetitions)
+            )
+            for (args, success, result) in imap:
                 n_total, aer = args
 
                 if success:
@@ -91,9 +100,15 @@ def _parse_args():
     parser.add_argument("low_n_total", type=int)
     parser.add_argument("high_n_total", type=int)
     parser.add_argument("n_processes", type=int)
+    parser.add_argument("n_repetitions", type=int, default=1)
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     cmd_args = _parse_args()
-    search_for_impossibilities(cmd_args.n_processes, cmd_args.low_n_total, cmd_args.high_n_total)
+    search_for_impossibilities(
+        cmd_args.n_processes,
+        cmd_args.low_n_total,
+        cmd_args.high_n_total,
+        cmd_args.n_repetitions
+    )
