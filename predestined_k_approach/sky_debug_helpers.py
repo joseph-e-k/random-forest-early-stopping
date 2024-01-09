@@ -68,7 +68,7 @@ class Worker:
 
 
 def search_for_impossibilities(n_processes, low_n_total, high_n_total):
-    n_totals = range(low_n_total, high_n_total, 2)
+    n_totals = range(low_n_total, high_n_total + 1, 2)
     aers = [1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 0]
     with TimerContext("total"):
         with mp.Pool(n_processes) as pool:
@@ -79,6 +79,8 @@ def search_for_impossibilities(n_processes, low_n_total, high_n_total):
                     low_fwss_time, high_fwss_time, low_fwe_time, high_fwe_time = result
                     if low_fwss_time > low_fwe_time and high_fwss_time > high_fwe_time:
                         print(f"impossible: {n_total=}, {aer=}, {low_fwss_time=}, {high_fwss_time=}, {low_fwe_time=}, {high_fwe_time=}")
+                    else:
+                        print(f"possible: {n_total=}, {aer=}, {low_fwss_time=}, {high_fwss_time=}, {low_fwe_time=}, {high_fwe_time=}")
 
                 else:
                     print(f"error: {n_total=}, {aer=}, error={result!r}")
