@@ -101,18 +101,18 @@ def search_for_impossibilities(n_processes, low_n_total, high_n_total, repetitio
 
 def _parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("low_n_total", type=int)
-    parser.add_argument("high_n_total", type=int)
-    parser.add_argument("n_processes", type=int)
-    parser.add_argument("n_repetitions", type=int, default=1)
+    parser.add_argument("--n-lower-bound", "-l", type=int)
+    parser.add_argument("--n-upper-bound", "-u", type=int)
+    parser.add_argument("--worker-process-count", "-w", type=int)
+    parser.add_argument("--repetition-count", "-r", type=int, default=1)
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     cmd_args = _parse_args()
     search_for_impossibilities(
-        cmd_args.n_processes,
-        cmd_args.low_n_total,
-        cmd_args.high_n_total,
-        cmd_args.n_repetitions
+        cmd_args.worker_process_count,
+        cmd_args.n_lower_bound,
+        cmd_args.n_upper_bound,
+        cmd_args.repetition_count
     )
