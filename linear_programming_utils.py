@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import os
 from enum import Enum
 
 import pulp
@@ -13,6 +14,8 @@ SparseArray = dok_array
 Constant = int | float
 
 CONSTANT_COEFF_KEY = None
+
+GUROBI_CL_PATH = "/home/josephkalman/gurobi1100/linux64/bin/gurobi_cl"
 
 
 class OptimizationFailure(Exception):
@@ -253,10 +256,15 @@ class Problem:
         for i_constraint, constraint in enumerate(self.constraints):
             pulp_problem += (
                 self._logical_expression_to_pulp_format(constraint, pulp_vars_by_name),
-                f"Constraint #{i_constraint}: {constraint}"
+                f"constraint_{i_constraint}"
             )
 
-        pulp_problem.solve(solver=pulp.PULP_CBC_CMD(msg=False))
+        if os.path.exists(GUROBI_CL_PATH):
+            os.putenv("LD_LIBRARY_PATH", os.path.dirname(GUROBI_CL_PATH))
+            solver = pulp.GUROBI_CMD(path=GUROBI_CL_PATH, msg=False)
+        else:
+            solver = pulp.PULP_CBC_CMD(msg=False)
+        pulp_problem.solve(solver=solver)
         return OptimizationResult.from_pulp_format(pulp_problem, pulp_vars_by_name)
 
 
