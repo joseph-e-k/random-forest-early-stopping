@@ -1,6 +1,7 @@
 import argparse
 import itertools
 import multiprocessing as mp
+import traceback
 from typing import Callable
 
 from predestined_k_approach.Forest import Forest
@@ -63,6 +64,7 @@ class Worker:
         try:
             result = self.function(*args)
         except Exception as e:
+            traceback.print_exc()
             return args, False, e
         return args, True, result
 
