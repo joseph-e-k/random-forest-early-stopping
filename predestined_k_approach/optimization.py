@@ -25,7 +25,7 @@ def get_optimal_stopping_strategy(n_total, allowable_error):
 
 
 # @cache.memoize()
-def make_and_solve_optimal_stopping_problem(n: int, alpha: float, known_solution: Sky = None) -> Sky:
+def make_and_solve_optimal_stopping_problem(n: int, alpha: float, known_solution: Sky = None) -> tuple[Sky, float]:
     problem = Problem()
 
     p, pi, pi_bar = _make_decision_variables(n, problem)
@@ -76,11 +76,13 @@ def make_and_solve_optimal_stopping_problem(n: int, alpha: float, known_solution
 
     solution = problem.solve_with_pulp()
 
-    return Sky(
+    sky_solution = Sky(
         _get_decision_variable_values(solution, p),
         _get_decision_variable_values(solution, pi),
         _get_decision_variable_values(solution, pi_bar)
     )
+
+    return sky_solution, solution.objective_value
 
 
 def _make_decision_variables(n, problem) -> tuple[np.ndarray, np.ndarray, np.ndarray]:

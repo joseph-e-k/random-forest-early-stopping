@@ -43,7 +43,7 @@ def get_expected_runtimes(n_total, aer=10**-6):
     low_fwe = ForestWithEnvelope.create_greedy(n_total, n_positive_low, aer)
     high_fwe = ForestWithEnvelope(forest=high_forest, envelope=low_fwe.envelope)
 
-    fwss_sky = make_and_solve_optimal_stopping_problem(n_total, aer)
+    fwss_sky, theoretical_fwss_time = make_and_solve_optimal_stopping_problem(n_total, aer)
     optimal_stopping_strategy = make_theta_from_sky(fwss_sky)
 
     low_fwss = ForestWithGivenStoppingStrategy(low_forest, optimal_stopping_strategy)
@@ -54,7 +54,7 @@ def get_expected_runtimes(n_total, aer=10**-6):
     low_fwe_time = low_fwe.analyse().expected_runtime
     high_fwe_time = high_fwe.analyse().expected_runtime
 
-    return low_fwss_time, high_fwss_time, low_fwe_time, high_fwe_time
+    return theoretical_fwss_time, low_fwss_time, high_fwss_time, low_fwe_time, high_fwe_time
 
 @dataclasses.dataclass(frozen=True)
 class Worker:
@@ -87,11 +87,13 @@ def search_for_impossibilities(n_processes, low_n_total, high_n_total, repetitio
                 n_total, aer = args
 
                 if success:
-                    low_fwss_time, high_fwss_time, low_fwe_time, high_fwe_time = result
+                    theoretical_fwss_time, low_fwss_time, high_fwss_time, low_fwe_time, high_fwe_time = result
+                    info = (f"{n_total=}, {aer=}, {theoretical_fwss_time=}, {low_fwss_time=}, {high_fwss_time=},"
+                            f"{low_fwe_time=}, {high_fwe_time=}")
                     if low_fwss_time > low_fwe_time and high_fwss_time > high_fwe_time:
-                        print(f"impossible: {n_total=}, {aer=}, {low_fwss_time=}, {high_fwss_time=}, {low_fwe_time=}, {high_fwe_time=}")
+                        print(f"impossible: {info}")
                     else:
-                        print(f"possible: {n_total=}, {aer=}, {low_fwss_time=}, {high_fwss_time=}, {low_fwe_time=}, {high_fwe_time=}")
+                        print(f"possible: {info}")
 
                 else:
                     print(f"error: {n_total=}, {aer=}, error={result!r}")
