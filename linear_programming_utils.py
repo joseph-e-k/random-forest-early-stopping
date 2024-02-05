@@ -16,6 +16,7 @@ Constant = int | float
 CONSTANT_COEFF_KEY = None
 
 GUROBI_CL_PATH = "/home/josephkalman/gurobi1100/linux64/bin/gurobi_cl"
+GUROBI_LIB_PATH = "/home/josephkalman/gurobi1100/linux64/lib"
 
 
 class OptimizationFailure(Exception):
@@ -260,7 +261,7 @@ class Problem:
             )
 
         if os.path.exists(GUROBI_CL_PATH):
-            os.putenv("LD_LIBRARY_PATH", os.path.dirname(GUROBI_CL_PATH))
+            os.putenv("LD_LIBRARY_PATH", GUROBI_LIB_PATH)
             solver = pulp.GUROBI_CMD(path=GUROBI_CL_PATH, msg=False)
         else:
             solver = pulp.PULP_CBC_CMD(msg=False)
