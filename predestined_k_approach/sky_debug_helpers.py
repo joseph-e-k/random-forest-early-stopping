@@ -11,6 +11,9 @@ from predestined_k_approach.ForestWithStoppingStrategy import ForestWithGivenSto
 from predestined_k_approach.utils import TimerContext
 
 
+DEFAULT_AERS = (1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 0)
+
+
 def make_sky_from_truncated_theta(truncated_theta):
     n = truncated_theta.shape[0] - 1
     theta = np.ones((n + 1, n + 1))
@@ -74,9 +77,8 @@ def n_cycles(iterable, n):
     return itertools.chain.from_iterable(itertools.repeat(tuple(iterable), n))
 
 
-def search_for_impossibilities(n_processes, low_n_total, high_n_total, repetitions=1):
+def search_for_impossibilities(n_processes, low_n_total, high_n_total, repetitions=1, aers=DEFAULT_AERS):
     n_totals = range(low_n_total, high_n_total + 1, 2)
-    aers = [1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 0]
     with TimerContext("total"):
         with mp.Pool(n_processes) as pool:
             imap = pool.imap(
@@ -105,6 +107,7 @@ def _parse_args():
     parser.add_argument("--n-upper-bound", "-u", type=int)
     parser.add_argument("--worker-process-count", "-w", type=int)
     parser.add_argument("--repetition-count", "-r", type=int, default=1)
+    parser.add_argument("--alphas", "-a", type=float, nargs="+", default=DEFAULT_AERS)
     return parser.parse_args()
 
 
@@ -114,5 +117,6 @@ if __name__ == "__main__":
         cmd_args.worker_process_count,
         cmd_args.n_lower_bound,
         cmd_args.n_upper_bound,
-        cmd_args.repetition_count
+        cmd_args.repetition_count,
+        cmd_args.alphas
     )
