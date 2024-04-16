@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import dataclasses
 import os
 
@@ -136,3 +137,15 @@ def make_theta_from_sky(sky):
     np.clip(theta, 0, 1, out=theta)
 
     return theta
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("n", type=int)
+    parser.add_argument("alpha", type=float, default=0.05)
+    args = parser.parse_args()
+
+    sky, objective_value = make_and_solve_optimal_stopping_problem(args.n, args.alpha)
+    print(f"{objective_value=}")
+    theta_values = make_theta_from_sky(sky)
+    print(theta_values)
