@@ -2,11 +2,16 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
+import os
 
 import numpy as np
+from diskcache import Cache
 from scipy import stats
 import gurobipy as gp
 from gurobipy import GRB
+
+
+cache = Cache(os.path.join(os.path.dirname(__file__), ".cache"))
 
 
 @dataclasses.dataclass(frozen=True)
@@ -16,6 +21,7 @@ class PiSolution:
     pi_bar: np.ndarray
 
 
+@cache.memoize("gurobi_optimization.get_optimal_stopping_strategy")
 def get_optimal_stopping_strategy(n_total, allowable_error):
     model, pi_solution = make_and_solve_optimal_stopping_problem(n_total, allowable_error)
     return make_theta_from_pi(pi_solution)
@@ -134,10 +140,8 @@ def main():
     parser.add_argument("alpha", type=float, default=0.05)
     args = parser.parse_args()
 
-    model, pi_solution = make_and_solve_optimal_stopping_problem(args.n, args.alpha)
-    print(f"{model.objVal=}")
-    theta_values = make_theta_from_pi(pi_solution)
-    print(theta_values)
+    stopping_strategy = get_optimal_stopping_strategy(args.n, args.alpha)
+    print(stopping_strategy)
 
 
 if __name__ == "__main__":

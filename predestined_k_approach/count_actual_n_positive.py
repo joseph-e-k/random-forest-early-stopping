@@ -12,7 +12,7 @@ from figure_utils import save_figure, RCPARAMS_LATEX_DOUBLE_COLUMN, RCPARAMS_LAT
 from predestined_k_approach.Forest import Forest
 from predestined_k_approach.ForestWithStoppingStrategy import ForestWithGivenStoppingStrategy
 from predestined_k_approach.eb_experiments import analyse_fwe_or_get_cached, cache
-from predestined_k_approach.optimization import get_optimal_stopping_strategy
+from predestined_k_approach.gurobi_optimization import get_optimal_stopping_strategy
 from predestined_k_approach.utils import covariates_response_split, timed
 
 

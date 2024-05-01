@@ -1,17 +1,13 @@
-import dataclasses
-import subprocess
 import os
 
-import numpy as np
 from matplotlib import pyplot as plt
-from scipy import optimize, stats
 from diskcache import Cache
 
-from .Forest import Forest
-from .optimization import get_optimal_stopping_strategy
-from .ForestWithEnvelope import ForestWithEnvelope
-from .ForestWithStoppingStrategy import ForestWithGivenStoppingStrategy
-from .utils import TimerContext, plot_function, plot_functions, timed
+from predestined_k_approach.Forest import Forest
+from predestined_k_approach.gurobi_optimization import get_optimal_stopping_strategy
+from predestined_k_approach.ForestWithEnvelope import ForestWithEnvelope
+from predestined_k_approach.ForestWithStoppingStrategy import ForestWithGivenStoppingStrategy
+from predestined_k_approach.utils import TimerContext, plot_functions, timed
 
 
 cache = Cache(os.path.join(os.path.dirname(__file__), ".cache"))
