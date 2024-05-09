@@ -22,15 +22,19 @@ class PiSolution:
 
 
 @cache.memoize("gurobi_optimization.get_optimal_stopping_strategy")
-def get_optimal_stopping_strategy(n_total, allowable_error):
-    model, pi_solution = make_and_solve_optimal_stopping_problem(n_total, allowable_error)
+def get_optimal_stopping_strategy(n_total, allowable_error, scale: float = 1.0):
+    model, pi_solution = make_and_solve_optimal_stopping_problem(n_total, allowable_error, scale)
     return make_theta_from_pi(pi_solution)
 
 
-def make_and_solve_optimal_stopping_problem(n: int, alpha: float) -> tuple[gp.Model, PiSolution]:
+def make_and_solve_optimal_stopping_problem(n: int, alpha: float, scale: float = 1.0) -> tuple[gp.Model, PiSolution]:
     model = gp.Model()
+    model.Params.NumericFocus = 3
+    model.Params.Aggregate = 0
+    model.Params.BarConvTol = 0
+    model.Params.FeasibilityTol = 1e-9
 
-    p, pi, pi_bar = _make_decision_variables(n, model)
+    p, pi, pi_bar = _make_decision_variables(n, model, scale)
     n_plus = np.array([n // 2, n // 2 + 1])
     a = make_abstract_probability_matrix(n, n_plus)
     beta = a * pi
@@ -47,7 +51,7 @@ def make_and_solve_optimal_stopping_problem(n: int, alpha: float) -> tuple[gp.Mo
     for k in range(len(n_plus)):
         model.addConstr(prob_error[k] <= alpha, f"prob_error[k] <= alpha with {k=}, {alpha=}")
 
-    model.addConstr(p[0, 0] == 1, "p[0, 0] == 1")
+    model.addConstr(p[0, 0] == scale, "p[0, 0] == 1.0")
 
     for i in range(n):
         model.addConstr(p[i + 1, 0] == pi_bar[i, 0], f"p[i + 1, 0] == pi_bar[i, 0] with {i=}")
@@ -78,14 +82,14 @@ def make_and_solve_optimal_stopping_problem(n: int, alpha: float) -> tuple[gp.Mo
     return model, pi_solution
 
 
-def _make_decision_variables(n: int, model: gp.Model) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    pi = _make_decision_variable_matrix(n, "pi", model)
-    pi_bar = _make_decision_variable_matrix(n, "pi_bar", model)
+def _make_decision_variables(n: int, model: gp.Model, scale: float=1.0) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    pi = _make_decision_variable_matrix(n, "pi", model, ub=scale)
+    pi_bar = _make_decision_variable_matrix(n, "pi_bar", model, ub=scale)
     p = pi + pi_bar
     return p, pi, pi_bar
 
 
-def _make_decision_variable_matrix(n, variable_name, model: gp.Model, lb=0, ub=1) -> np.ndarray:
+def _make_decision_variable_matrix(n, variable_name, model: gp.Model, lb=0.0, ub=1.0) -> np.ndarray:
     matrix = np.zeros((n + 1, n + 1), dtype=object)
     for i in range(n + 1):
         for j in range(i + 1):
