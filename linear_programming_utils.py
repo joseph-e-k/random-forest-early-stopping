@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import os
+import sys
 from enum import Enum
 
 import pulp
@@ -293,6 +294,46 @@ class Problem:
 
         raise ValueError(f"Unknown comparison operator: {expression.operator}")
 
+    def save_as_lp_format(self, file):
+        file.write("Minimize\n")
+        file.write(f" {self._arithmetic_expression_to_lp_format(self.objective)}\n")
+        file.write("Subject To\n")
+        for i_constraint, constraint in enumerate(self.constraints):
+            file.write(f" c{i_constraint}: {self._logical_expression_to_lp_format(constraint)}\n")
+        file.write("Generals\n")
+        for var_name in self.variable_names_to_indices.keys():
+            file.write(f" {var_name}")
+        file.write("\n")
+        file.write("End\n")
+
+    @staticmethod
+    def _arithmetic_expression_to_lp_format(expression: ArithmeticExpression):
+        parts = []
+        for var_name, coef in expression.coefficients.items():
+            if coef == 0:
+                continue
+            parts.append("+" if coef > 0 else "-")
+            if abs(coef) != 1:
+                parts.append(str(abs(coef)))
+            if var_name != CONSTANT_COEFF_KEY:
+                parts.append(var_name)
+        if len(parts) == 0:
+            return 0
+        if parts[0] == "+":
+            parts = parts[1:]
+        return " ".join(parts)
+
+    @classmethod
+    def _logical_expression_to_lp_format(cls, expr: LogicalExpression):
+        expr = expr.isolate_constants_on_rhs()
+        lhs_str = cls._arithmetic_expression_to_lp_format(expr.lhs)
+        operator_str = {
+            ComparisonOperator.LEq: "<=",
+            ComparisonOperator.Eq: "="
+        }[expr.operator]
+        rhs_str = cls._arithmetic_expression_to_lp_format(expr.rhs)
+        return f"{lhs_str} {operator_str} {rhs_str}"
+
 
 @dataclasses.dataclass(frozen=True)
 class OptimizationResult:
@@ -343,6 +384,9 @@ if __name__ == "__main__":
     prob.set_objective(objective)
     prob.add_constraint(5 * x + 8 * y <= 180)
     prob.add_constraint(5 * x + 4 * y <= 120)
+
+    prob.save_as_lp_format(file=sys.stdout)
+
     solution = prob.solve_with_scipy()
     print(f"x = {x.evaluate(solution)}, y = {y.evaluate(solution)}")
     print(f"objective = {objective.evaluate(solution)}")
