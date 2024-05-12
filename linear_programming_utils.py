@@ -2,8 +2,13 @@ from __future__ import annotations
 
 import dataclasses
 import os
+import re
+import subprocess
 import sys
+import tempfile
 from enum import Enum
+from fractions import Fraction
+from io import StringIO
 
 import pulp
 import scipy
@@ -12,12 +17,13 @@ from scipy.sparse import dok_array
 
 SparseArray = dok_array
 
-Constant = int | float
+Constant = int | float | Fraction
 
 CONSTANT_COEFF_KEY = None
 
 GUROBI_CL_PATH = "/home/josephkalman/gurobi1100/linux64/bin/gurobi_cl"
 GUROBI_LIB_PATH = "/home/josephkalman/gurobi1100/linux64/lib"
+SOPLEX_CL_FORMAT = "soplex {} --real:feastol=0 --real:opttol=0 --int:solvemode=2 --int:syncmode=1 --int:readmode=1 --int:checkmode=2 -X={}"
 
 
 class OptimizationFailure(Exception):
@@ -269,8 +275,6 @@ class Problem:
         pulp_problem.solve(solver=solver)
         return OptimizationResult.from_pulp_format(pulp_problem, pulp_vars_by_name)
 
-
-
     @staticmethod
     def _arithmetic_expression_to_pulp_format(expression: ArithmeticExpression, pulp_vars_by_name: dict):
         coeffs = expression.coefficients
@@ -294,12 +298,60 @@ class Problem:
 
         raise ValueError(f"Unknown comparison operator: {expression.operator}")
 
+    def solve_with_soplex(self) -> OptimizationResult:
+        lp_file = tempfile.NamedTemporaryFile("wt")
+        solution_file = tempfile.NamedTemporaryFile("rt")
+
+        with lp_file:
+            buffer = StringIO()
+            self.save_as_lp_format(buffer)
+            lp_text = buffer.getvalue()
+            print("*** BEGIN LP FILE ***")
+            print(lp_text)
+            print("*** END LP FILE ***")
+            lp_file.write(lp_text)
+            lp_file.flush()
+            process = subprocess.run(
+                SOPLEX_CL_FORMAT.format(lp_file.name, solution_file.name),
+                shell=True,
+                capture_output=True,
+                text=True
+            )
+
+        print("*** BEGIN SOPLEX STDOUT ***")
+        print(process.stdout)
+        print("*** END SOPLEX STDOUT ***")
+        print("*** BEGIN SOPLEX STDERR ***")
+        print(process.stderr)
+        print("*** END SOPLEX STDERR ***")
+
+        for line in process.stdout.splitlines():
+            if m := re.match(r"Objective value\s*: (\S+)$", line):
+                objective_value = float(m.group(1))
+                break
+        else:
+            raise OptimizationFailure("Could not get objective value from SoPlex output")
+
+        variable_values = dict()
+        with solution_file:
+            for line in solution_file:
+                if m := re.match(r"(\S+)\s+(\S+)$", line):
+                    variable_values[m.group(1)] = Fraction(m.group(2))
+
+        return OptimizationResult(
+            objective_value=objective_value,
+            variable_values=Coefficients(variable_values)
+        )
+
     def save_as_lp_format(self, file):
         file.write("Minimize\n")
         file.write(f" {self._arithmetic_expression_to_lp_format(self.objective)}\n")
         file.write("Subject To\n")
         for i_constraint, constraint in enumerate(self.constraints):
-            file.write(f" c{i_constraint}: {self._logical_expression_to_lp_format(constraint)}\n")
+            constraint_str = self._logical_expression_to_lp_format(constraint)
+            if constraint_str == "0 <= 0":
+                continue
+            file.write(f" c{i_constraint}: {constraint_str}\n")
         file.write("Generals\n")
         for var_name in self.variable_names_to_indices.keys():
             file.write(f" {var_name}")
@@ -313,7 +365,7 @@ class Problem:
             if coef == 0:
                 continue
             parts.append("+" if coef > 0 else "-")
-            if abs(coef) != 1:
+            if abs(coef) != 1 or var_name == CONSTANT_COEFF_KEY:
                 parts.append(str(abs(coef)))
             if var_name != CONSTANT_COEFF_KEY:
                 parts.append(var_name)
@@ -332,7 +384,11 @@ class Problem:
             ComparisonOperator.Eq: "="
         }[expr.operator]
         rhs_str = cls._arithmetic_expression_to_lp_format(expr.rhs)
-        return f"{lhs_str} {operator_str} {rhs_str}"
+        ret = f"{lhs_str} {operator_str} {rhs_str}"
+        if re.match(r".*<=\s*$", ret):
+            import pdb
+            pdb.set_trace()
+        return ret
 
 
 @dataclasses.dataclass(frozen=True)
@@ -385,13 +441,22 @@ if __name__ == "__main__":
     prob.add_constraint(5 * x + 8 * y <= 180)
     prob.add_constraint(5 * x + 4 * y <= 120)
 
-    prob.save_as_lp_format(file=sys.stdout)
-
+    print("Solving with SciPy:")
     solution = prob.solve_with_scipy()
     print(f"x = {x.evaluate(solution)}, y = {y.evaluate(solution)}")
     print(f"objective = {objective.evaluate(solution)}")
     print(solution)
+    print()
+
+    print("Solving with PuLP:")
     solution = prob.solve_with_pulp()
+    print(f"x = {x.evaluate(solution)}, y = {y.evaluate(solution)}")
+    print(f"objective = {objective.evaluate(solution)}")
+    print(solution)
+    print()
+
+    print("Solving with SoPlex:")
+    solution = prob.solve_with_soplex()
     print(f"x = {x.evaluate(solution)}, y = {y.evaluate(solution)}")
     print(f"objective = {objective.evaluate(solution)}")
     print(solution)
