@@ -312,22 +312,10 @@ class Problem:
                 text=True
             )
 
-        for line in process.stdout.splitlines():
-            if m := re.match(r"Objective value\s*: (\S+)$", line):
-                objective_value = float(m.group(1))
-                break
-        else:
-            raise OptimizationFailure("Could not get objective value from SoPlex output")
-
-        variable_values = dict()
-        with solution_file:
-            for line in solution_file:
-                if m := re.match(r"(\S+)\s+(\S+)$", line):
-                    variable_values[m.group(1)] = Fraction(m.group(2))
-
-        return OptimizationResult(
-            objective_value=objective_value,
-            variable_values=Coefficients(variable_values)
+        return OptimizationResult.from_soplex_output(
+            StringIO(process.stdout),
+            StringIO(process.stderr),
+            solution_file
         )
 
     def save_as_lp_format(self, file):
@@ -416,6 +404,45 @@ class OptimizationResult:
         return cls(
             variable_values=Coefficients(variable_values),
             objective_value=pulp.value(pulp_problem.objective)
+        )
+
+    @classmethod
+    def from_soplex_output(cls, stdout, stderr, solution_file):
+        success = False
+        objective_value = None
+
+        for line in stdout:
+            if re.match(r"SoPlex status\s*:\s*problem is solved \[optimal\]\s*$", line):
+                success = True
+            if m := re.match(r"Objective value\s*: (\S+)$", line):
+                objective_value = float(m.group(1))
+            if success and objective_value is not None:
+                break
+        else:
+            stdout.seek(0)
+            output_text = stdout.read()
+            error_text = stderr.read()
+
+            if not success:
+                message = "SoPlex status was not 'optimal' or could not be parsed from output"
+            else:
+                message = "objective value could not be parsed from SoPlex output"
+
+            raise OptimizationFailure(
+                message,
+                output_text,
+                error_text
+            )
+
+        variable_values = dict()
+        with solution_file:
+            for line in solution_file:
+                if m := re.match(r"(\S+)\s+(\S+)$", line):
+                    variable_values[m.group(1)] = Fraction(m.group(2))
+
+        return OptimizationResult(
+            objective_value=objective_value,
+            variable_values=Coefficients(variable_values)
         )
 
 
