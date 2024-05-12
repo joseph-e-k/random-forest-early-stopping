@@ -34,7 +34,7 @@ def make_sky_from_truncated_theta(truncated_theta):
                 + ((j + 1) / (i + 1)) * p[i, j] * theta_bar[i, j]
             )
 
-    return Sky(p, p * theta, p * theta_bar)
+    return PiSolution(p, p * theta, p * theta_bar)
 
 
 def get_expected_runtimes(n_total, aer=10**-6):
@@ -48,7 +48,7 @@ def get_expected_runtimes(n_total, aer=10**-6):
     high_fwe = ForestWithEnvelope(forest=high_forest, envelope=low_fwe.envelope)
 
     fwss_sky, theoretical_fwss_time = make_and_solve_optimal_stopping_problem(n_total, aer)
-    optimal_stopping_strategy = make_theta_from_sky(fwss_sky)
+    optimal_stopping_strategy = make_theta_from_pi(fwss_sky)
 
     low_fwss = ForestWithGivenStoppingStrategy(low_forest, optimal_stopping_strategy)
     high_fwss = ForestWithGivenStoppingStrategy(high_forest, optimal_stopping_strategy)

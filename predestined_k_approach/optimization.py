@@ -16,7 +16,7 @@ cache = Cache(os.path.join(os.path.dirname(__file__), ".cache"))
 
 
 @dataclasses.dataclass(frozen=True)
-class Sky:
+class PiSolution:
     p: np.ndarray
     pi: np.ndarray
     pi_bar: np.ndarray
@@ -24,11 +24,11 @@ class Sky:
 
 def get_optimal_stopping_strategy(n_total, allowable_error, precise=False):
     pi_solution, objective_value = make_and_solve_optimal_stopping_problem(n_total, allowable_error, precise)
-    return make_theta_from_sky(pi_solution)
+    return make_theta_from_pi(pi_solution)
 
 
 # @cache.memoize()
-def make_and_solve_optimal_stopping_problem(n: int, alpha: float, precise: bool = False) -> tuple[Sky, float]:
+def make_and_solve_optimal_stopping_problem(n: int, alpha: float, precise: bool = False) -> tuple[PiSolution, float]:
     problem = Problem()
 
     p, pi, pi_bar = _make_decision_variables(n, problem)
@@ -83,13 +83,13 @@ def make_and_solve_optimal_stopping_problem(n: int, alpha: float, precise: bool 
     else:
         solution = problem.solve_with_pulp()
 
-    sky_solution = Sky(
+    pi_solution = PiSolution(
         _get_decision_variable_values(solution, p),
         _get_decision_variable_values(solution, pi),
         _get_decision_variable_values(solution, pi_bar)
     )
 
-    return sky_solution, solution.objective_value
+    return pi_solution, solution.objective_value
 
 
 def _make_decision_variables(n, problem) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -149,9 +149,9 @@ def _get_decision_variable_values(solution: OptimizationResult, decision_variabl
     return values
 
 
-def make_theta_from_sky(sky):
-    theta = np.ones_like(sky.p)
-    np.divide(sky.pi, sky.p, out=theta, where=(sky.p!=0))
+def make_theta_from_pi(pi_solution):
+    theta = np.ones_like(pi_solution.p)
+    np.divide(pi_solution.pi, pi_solution.p, out=theta, where=(pi_solution.p != 0))
 
     # TODO: Find a less hacky way to deal with floating-point errors and decision variable values exceeding their bounds
     np.clip(theta, 0, 1, out=theta)
@@ -166,7 +166,7 @@ if __name__ == "__main__":
     parser.add_argument("--precise", "-p", action="store_true")
     args = parser.parse_args()
 
-    sky, objective_value = make_and_solve_optimal_stopping_problem(args.n, args.alpha, args.precise)
+    pi_solution, objective_value = make_and_solve_optimal_stopping_problem(args.n, args.alpha, args.precise)
     print(f"{objective_value=}")
-    theta_values = make_theta_from_sky(sky)
+    theta_values = make_theta_from_pi(pi_solution)
     print(theta_values)
