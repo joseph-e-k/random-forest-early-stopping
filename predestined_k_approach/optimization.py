@@ -27,7 +27,7 @@ def get_optimal_stopping_strategy(n_total, allowable_error, precise=False):
     return make_theta_from_pi(pi_solution)
 
 
-# @cache.memoize()
+@cache.memoize("make_and_solve_optimal_stopping_problem")
 def make_and_solve_optimal_stopping_problem(n: int, alpha: float, precise: bool = False) -> tuple[PiSolution, float]:
     problem = Problem()
 
