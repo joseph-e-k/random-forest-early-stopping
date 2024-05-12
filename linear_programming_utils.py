@@ -303,13 +303,7 @@ class Problem:
         solution_file = tempfile.NamedTemporaryFile("rt")
 
         with lp_file:
-            buffer = StringIO()
-            self.save_as_lp_format(buffer)
-            lp_text = buffer.getvalue()
-            print("*** BEGIN LP FILE ***")
-            print(lp_text)
-            print("*** END LP FILE ***")
-            lp_file.write(lp_text)
+            self.save_as_lp_format(lp_file)
             lp_file.flush()
             process = subprocess.run(
                 SOPLEX_CL_FORMAT.format(lp_file.name, solution_file.name),
@@ -317,13 +311,6 @@ class Problem:
                 capture_output=True,
                 text=True
             )
-
-        print("*** BEGIN SOPLEX STDOUT ***")
-        print(process.stdout)
-        print("*** END SOPLEX STDOUT ***")
-        print("*** BEGIN SOPLEX STDERR ***")
-        print(process.stderr)
-        print("*** END SOPLEX STDERR ***")
 
         for line in process.stdout.splitlines():
             if m := re.match(r"Objective value\s*: (\S+)$", line):
