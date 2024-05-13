@@ -10,7 +10,7 @@ from diskcache import Cache
 from scipy import stats
 from scipy.special import comb
 
-from linear_programming_utils import Problem, OptimizationResult, ArithmeticExpression
+from linear_programming_utils import Problem, OptimizationResult, ArithmeticExpression, OptimizationFailure
 
 cache = Cache(os.path.join(os.path.dirname(__file__), ".cache"))
 
@@ -22,6 +22,7 @@ class PiSolution:
     pi_bar: np.ndarray
 
 
+@cache.memoize("get_optimal_stopping_strategy")
 def get_optimal_stopping_strategy(n_total, allowable_error, precise=False):
     pi_solution, objective_value = make_and_solve_optimal_stopping_problem(n_total, allowable_error, precise)
     return make_theta_from_pi(pi_solution)
@@ -161,12 +162,18 @@ def make_theta_from_pi(pi_solution):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("n", type=int)
-    parser.add_argument("alpha", type=float, default=0.05)
+    parser.add_argument("-n", type=int)
+    parser.add_argument("--alpha", "--aer", "-a", type=float, default=0.05)
     parser.add_argument("--precise", "-p", action="store_true")
     args = parser.parse_args()
 
-    pi_solution, objective_value = make_and_solve_optimal_stopping_problem(args.n, args.alpha, args.precise)
-    print(f"{objective_value=}")
-    theta_values = make_theta_from_pi(pi_solution)
-    print(theta_values)
+    try:
+        pi_solution, objective_value = make_and_solve_optimal_stopping_problem(args.n, args.alpha, args.precise)
+    except OptimizationFailure as e:
+        print(e.args[0])
+        print(e.args[1])
+        print(e.args[2])
+    else:
+        print(f"{objective_value=}")
+        theta_values = make_theta_from_pi(pi_solution)
+        print(theta_values)

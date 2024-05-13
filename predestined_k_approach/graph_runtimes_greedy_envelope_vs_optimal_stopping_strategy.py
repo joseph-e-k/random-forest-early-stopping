@@ -4,7 +4,7 @@ from matplotlib import pyplot as plt
 from diskcache import Cache
 
 from predestined_k_approach.Forest import Forest
-from predestined_k_approach.gurobi_optimization import get_optimal_stopping_strategy
+from predestined_k_approach.optimization import get_optimal_stopping_strategy
 from predestined_k_approach.ForestWithEnvelope import ForestWithEnvelope
 from predestined_k_approach.ForestWithStoppingStrategy import ForestWithGivenStoppingStrategy
 from predestined_k_approach.utils import TimerContext, plot_functions, timed
@@ -17,10 +17,11 @@ def time_computation_of_optimal_stopping_strategy(n_total, aer):
         get_optimal_stopping_strategy(n_total, aer)
     return timer.elapsed_time
 
+
 @timed
 @cache.memoize()
 def optimal_expected_runtime(n_total, prop_positive, aer, relative=False):
-    stopping_strategy = get_optimal_stopping_strategy(n_total, aer)
+    stopping_strategy = get_optimal_stopping_strategy(n_total, aer, precise=True)
     fwss = ForestWithGivenStoppingStrategy(Forest(n_total, int(n_total * prop_positive)), stopping_strategy)
     expected_runtime = fwss.analyse().expected_runtime
 

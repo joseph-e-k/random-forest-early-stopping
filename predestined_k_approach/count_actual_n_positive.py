@@ -1,5 +1,4 @@
 from collections import Counter
-from itertools import product
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -7,12 +6,10 @@ import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 
-from figure_utils import save_figure, RCPARAMS_LATEX_DOUBLE_COLUMN, RCPARAMS_LATEX_SINGLE_COLUMN_WIDE, \
-    RCPARAMS_ONE_TIME_THING
 from predestined_k_approach.Forest import Forest
 from predestined_k_approach.ForestWithStoppingStrategy import ForestWithGivenStoppingStrategy
 from predestined_k_approach.eb_experiments import analyse_fwe_or_get_cached, cache
-from predestined_k_approach.gurobi_optimization import get_optimal_stopping_strategy
+from predestined_k_approach.optimization import get_optimal_stopping_strategy
 from predestined_k_approach.utils import covariates_response_split, timed
 
 
@@ -165,7 +162,7 @@ def get_and_show_error_rates_and_runtimes(n_trees, datasets, allowable_error_rat
 @timed
 @cache.memoize()
 def analyse_optimal_fwss_or_get_cached(n_total, n_positive, allowable_error):
-    optimal_stopping_strategy = get_optimal_stopping_strategy(n_total, allowable_error)
+    optimal_stopping_strategy = get_optimal_stopping_strategy(n_total, allowable_error, precise=True)
     fwss = ForestWithGivenStoppingStrategy(Forest(n_total, n_positive), optimal_stopping_strategy)
     return fwss.analyse()
 

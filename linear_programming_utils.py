@@ -345,7 +345,7 @@ class Problem:
             if var_name != CONSTANT_COEFF_KEY:
                 parts.append(var_name)
         if len(parts) == 0:
-            return 0
+            return "0"
         if parts[0] == "+":
             parts = parts[1:]
         return " ".join(parts)
@@ -360,9 +360,6 @@ class Problem:
         }[expr.operator]
         rhs_str = cls._arithmetic_expression_to_lp_format(expr.rhs)
         ret = f"{lhs_str} {operator_str} {rhs_str}"
-        if re.match(r".*<=\s*$", ret):
-            import pdb
-            pdb.set_trace()
         return ret
 
 
