@@ -24,7 +24,11 @@ class PiSolution:
 
 @cache.memoize("get_optimal_stopping_strategy")
 def get_optimal_stopping_strategy(n_total, allowable_error, precise=False):
-    pi_solution, objective_value = make_and_solve_optimal_stopping_problem(n_total, allowable_error, precise)
+    pi_solution, objective_value = make_and_solve_optimal_stopping_problem(
+        n=n_total,
+        alpha=allowable_error,
+        precise=precise
+    )
     return make_theta_from_pi(pi_solution)
 
 
@@ -165,15 +169,26 @@ if __name__ == "__main__":
     parser.add_argument("-n", type=int)
     parser.add_argument("--alpha", "--aer", "-a", type=float, default=0.05)
     parser.add_argument("--precise", "-p", action="store_true")
+    parser.add_argument("--no-cache", action="store_true")
     args = parser.parse_args()
 
+    function = get_optimal_stopping_strategy
+
+    if args.no_cache:
+        function = function.__wrapped__
+    else:
+        print(f"{cache.directory=}")
+        cache_key = function.__cache_key__(n_total=args.n, allowable_error=args.alpha, precise=args.precise)
+        if cache_key in cache:
+            print(f"{cache_key=} found in cache")
+        else:
+            print(f"{cache_key=} not found in cache")
+
     try:
-        pi_solution, objective_value = make_and_solve_optimal_stopping_problem(args.n, args.alpha, args.precise)
+        oss = function(args.n, args.alpha, precise=args.precise)
     except OptimizationFailure as e:
         print(e.args[0])
         print(e.args[1])
         print(e.args[2])
     else:
-        print(f"{objective_value=}")
-        theta_values = make_theta_from_pi(pi_solution)
-        print(theta_values)
+        print(oss)

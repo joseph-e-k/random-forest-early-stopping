@@ -14,14 +14,14 @@ cache = Cache(os.path.join(os.path.dirname(__file__), ".cache"))
 
 def time_computation_of_optimal_stopping_strategy(n_total, aer):
     with TimerContext(f"get_optimal_stopping_strategy({n_total, aer})") as timer:
-        get_optimal_stopping_strategy(n_total, aer)
+        get_optimal_stopping_strategy(n_total=n_total, allowable_error=aer, precise=True)
     return timer.elapsed_time
 
 
 @timed
 @cache.memoize()
 def optimal_expected_runtime(n_total, prop_positive, aer, relative=False):
-    stopping_strategy = get_optimal_stopping_strategy(n_total, aer, precise=True)
+    stopping_strategy = get_optimal_stopping_strategy(n_total=n_total, allowable_error=aer, precise=True)
     fwss = ForestWithGivenStoppingStrategy(Forest(n_total, int(n_total * prop_positive)), stopping_strategy)
     expected_runtime = fwss.analyse().expected_runtime
 
@@ -43,7 +43,7 @@ def greedy_envelope_expected_runtime(n_total, prop_positive, aer, relative=False
 
 def main():
     n_total_min = 11
-    n_total_max = 251
+    n_total_max = 201
     n_total_step = 2
     prop_positive = 0.25
     aer = 10**-6

@@ -4,7 +4,6 @@ import dataclasses
 import os
 import re
 import subprocess
-import sys
 import tempfile
 from enum import Enum
 from fractions import Fraction
@@ -23,7 +22,7 @@ CONSTANT_COEFF_KEY = None
 
 GUROBI_CL_PATH = "/home/josephkalman/gurobi1100/linux64/bin/gurobi_cl"
 GUROBI_LIB_PATH = "/home/josephkalman/gurobi1100/linux64/lib"
-SOPLEX_CL_FORMAT = "soplex {} --real:feastol=0 --real:opttol=0 --int:solvemode=2 --int:syncmode=1 --int:readmode=1 --int:checkmode=2 -X={}"
+SOPLEX_CL_FORMAT = "soplex {} --real:feastol=0 --real:opttol=0 --int:solvemode=2 --int:syncmode=1 --int:readmode=1 --int:checkmode=2 --int:multiprecision_limit=3000 -X={}"
 
 
 class OptimizationFailure(Exception):

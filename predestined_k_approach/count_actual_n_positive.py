@@ -162,13 +162,13 @@ def get_and_show_error_rates_and_runtimes(n_trees, datasets, allowable_error_rat
 @timed
 @cache.memoize()
 def analyse_optimal_fwss_or_get_cached(n_total, n_positive, allowable_error):
-    optimal_stopping_strategy = get_optimal_stopping_strategy(n_total, allowable_error, precise=True)
+    optimal_stopping_strategy = get_optimal_stopping_strategy(n_total=n_total, allowable_error=allowable_error, precise=True)
     fwss = ForestWithGivenStoppingStrategy(Forest(n_total, n_positive), optimal_stopping_strategy)
     return fwss.analyse()
 
 
 def main():
-    n_trees = 501
+    n_trees = 201
     datasets = {
         "Banknotes": pd.read_csv(r"../data/data_banknote_authentication.txt"),
         "Heart Attacks": pd.read_csv(r"../data/heart_attack.csv"),
@@ -176,7 +176,7 @@ def main():
         "Dry Beans": pd.read_excel(r"../data/dry_beans.xlsx")
     }
 
-    get_and_show_error_rates_and_runtimes(n_trees, datasets, [10 ** -3, 10 ** -6, 0], [
+    get_and_show_error_rates_and_runtimes(n_trees, datasets, [10 ** -3, 10 ** -6, 0.0], [
         analyse_fwe_or_get_cached,
         analyse_optimal_fwss_or_get_cached
     ])
