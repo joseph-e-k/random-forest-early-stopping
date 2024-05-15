@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import random
+import warnings
 
 import numpy as np
 from scipy.special import logsumexp
@@ -42,11 +43,13 @@ class ForestWithStoppingStrategy:
         self._n_unseen_good = np.maximum(self._n_good - self._n_seen_good, 0)
         self._n_unseen_bad = np.maximum(self._n_bad - self._n_seen_bad, 0)
 
-        self._log_prob_see_good = np.log(self._n_unseen_good / self._n_unseen)
-        self._log_prob_see_bad = np.log(self._n_unseen_bad / self._n_unseen)
+        with warnings.catch_warnings(category=RuntimeWarning, action="ignore"):
+            self._log_prob_see_good = np.log(self._n_unseen_good / self._n_unseen)
+            self._log_prob_see_bad = np.log(self._n_unseen_bad / self._n_unseen)
 
         self._log_state_probabilities = np.empty(shape=(self._n_steps, self._n_values))
-        self._log_state_probabilities[0, :] = np.log(np.zeros(shape=self._n_values))
+        with warnings.catch_warnings(category=RuntimeWarning, action="ignore"):
+            self._log_state_probabilities[0, :] = np.log(np.zeros(shape=self._n_values))
         self._log_state_probabilities[0, 0] = np.log(1)
 
         self._log_prob_stop = self._get_log_prob_stop()
@@ -174,7 +177,8 @@ class ForestWithGivenStoppingStrategy(ForestWithStoppingStrategy):
         super().__post_init__()
 
     def _get_log_prob_stop(self):
-        return np.log(self.stopping_strategy)
+        with warnings.catch_warnings(category=RuntimeWarning, action="ignore"):
+            return np.log(self.stopping_strategy)
 
 
 @dataclasses.dataclass(frozen=True)

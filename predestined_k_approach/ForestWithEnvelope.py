@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import math
+import warnings
 
 import numpy as np
 from scipy.special import logsumexp
@@ -25,7 +26,8 @@ class ForestWithEnvelope(ForestWithStoppingStrategy):
         return prob_stop
 
     def _get_log_prob_stop(self):
-        return np.log(self.get_prob_stop())
+        with warnings.catch_warnings(category=RuntimeWarning, action="ignore"):
+            return np.log(self.get_prob_stop())
 
     @classmethod
     def create(cls, n_total, n_total_positive, envelope=None):
@@ -72,5 +74,3 @@ class ForestWithEnvelope(ForestWithStoppingStrategy):
     def add_increment_to_envelope(self, increment_index: int):
         add_increment_to_envelope(self.envelope, increment_index)
         self._invalidate_state_probabilities(start_index=increment_index)
-
-

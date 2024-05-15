@@ -3,7 +3,6 @@ import dataclasses
 import itertools
 import multiprocessing as mp
 import traceback
-import warnings
 from typing import Callable
 
 from predestined_k_approach.optimization import get_optimal_stopping_strategy
@@ -20,8 +19,7 @@ class Worker:
     def __call__(self, args):
         try:
             with TimerContext(verbose=False) as timer:
-                with warnings.catch_warnings(action="ignore"):
-                    result = self.function(*args)
+                result = self.function(*args)
         except Exception as e:
             traceback.print_exc()
             return args, False, e, timer.elapsed_time
