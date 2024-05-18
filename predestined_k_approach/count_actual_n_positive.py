@@ -1,16 +1,28 @@
+import os
 from collections import Counter
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from diskcache import Cache
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 
 from predestined_k_approach.Forest import Forest
-from predestined_k_approach.ForestWithStoppingStrategy import ForestWithGivenStoppingStrategy
-from predestined_k_approach.eb_experiments import analyse_fwe_or_get_cached, cache
+from predestined_k_approach.ForestWithEnvelope import ForestWithEnvelope
+from predestined_k_approach.ForestWithStoppingStrategy import ForestWithGivenStoppingStrategy, ForestAnalysis
 from predestined_k_approach.optimization import get_optimal_stopping_strategy
 from predestined_k_approach.utils import covariates_response_split, timed
+
+
+cache = Cache(os.path.join(os.path.dirname(__file__), ".cache"))
+
+
+@timed
+@cache.memoize()
+def analyse_fwe_or_get_cached(n_total, n_positive, allowable_error) -> ForestAnalysis:
+    fwe = ForestWithEnvelope.create_greedy(n_total, n_positive, allowable_error)
+    return fwe.analyse()
 
 
 def to_binary_classifications(classifications):
