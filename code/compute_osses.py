@@ -5,8 +5,8 @@ import multiprocessing as mp
 import traceback
 from typing import Callable
 
-from predestined_k_approach.optimization import get_optimal_stopping_strategy
-from predestined_k_approach.utils import TimerContext
+from code.optimization import get_optimal_stopping_strategy
+from code.utils import TimerContext
 
 
 DEFAULT_AERS = (0.0, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6)

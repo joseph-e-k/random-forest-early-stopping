@@ -3,11 +3,11 @@ import os
 from matplotlib import pyplot as plt
 from diskcache import Cache
 
-from predestined_k_approach.Forest import Forest
-from predestined_k_approach.optimization import get_optimal_stopping_strategy
-from predestined_k_approach.ForestWithEnvelope import ForestWithEnvelope
-from predestined_k_approach.ForestWithStoppingStrategy import ForestWithGivenStoppingStrategy
-from predestined_k_approach.utils import TimerContext, plot_functions, timed
+from code.Forest import Forest
+from code.optimization import get_optimal_stopping_strategy
+from code.ForestWithEnvelope import ForestWithEnvelope
+from code.ForestWithStoppingStrategy import ForestWithGivenStoppingStrategy
+from code.utils import TimerContext, plot_functions, timed
 
 
 cache = Cache(os.path.join(os.path.dirname(__file__), ".cache"))
