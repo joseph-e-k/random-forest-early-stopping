@@ -7,6 +7,7 @@ from code.ForestWithStoppingStrategy import ForestWithGivenStoppingStrategy
 from code.utils import TimerContext, timed, cache
 from code.figure_utils import plot_functions
 
+
 def time_computation_of_optimal_stopping_strategy(n_total, aer):
     with TimerContext(f"get_optimal_stopping_strategy({n_total, aer})") as timer:
         get_optimal_stopping_strategy(n_total=n_total, allowable_error=aer, precise=True)
