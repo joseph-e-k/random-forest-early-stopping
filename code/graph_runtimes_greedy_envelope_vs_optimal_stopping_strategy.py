@@ -7,8 +7,8 @@ from code.Forest import Forest
 from code.optimization import get_optimal_stopping_strategy
 from code.ForestWithEnvelope import ForestWithEnvelope
 from code.ForestWithStoppingStrategy import ForestWithGivenStoppingStrategy
-from code.utils import TimerContext, plot_functions, timed
-
+from code.utils import TimerContext, timed
+from code.figure_utils import plot_functions
 
 cache = Cache(os.path.join(os.path.dirname(__file__), ".cache"))
 
