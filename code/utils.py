@@ -2,11 +2,16 @@ import dataclasses
 import functools
 import inspect
 import itertools
+import os
 import time
 
 import numpy as np
 import pandas as pd
+from diskcache import Cache
 from scipy import stats
+
+
+cache = Cache(os.path.join(os.path.dirname(__file__), ".cache"))
 
 
 def shift_array(arr, num, fill_value=np.nan):

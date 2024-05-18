@@ -1,10 +1,8 @@
-import os
 from collections import Counter
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from diskcache import Cache
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 
@@ -12,10 +10,7 @@ from code.Forest import Forest
 from code.ForestWithEnvelope import ForestWithEnvelope
 from code.ForestWithStoppingStrategy import ForestWithGivenStoppingStrategy, ForestAnalysis
 from code.optimization import get_optimal_stopping_strategy
-from code.utils import covariates_response_split, timed
-
-
-cache = Cache(os.path.join(os.path.dirname(__file__), ".cache"))
+from code.utils import covariates_response_split, timed, cache
 
 
 @timed

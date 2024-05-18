@@ -2,17 +2,14 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
-import os
 from fractions import Fraction
 
 import numpy as np
-from diskcache import Cache
 from scipy import stats
 from scipy.special import comb
 
 from linear_programming_utils import Problem, OptimizationResult, ArithmeticExpression, OptimizationFailure
-
-cache = Cache(os.path.join(os.path.dirname(__file__), ".cache"))
+from utils import cache
 
 
 @dataclasses.dataclass(frozen=True)

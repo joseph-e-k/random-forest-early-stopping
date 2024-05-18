@@ -1,16 +1,11 @@
-import os
-
 from matplotlib import pyplot as plt
-from diskcache import Cache
 
 from code.Forest import Forest
 from code.optimization import get_optimal_stopping_strategy
 from code.ForestWithEnvelope import ForestWithEnvelope
 from code.ForestWithStoppingStrategy import ForestWithGivenStoppingStrategy
-from code.utils import TimerContext, timed
+from code.utils import TimerContext, timed, cache
 from code.figure_utils import plot_functions
-
-cache = Cache(os.path.join(os.path.dirname(__file__), ".cache"))
 
 def time_computation_of_optimal_stopping_strategy(n_total, aer):
     with TimerContext(f"get_optimal_stopping_strategy({n_total, aer})") as timer:
