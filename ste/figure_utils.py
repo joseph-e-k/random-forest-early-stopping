@@ -15,7 +15,7 @@ import os
 import matplotlib
 import numpy as np
 
-from code.utils import stringify_kwargs
+from ste.utils import stringify_kwargs
 
 FIGURES_PATH = r"C:\Users\Josep\Dropbox\Joseph's Dropbox\School\Thesis\Graphs"
 DPI = 600

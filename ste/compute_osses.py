@@ -2,9 +2,9 @@ import argparse
 import functools
 import itertools
 
-from code.multiprocessing_utils import parallelize
-from code.optimization import get_optimal_stopping_strategy
-from code.utils import TimerContext
+from ste.multiprocessing_utils import parallelize
+from ste.optimization import get_optimal_stopping_strategy
+from ste.utils import TimerContext
 
 
 DEFAULT_AERS = (0.0, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6)

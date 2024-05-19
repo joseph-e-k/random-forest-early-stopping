@@ -1,11 +1,11 @@
 from matplotlib import pyplot as plt
 
-from code.Forest import Forest
-from code.optimization import get_optimal_stopping_strategy
-from code.ForestWithEnvelope import ForestWithEnvelope
-from code.ForestWithStoppingStrategy import ForestWithGivenStoppingStrategy
-from code.utils import timed, memoize
-from code.figure_utils import plot_functions
+from ste.Forest import Forest
+from ste.optimization import get_optimal_stopping_strategy
+from ste.ForestWithEnvelope import ForestWithEnvelope
+from ste.ForestWithStoppingStrategy import ForestWithGivenStoppingStrategy
+from ste.utils import timed, memoize
+from ste.figure_utils import plot_functions
 
 
 @timed

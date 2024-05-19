@@ -6,11 +6,11 @@ import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 
-from code.Forest import Forest
-from code.ForestWithEnvelope import ForestWithEnvelope
-from code.ForestWithStoppingStrategy import ForestWithGivenStoppingStrategy, ForestAnalysis
-from code.optimization import get_optimal_stopping_strategy
-from code.utils import covariates_response_split, timed, memoize
+from ste.Forest import Forest
+from ste.ForestWithEnvelope import ForestWithEnvelope
+from ste.ForestWithStoppingStrategy import ForestWithGivenStoppingStrategy, ForestAnalysis
+from ste.optimization import get_optimal_stopping_strategy
+from ste.utils import covariates_response_split, timed, memoize
 
 
 @timed

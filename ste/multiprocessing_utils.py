@@ -4,7 +4,7 @@ import os
 import traceback
 from typing import Callable
 
-from code.utils import TimerContext
+from ste.utils import TimerContext
 
 _ENV_KEY_N_WORKER_PROCESSES = "STE_N_WORKER_PROCESSES"
 N_WORKER_PROCESSES = int(os.getenv(_ENV_KEY_N_WORKER_PROCESSES, 32))
