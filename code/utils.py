@@ -110,3 +110,18 @@ def is_mean_surprising(observations, expected_mean, confidence_level=0.9):
 
 def is_proportion_surprising(observations, expected_proportion, confidence_level=0.9):
     return stats.binomtest(sum(observations), len(observations), expected_proportion).pvalue < 1 - confidence_level
+
+
+def _robust_cache_key(function, *args, **kwargs):
+    signature = inspect.signature(function)
+    bound_arguments = signature.bind(*args, **kwargs)
+    bound_arguments.apply_defaults()
+    return tuple(bound_arguments.arguments.items())
+
+
+def memoize(*args, **kwargs):
+    def decorator(function):
+        memoized = cache.memoize(*args, **kwargs)(function)
+        memoized.__cache_key__ = functools.partial(_robust_cache_key, memoized)
+        return memoized
+    return decorator

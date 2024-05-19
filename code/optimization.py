@@ -9,7 +9,7 @@ from scipy import stats
 from scipy.special import comb
 
 from linear_programming_utils import Problem, OptimizationResult, ArithmeticExpression, OptimizationFailure
-from utils import cache
+from utils import memoize
 
 
 @dataclasses.dataclass(frozen=True)
@@ -19,7 +19,7 @@ class PiSolution:
     pi_bar: np.ndarray
 
 
-@cache.memoize("get_optimal_stopping_strategy")
+@memoize("get_optimal_stopping_strategy")
 def get_optimal_stopping_strategy(n_total, allowable_error, precise=False):
     pi_solution, objective_value = make_and_solve_optimal_stopping_problem(
         n=n_total,
@@ -29,7 +29,7 @@ def get_optimal_stopping_strategy(n_total, allowable_error, precise=False):
     return make_theta_from_pi(pi_solution)
 
 
-@cache.memoize("make_and_solve_optimal_stopping_problem")
+@memoize("make_and_solve_optimal_stopping_problem")
 def make_and_solve_optimal_stopping_problem(n: int, alpha: float, precise: bool = False) -> tuple[PiSolution, float]:
     problem = Problem()
 
@@ -162,8 +162,10 @@ def make_theta_from_pi(pi_solution):
 
 
 if __name__ == "__main__":
+    from utils import cache
+
     parser = argparse.ArgumentParser()
-    parser.add_argument("-n", type=int)
+    parser.add_argument("-n", type=int, required=True)
     parser.add_argument("--alpha", "--aer", "-a", type=float, default=0.05)
     parser.add_argument("--precise", "-p", action="store_true")
     parser.add_argument("--no-cache", action="store_true")

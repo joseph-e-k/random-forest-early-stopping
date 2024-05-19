@@ -10,11 +10,11 @@ from code.Forest import Forest
 from code.ForestWithEnvelope import ForestWithEnvelope
 from code.ForestWithStoppingStrategy import ForestWithGivenStoppingStrategy, ForestAnalysis
 from code.optimization import get_optimal_stopping_strategy
-from code.utils import covariates_response_split, timed, cache
+from code.utils import covariates_response_split, timed, memoize
 
 
 @timed
-@cache.memoize()
+@memoize()
 def analyse_fwe_or_get_cached(n_total, n_positive, allowable_error) -> ForestAnalysis:
     fwe = ForestWithEnvelope.create_greedy(n_total, n_positive, allowable_error)
     return fwe.analyse()
@@ -41,7 +41,7 @@ def coerce_nonnumeric_columns_to_numeric(df: pd.DataFrame):
 
 
 @timed
-@cache.memoize()
+@memoize()
 def estimate_positive_tree_distribution(dataset: pd.DataFrame, n_trees=100, test_proportion=0.2, *, response_column=-1):
     # Processing: get covariates and responses, convert responses to binary classes, and split into train and test sets
     X, y = covariates_response_split(dataset, response_column)
@@ -167,7 +167,7 @@ def get_and_show_error_rates_and_runtimes(n_trees, datasets, allowable_error_rat
 
 
 @timed
-@cache.memoize()
+@memoize()
 def analyse_optimal_fwss_or_get_cached(n_total, n_positive, allowable_error):
     optimal_stopping_strategy = get_optimal_stopping_strategy(n_total=n_total, allowable_error=allowable_error, precise=True)
     fwss = ForestWithGivenStoppingStrategy(Forest(n_total, n_positive), optimal_stopping_strategy)

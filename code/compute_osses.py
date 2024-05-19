@@ -1,4 +1,5 @@
 import argparse
+import functools
 import itertools
 
 from code.multiprocessing_utils import parallelize
@@ -9,18 +10,18 @@ from code.utils import TimerContext
 DEFAULT_AERS = (0.0, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6)
 
 
-def _compute_oss(n, a):
-    return get_optimal_stopping_strategy(n_total=n, allowable_error=a, precise=True)
-
-
 def compute_optimal_stopping_strategies(low_n_total, high_n_total, aers):
     n_totals = range(low_n_total, high_n_total + 1)
+    results = parallelize(
+        functools.partial(get_optimal_stopping_strategy, precise=True),
+        itertools.product(n_totals, aers)
+    )
     with TimerContext("total"):
-        for ((n_total, aer), success, result, duration) in parallelize(_compute_oss, itertools.product(n_totals, aers)):
+        for ((n_total, aer), success, outcome, duration) in results:
             if success:
                 print(f"success ({duration:.1f}s): {n_total=}, {aer=}")
             else:
-                print(f"error ({duration:.1f}s): {n_total=}, {aer=}, error={result!r}")
+                print(f"error ({duration:.1f}s): {n_total=}, {aer=}, error={outcome!r}")
 
 
 def _parse_args():

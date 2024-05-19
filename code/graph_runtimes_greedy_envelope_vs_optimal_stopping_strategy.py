@@ -4,18 +4,12 @@ from code.Forest import Forest
 from code.optimization import get_optimal_stopping_strategy
 from code.ForestWithEnvelope import ForestWithEnvelope
 from code.ForestWithStoppingStrategy import ForestWithGivenStoppingStrategy
-from code.utils import TimerContext, timed, cache
+from code.utils import timed, memoize
 from code.figure_utils import plot_functions
 
 
-def time_computation_of_optimal_stopping_strategy(n_total, aer):
-    with TimerContext(f"get_optimal_stopping_strategy({n_total, aer})") as timer:
-        get_optimal_stopping_strategy(n_total=n_total, allowable_error=aer, precise=True)
-    return timer.elapsed_time
-
-
 @timed
-@cache.memoize()
+@memoize()
 def optimal_expected_runtime(n_total, prop_positive, aer, relative=False):
     stopping_strategy = get_optimal_stopping_strategy(n_total=n_total, allowable_error=aer, precise=True)
     fwss = ForestWithGivenStoppingStrategy(Forest(n_total, int(n_total * prop_positive)), stopping_strategy)
@@ -27,7 +21,7 @@ def optimal_expected_runtime(n_total, prop_positive, aer, relative=False):
 
 
 @timed
-@cache.memoize()
+@memoize()
 def greedy_envelope_expected_runtime(n_total, prop_positive, aer, relative=False):
     fwe = ForestWithEnvelope.create_greedy(n_total, int(n_total * prop_positive), aer)
     expected_runtime = fwe.analyse().expected_runtime
