@@ -10,11 +10,12 @@
 #
 #
 # Amit Moscovich, Tel Aviv University, 2023.
-
+import functools
 import os
 import matplotlib
 import numpy as np
 
+from ste.multiprocessing_utils import parallelize
 from ste.utils import stringify_kwargs
 
 FIGURES_PATH = r"C:\Users\Josep\Dropbox\Joseph's Dropbox\School\Thesis\Graphs"
@@ -81,17 +82,25 @@ def plot_function(ax, x_axis_arg_name, function, function_kwargs=None, plot_kwar
         title += f" ({stringify_kwargs(function_kwargs)})"
     ax.set_title(title)
 
-    results = np.zeros(len(x_axis_values))
+    y_axis_values = np.zeros(len(x_axis_values))
 
-    for i, x_axis_value in enumerate(x_axis_values):
+    results = parallelize(
+        functools.partial(function, **function_kwargs),
+        ({x_axis_arg_name: x} for x in x_axis_values)
+    )
+
+    for i, (kwargs, success, outcome, duration) in enumerate(results):
+        if not success:
+            raise outcome
+        x = kwargs[x_axis_arg_name]
         if verbose:
-            print(f"Computing {function.__name__} value at {x_axis_value!r}")
-        results[i] = function(**(function_kwargs | {x_axis_arg_name: x_axis_value}))
+            print(f"Computed {function.__name__} value at {x!r} in {duration:.1f}s")
+        y_axis_values[i] = outcome
 
-    results = results_transform(results)
+    y_axis_values = results_transform(y_axis_values)
     x_axis_values = x_axis_values_transform(x_axis_values)
 
-    ax.plot(x_axis_values, results, **plot_kwargs)
+    ax.plot(x_axis_values, y_axis_values, **plot_kwargs)
 
 
 def plot_functions(ax, x_axis_arg_name, functions, function_kwargs=None, plot_kwargs=None,
