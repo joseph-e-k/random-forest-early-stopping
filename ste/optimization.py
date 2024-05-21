@@ -8,8 +8,8 @@ import numpy as np
 from scipy import stats
 from scipy.special import comb
 
-from linear_programming_utils import Problem, OptimizationResult, ArithmeticExpression, OptimizationFailure
-from utils import memoize
+from ste.linear_programming_utils import Problem, OptimizationResult, ArithmeticExpression, OptimizationFailure
+from ste.utils import memoize
 
 
 @dataclasses.dataclass(frozen=True)
