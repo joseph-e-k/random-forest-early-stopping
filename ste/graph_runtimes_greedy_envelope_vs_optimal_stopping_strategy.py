@@ -1,3 +1,5 @@
+import argparse
+
 from matplotlib import pyplot as plt
 
 from ste.Forest import Forest
@@ -31,21 +33,27 @@ def greedy_envelope_expected_runtime(n_total, prop_positive, aer, relative=False
     return expected_runtime
 
 
+def _parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--n-lower-bound", "-l", type=int, default=11)
+    parser.add_argument("--n-upper-bound", "-u", type=int, required=True)
+    parser.add_argument("--n-step", "-s", type=int, default=2)
+    parser.add_argument("--alpha", "--aer", "-a", type=float, default=1e-6)
+    parser.add_argument("--prop-positive", "-p", type=float, default=0.25)
+    return parser.parse_args()
+
+
 def main():
-    n_total_min = 11
-    n_total_max = 201
-    n_total_step = 2
-    prop_positive = 0.25
-    aer = 10**-6
+    args = _parse_args()
 
     plot_functions(
         ax=plt.subplot(),
         x_axis_arg_name="n_total",
         functions=[optimal_expected_runtime, greedy_envelope_expected_runtime],
         function_kwargs=dict(
-            n_total=range(n_total_min, n_total_max, n_total_step),
-            prop_positive=prop_positive,
-            aer=aer,
+            n_total=range(args.n_lower_bound, args.n_upper_bound, args.n_step),
+            prop_positive=args.prop_positive,
+            aer=args.alpha,
             relative=False,
         )
     )
