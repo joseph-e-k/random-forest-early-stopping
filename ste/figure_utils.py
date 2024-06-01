@@ -14,6 +14,7 @@ import functools
 import os
 import matplotlib
 import numpy as np
+from matplotlib import pyplot as plt
 
 from ste.multiprocessing_utils import parallelize
 from ste.utils import stringify_kwargs
@@ -149,3 +150,12 @@ def plot_function_many_curves(ax, x_axis_arg_name, distinct_curves_arg_name, fun
     ax.set_title(title)
 
     ax.legend()
+
+
+def create_subplot_grid(n_subplots, n_rows=None, n_columns=None):
+    n_rows = n_rows or 1
+    n_columns = n_columns or n_subplots // n_rows
+    if n_columns * n_rows != n_subplots:
+        raise ValueError("Number of subplots does not fit evenly into given number of rows and columns")
+
+    return plt.subplots(nrows=n_rows, ncols=n_columns, tight_layout=True)

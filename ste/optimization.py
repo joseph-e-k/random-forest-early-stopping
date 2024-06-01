@@ -5,9 +5,12 @@ import dataclasses
 from fractions import Fraction
 
 import numpy as np
+from matplotlib import pyplot as plt
 from scipy import stats
 from scipy.special import comb
 
+from ste.ForestWithEnvelope import ForestWithEnvelope, get_greedy_stopping_strategy
+from ste.figure_utils import create_subplot_grid
 from ste.linear_programming_utils import Problem, OptimizationResult, ArithmeticExpression, OptimizationFailure
 from ste.utils import memoize
 
@@ -161,7 +164,18 @@ def make_theta_from_pi(pi_solution):
     return theta
 
 
-if __name__ == "__main__":
+def show_stopping_strategies(stopping_strategies, titles):
+    fig, axs = create_subplot_grid(len(stopping_strategies))
+
+    for i, (ss, title) in enumerate(zip(stopping_strategies, titles)):
+        im = axs[i].matshow(ss)
+        plt.colorbar(ax=axs[i], mappable=im)
+        axs[i].title.set_text(title)
+
+    plt.show()
+
+
+def main():
     from utils import cache
 
     parser = argparse.ArgumentParser()
@@ -169,6 +183,7 @@ if __name__ == "__main__":
     parser.add_argument("--alpha", "--aer", "-a", type=float, default=0.05)
     parser.add_argument("--precise", "-p", action="store_true")
     parser.add_argument("--no-cache", action="store_true")
+    parser.add_argument("--graph", "-g", action="store_true")
     args = parser.parse_args()
 
     function = get_optimal_stopping_strategy
@@ -189,5 +204,16 @@ if __name__ == "__main__":
         print(e.args[0])
         print(e.args[1])
         print(e.args[2])
+        return
     else:
         print(oss)
+
+    if not args.graph:
+        return
+
+    greedy_ss = get_greedy_stopping_strategy(args.n, args.alpha)
+    show_stopping_strategies([oss, greedy_ss], ["Optimal stopping strategy", "Greedy envelope"])
+
+
+if __name__ == "__main__":
+    main()

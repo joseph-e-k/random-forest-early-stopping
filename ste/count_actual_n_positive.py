@@ -9,6 +9,7 @@ from sklearn.model_selection import train_test_split
 from ste.Forest import Forest
 from ste.ForestWithEnvelope import ForestWithEnvelope
 from ste.ForestWithStoppingStrategy import ForestWithGivenStoppingStrategy, ForestAnalysis
+from ste.figure_utils import create_subplot_grid
 from ste.optimization import get_optimal_stopping_strategy
 from ste.utils import covariates_response_split, timed, memoize
 
@@ -69,19 +70,15 @@ def estimate_positive_tree_distribution(dataset: pd.DataFrame, n_trees=100, test
     )
 
 
-def plot_n_positive_distributions(n_trees, datasets, nrows=None, ncols=None):
-    nrows = nrows or 1
-    ncols = ncols or len(datasets) // nrows
-    if ncols * nrows != len(datasets):
-        raise ValueError("Datasets do not divide evenly into given number of rows")
-
-    fig, axs = plt.subplots(nrows=nrows, ncols=ncols, tight_layout=True)
+def plot_n_positive_distributions(n_trees, datasets):
+    fig, axs = create_subplot_grid(len(datasets))
+    n_rows = axs.shape[0]
 
     for i_dataset, (dataset_name, dataset) in enumerate(datasets.items()):
         n_observations, n_positive_observations, *distributions = estimate_positive_tree_distribution(dataset, n_trees)
         distribution_total, distribution_for_pos, distribution_for_neg = distributions
 
-        ax = axs[i_dataset // nrows, i_dataset % nrows]
+        ax = axs[i_dataset // n_rows, i_dataset % n_rows]
         ax.hist(distribution_total)
         ax.title.set_text(f"{dataset_name}")
         ax.set_xlim((0, n_trees))

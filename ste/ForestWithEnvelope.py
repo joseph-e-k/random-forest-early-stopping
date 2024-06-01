@@ -10,6 +10,7 @@ from scipy.special import logsumexp
 from .Forest import Forest
 from .ForestWithStoppingStrategy import ForestWithStoppingStrategy
 from .envelopes import Envelope, get_null_envelope, add_increment_to_envelope
+from .utils import memoize
 
 
 @dataclasses.dataclass
@@ -74,3 +75,9 @@ class ForestWithEnvelope(ForestWithStoppingStrategy):
     def add_increment_to_envelope(self, increment_index: int):
         add_increment_to_envelope(self.envelope, increment_index)
         self._invalidate_state_probabilities(start_index=increment_index)
+
+
+@memoize("get_greedy_stopping_strategy")
+def get_greedy_stopping_strategy(n_total, allowable_error):
+    fwe = ForestWithEnvelope.create_greedy(n_total=n_total, n_positive=n_total, allowable_error=allowable_error)
+    return fwe.get_prob_stop()
