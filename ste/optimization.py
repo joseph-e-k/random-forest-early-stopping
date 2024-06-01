@@ -9,8 +9,8 @@ from matplotlib import pyplot as plt
 from scipy import stats
 from scipy.special import comb
 
-from ste.ForestWithEnvelope import ForestWithEnvelope, get_greedy_stopping_strategy
-from ste.figure_utils import create_subplot_grid
+from ste.ForestWithEnvelope import get_greedy_stopping_strategy
+from ste.figure_utils import create_subplot_grid, plot_stopping_strategy
 from ste.linear_programming_utils import Problem, OptimizationResult, ArithmeticExpression, OptimizationFailure
 from ste.utils import memoize
 
@@ -168,8 +168,7 @@ def show_stopping_strategies(stopping_strategies, titles):
     fig, axs = create_subplot_grid(len(stopping_strategies))
 
     for i, (ss, title) in enumerate(zip(stopping_strategies, titles)):
-        im = axs[i].matshow(ss)
-        plt.colorbar(ax=axs[i], mappable=im)
+        plot_stopping_strategy(ss, ax=axs[i])
         axs[i].title.set_text(title)
 
     plt.show()
