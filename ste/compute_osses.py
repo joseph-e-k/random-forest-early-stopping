@@ -13,7 +13,7 @@ DEFAULT_AERS = (0.0, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6)
 def compute_optimal_stopping_strategies(low_n_total, high_n_total, aers):
     n_totals = range(low_n_total, high_n_total + 1)
     results = parallelize(
-        functools.partial(get_optimal_stopping_strategy, precise=True),
+        get_optimal_stopping_strategy,
         itertools.product(n_totals, aers)
     )
     with TimerContext("total"):

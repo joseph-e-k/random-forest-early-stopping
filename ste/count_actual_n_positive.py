@@ -166,7 +166,7 @@ def get_and_show_error_rates_and_runtimes(n_trees, datasets, allowable_error_rat
 @timed
 @memoize()
 def analyse_optimal_fwss_or_get_cached(n_total, n_positive, allowable_error):
-    optimal_stopping_strategy = get_optimal_stopping_strategy(n_total=n_total, allowable_error=allowable_error, precise=True)
+    optimal_stopping_strategy = get_optimal_stopping_strategy(n_total=n_total, allowable_error=allowable_error)
     fwss = ForestWithGivenStoppingStrategy(Forest(n_total, n_positive), optimal_stopping_strategy)
     return fwss.analyse()
 

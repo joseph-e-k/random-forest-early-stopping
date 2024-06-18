@@ -8,6 +8,7 @@ import time
 import numpy as np
 import pandas as pd
 from diskcache import Cache
+from diskcache.core import full_name
 from scipy import stats
 
 
@@ -112,16 +113,18 @@ def is_proportion_surprising(observations, expected_proportion, confidence_level
     return stats.binomtest(sum(observations), len(observations), expected_proportion).pvalue < 1 - confidence_level
 
 
-def _robust_cache_key(function, *args, **kwargs):
+def _robust_cache_key(function, name, *args, **kwargs):
     signature = inspect.signature(function)
     bound_arguments = signature.bind(*args, **kwargs)
     bound_arguments.apply_defaults()
-    return tuple(bound_arguments.arguments.items())
+    return (name,) + tuple(bound_arguments.arguments.items())
 
 
-def memoize(*args, **kwargs):
-    def decorator(function):
-        memoized = cache.memoize(*args, **kwargs)(function)
-        memoized.__cache_key__ = functools.partial(_robust_cache_key, memoized)
+def memoize(name=None):
+    def decorator(function, name=name):
+        if name is None:
+            name = full_name(function)
+        memoized = cache.memoize(name=name)(function)
+        memoized.__cache_key__ = functools.partial(_robust_cache_key, memoized, name)
         return memoized
     return decorator

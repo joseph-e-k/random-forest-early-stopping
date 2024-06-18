@@ -13,7 +13,7 @@ from ste.figure_utils import plot_functions
 @timed
 @memoize()
 def optimal_expected_runtime(n_total, prop_positive, aer, relative=False):
-    stopping_strategy = get_optimal_stopping_strategy(n_total=n_total, allowable_error=aer, precise=True)
+    stopping_strategy = get_optimal_stopping_strategy(n_total=n_total, allowable_error=aer)
     fwss = ForestWithGivenStoppingStrategy(Forest(n_total, int(n_total * prop_positive)), stopping_strategy)
     expected_runtime = fwss.analyse().expected_runtime
 
