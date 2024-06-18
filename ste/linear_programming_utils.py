@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import dataclasses
-import os
 import re
 import subprocess
 import tempfile
@@ -9,12 +8,7 @@ from enum import Enum
 from fractions import Fraction
 from io import StringIO
 
-import pulp
-import scipy
 from frozendict import frozendict
-from scipy.sparse import dok_array
-
-SparseArray = dok_array
 
 Constant = int | float | Fraction
 
@@ -192,111 +186,6 @@ class Problem:
 
         self.objective = objective
 
-    def expression_as_sparse_array(self, expression: ArithmeticExpression) -> SparseArray:
-        array = SparseArray((1, self.n_variables), dtype=float)
-
-        for name, value in expression.coefficients.items():
-            if value == 0:
-                continue
-            index = self.variable_names_to_indices[name]
-            array[0, index] = value
-
-        return array
-
-
-    def solve_with_scipy(self, method="highs"):
-        if self.objective is None:
-            raise ValueError("Must set an objective function before converting to SciPy format")
-
-        A_ub, b_ub, A_eq, b_eq = self._get_constraints_scipy_format()
-
-        scipy_result = scipy.optimize.linprog(
-            c=self._get_objective_coeffs_array().toarray(),
-            A_ub=A_ub.toarray(),
-            b_ub=b_ub.toarray(),
-            A_eq=A_eq.toarray(),
-            b_eq=b_eq.toarray(),
-            bounds=(None, None),
-            method=method
-        )
-
-        return OptimizationResult.from_scipy_format(scipy_result, self)
-
-    def _get_objective_coeffs_array(self):
-        return self.expression_as_sparse_array(self.objective)
-
-    def _get_constraints_scipy_format(self):
-        constraints_by_operator = {
-            ComparisonOperator.LEq: set(),
-            ComparisonOperator.Eq: set()
-        }
-
-        for constraint in self.constraints:
-            constraints_by_operator[constraint.operator].add(constraint)
-
-        for operator in [ComparisonOperator.LEq, ComparisonOperator.Eq]:
-            yield from self._filtered_constraints_to_scipy_format(constraints_by_operator[operator])
-
-    def _filtered_constraints_to_scipy_format(self, constraints: set[LogicalExpression]):
-        lhs_coeffs_matrix = SparseArray((len(constraints), self.n_variables))
-        rhs_constants_array = SparseArray((len(constraints), 1))
-
-        for i_constraint, constraint in enumerate(constraints):
-            constraint: LogicalExpression = constraint.isolate_constants_on_rhs()
-            lhs_coeffs_matrix[i_constraint, :] = self.expression_as_sparse_array(constraint.lhs)
-            rhs_constants_array[i_constraint, 0] = constraint.rhs.coefficients[CONSTANT_COEFF_KEY]
-
-        return lhs_coeffs_matrix, rhs_constants_array
-
-    def solve_with_pulp(self):
-        pulp_problem = pulp.LpProblem(sense=pulp.LpMinimize)
-        pulp_vars_by_name = {
-            name: pulp.LpVariable(name)
-            for name in self.variable_names_to_indices
-        }
-
-        pulp_problem += (
-            self._arithmetic_expression_to_pulp_format(self.objective, pulp_vars_by_name),
-            "objective"
-        )
-
-        for i_constraint, constraint in enumerate(self.constraints):
-            pulp_problem += (
-                self._logical_expression_to_pulp_format(constraint, pulp_vars_by_name),
-                f"constraint_{i_constraint}"
-            )
-
-        if os.path.exists(GUROBI_CL_PATH):
-            os.putenv("LD_LIBRARY_PATH", GUROBI_LIB_PATH)
-            solver = pulp.GUROBI_CMD(path=GUROBI_CL_PATH, msg=False)
-        else:
-            solver = pulp.PULP_CBC_CMD(msg=False)
-        pulp_problem.solve(solver=solver)
-        return OptimizationResult.from_pulp_format(pulp_problem, pulp_vars_by_name)
-
-    @staticmethod
-    def _arithmetic_expression_to_pulp_format(expression: ArithmeticExpression, pulp_vars_by_name: dict):
-        coeffs = expression.coefficients
-
-        return sum(
-            coeff * pulp_vars_by_name[name]
-            for (name, coeff) in coeffs.items()
-            if name is not None
-        ) + coeffs[CONSTANT_COEFF_KEY]
-
-    @staticmethod
-    def _logical_expression_to_pulp_format(expression: LogicalExpression, pulp_vars_by_name: dict):
-        pulp_lhs = Problem._arithmetic_expression_to_pulp_format(expression.lhs, pulp_vars_by_name)
-        pulp_rhs = Problem._arithmetic_expression_to_pulp_format(expression.rhs, pulp_vars_by_name)
-
-        if expression.operator == ComparisonOperator.LEq:
-            return pulp_lhs <= pulp_rhs
-
-        if expression.operator == ComparisonOperator.Eq:
-            return pulp_lhs == pulp_rhs
-
-        raise ValueError(f"Unknown comparison operator: {expression.operator}")
-
     def solve_with_soplex(self) -> OptimizationResult:
         lp_file = tempfile.NamedTemporaryFile("wt")
         solution_file = tempfile.NamedTemporaryFile("rt")
@@ -371,38 +260,6 @@ class OptimizationResult:
         return self.variable_values[item]
 
     @classmethod
-    def from_scipy_format(cls, scipy_result, problem):
-        if not scipy_result.success:
-            raise OptimizationFailure()
-
-        variable_values = dict()
-
-        for variable_name, variable_index in problem.variable_names_to_indices.items():
-            variable_value = scipy_result.x[variable_index]
-            if variable_value != 0:
-                variable_values[variable_name] = scipy_result.x[variable_index]
-
-        return cls(
-            variable_values=Coefficients(variable_values),
-            objective_value=scipy_result.fun
-        )
-
-    @classmethod
-    def from_pulp_format(cls, pulp_problem, pulp_vars_by_name):
-        if pulp_problem.status != 1:
-            raise OptimizationFailure()
-
-        variable_values = {
-            name: pulp.value(pulp_var)
-            for (name, pulp_var) in pulp_vars_by_name.items()
-        }
-
-        return cls(
-            variable_values=Coefficients(variable_values),
-            objective_value=pulp.value(pulp_problem.objective)
-        )
-
-    @classmethod
     def from_soplex_output(cls, stdout, stderr, solution_file):
         success = False
         objective_value = None
@@ -450,20 +307,6 @@ if __name__ == "__main__":
     prob.set_objective(objective)
     prob.add_constraint(5 * x + 8 * y <= 180)
     prob.add_constraint(5 * x + 4 * y <= 120)
-
-    print("Solving with SciPy:")
-    solution = prob.solve_with_scipy()
-    print(f"x = {x.evaluate(solution)}, y = {y.evaluate(solution)}")
-    print(f"objective = {objective.evaluate(solution)}")
-    print(solution)
-    print()
-
-    print("Solving with PuLP:")
-    solution = prob.solve_with_pulp()
-    print(f"x = {x.evaluate(solution)}, y = {y.evaluate(solution)}")
-    print(f"objective = {objective.evaluate(solution)}")
-    print(solution)
-    print()
 
     print("Solving with SoPlex:")
     solution = prob.solve_with_soplex()
