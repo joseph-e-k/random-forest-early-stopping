@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 import dataclasses
 import re
 import subprocess
@@ -50,7 +51,19 @@ class ArithmeticExpression:
 
     @classmethod
     def from_constant(cls, const: Constant):
-        return cls(Coefficients([(CONSTANT_COEFF_KEY, const)]))
+        return cls.from_coeffs([(CONSTANT_COEFF_KEY, const)])
+    
+    @classmethod
+    def from_coeffs(cls, coeffs_source=()):
+        if isinstance(coeffs_source, Mapping):
+            coeff_items = coeffs_source.items()
+        else:
+            coeff_items = coeffs_source
+        return cls(Coefficients(
+            (key, value)
+            for (key, value) in coeff_items
+            if value != 0
+        ))
 
     def __add__(self, other: ArithmeticExpression | Constant):
         if isinstance(other, ArithmeticExpression):
@@ -60,26 +73,22 @@ class ArithmeticExpression:
         raise TypeError(f"In {type(self)}.__add__, `other` must be an ArithmeticExpression or Constant")
 
     def _add_arithmetic_expression(self, other: ArithmeticExpression):
-        return ArithmeticExpression(Coefficients(
+        return ArithmeticExpression.from_coeffs(
             (index, (self.coefficients[index] + other.coefficients[index]))
             for index in (self.coefficients.keys() | other.coefficients.keys())
-        ))
+        )
 
     def _add_constant(self, const: Constant):
-        return ArithmeticExpression(Coefficients(
-            self.coefficients.set(
-                CONSTANT_COEFF_KEY,
-                self.coefficients[CONSTANT_COEFF_KEY] + const)
-        ))
+        return self + ArithmeticExpression.from_constant(const)
 
     def __radd__(self, other: Constant):
         return self._add_constant(other)
 
     def __mul__(self, other: Constant):
-        return ArithmeticExpression(Coefficients(
+        return ArithmeticExpression.from_coeffs(
             (key, other * value)
             for (key, value) in self.coefficients.items()
-        ))
+        )
 
     def __rmul__(self, other):
         return self * other
@@ -94,10 +103,10 @@ class ArithmeticExpression:
         return other + (-self)
 
     def __truediv__(self, other: Constant):
-        return ArithmeticExpression(Coefficients(
+        return ArithmeticExpression.from_coeffs(
             (key, value / other)
             for (key, value) in self.coefficients.items()
-        ))
+        )
 
     def __eq__(self, other: ArithmeticExpression | Constant) -> LogicalExpression:
         if isinstance(other, Constant):
@@ -142,10 +151,13 @@ class LogicalExpression:
         lhs_coeffs = (self.lhs - self.rhs).coefficients.set(CONSTANT_COEFF_KEY, 0)
         rhs_value = self.rhs.coefficients[CONSTANT_COEFF_KEY] - self.lhs.coefficients[CONSTANT_COEFF_KEY]
         return LogicalExpression(
-            lhs=ArithmeticExpression(lhs_coeffs),
+            lhs=ArithmeticExpression.from_coeffs(lhs_coeffs),
             rhs=ArithmeticExpression.from_constant(rhs_value),
             operator=self.operator
         )
+    
+    def is_tautology(self) -> bool:
+        return len(self.isolate_constants_on_rhs().lhs.coefficients.keys()) == 0
 
     def __repr__(self):
         return f"{self.lhs!r} {self.operator.value} {self.rhs!r}"
@@ -211,9 +223,9 @@ class Problem:
         file.write(f" {self._arithmetic_expression_to_lp_format(self.objective)}\n")
         file.write("Subject To\n")
         for i_constraint, constraint in enumerate(self.constraints):
-            constraint_str = self._logical_expression_to_lp_format(constraint)
-            if constraint_str == "0 <= 0":
+            if constraint.is_tautology():
                 continue
+            constraint_str = self._logical_expression_to_lp_format(constraint)
             file.write(f" c{i_constraint}: {constraint_str}\n")
         file.write("Generals\n")
         for var_name in self.variable_names_to_indices.keys():
