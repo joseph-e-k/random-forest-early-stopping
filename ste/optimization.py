@@ -12,7 +12,7 @@ from scipy.special import comb
 from ste.ForestWithEnvelope import get_greedy_stopping_strategy
 from ste.figure_utils import create_subplot_grid, plot_stopping_strategy
 from ste.linear_programming_utils import Problem, OptimizationResult, ArithmeticExpression, OptimizationFailure
-from ste.utils import memoize
+from ste.utils import forwards_to, memoize
 
 
 @dataclasses.dataclass(frozen=True)
@@ -22,30 +22,34 @@ class PiSolution:
     pi_bar: np.ndarray
 
 
-@memoize("get_optimal_stopping_strategy")
-def get_optimal_stopping_strategy(n_total, allowable_error):
-    pi_solution, objective_value = make_and_solve_optimal_stopping_problem(
-        n=n_total,
-        alpha=allowable_error
-    )
-    return make_theta_from_pi(pi_solution)
-
-
 @memoize("make_and_solve_optimal_stopping_problem")
-def make_and_solve_optimal_stopping_problem(n: int, alpha: float) -> tuple[PiSolution, float]:
+def make_and_solve_optimal_stopping_problem(n: int, alpha: float, freqs_n_plus: np.ndarray = None, error_minimax=True, runtime_minimax=True) -> tuple[PiSolution, float]:
     problem = Problem()
 
+    if error_minimax and runtime_minimax and freqs_n_plus is not None:
+        raise ValueError("frequencies were provided for n_plus but both error_minimax and runtime_minimax are True, so those frequencies cannot be used")
+
+    if error_minimax and runtime_minimax:
+        # In minimax mode, we need only consider the worst-case scenario, which is a balanced ensemble
+        n_plus = np.array([n // 2, n // 2 + 1])
+    else:
+        n_plus = np.arange(0, n + 1)
+
     p, pi, pi_bar = _make_decision_variables(n, problem)
-    n_plus = np.array([n // 2, n // 2 + 1])
     a = make_abstract_probability_matrix(n, n_plus)
     beta = a * pi
 
     prob_B_equals = np.sum(beta, axis=2)
     expected_B = np.sum(prob_B_equals * np.arange(n + 1), axis=1)
-    max_expected_B = problem.add_variable("max_expected_B")
-    problem.set_objective(max_expected_B)
-    for k in range(len(n_plus)):
-        problem.add_constraint(max_expected_B >= expected_B[k])
+
+    if runtime_minimax:
+        max_expected_B = problem.add_variable("max_expected_B")
+        for k in range(len(n_plus)):
+            problem.add_constraint(max_expected_B >= expected_B[k])
+        problem.set_objective(max_expected_B)
+    else:
+        expected_expected_B = np.sum(expected_B * freqs_n_plus)
+        problem.set_objective(expected_expected_B)
 
     for decision_variable in [p, pi, pi_bar]:
         for i in range(n + 1):
@@ -55,8 +59,15 @@ def make_and_solve_optimal_stopping_problem(n: int, alpha: float) -> tuple[PiSol
 
     e = _make_error_mask(n, n_plus)
     prob_error = np.sum(e * beta, axis=(1, 2))
-    for k in range(len(n_plus)):
-        problem.add_constraint(prob_error[k] <= alpha)
+
+    if error_minimax:
+        # In minimax mode, error probability must be controlled in each scenario separately
+        for k in range(len(n_plus)):
+            problem.add_constraint(prob_error[k] <= alpha)
+    else:
+        expected_prob_error = np.sum(prob_error * freqs_n_plus) / np.sum(freqs_n_plus)
+        problem.add_constraint(expected_prob_error <= alpha)
+
 
     problem.add_constraint(p[0, 0] == 1)
 
@@ -146,14 +157,22 @@ def make_theta_from_pi(pi_solution):
     return theta
 
 
-def show_stopping_strategies(stopping_strategies, titles):
-    fig, axs = create_subplot_grid(len(stopping_strategies))
-
+def show_stopping_strategies(stopping_strategies, titles, n_rows=None, n_columns=None):
+    fig, axs = create_subplot_grid(len(stopping_strategies), n_rows, n_columns)
+    axs = axs.reshape(-1)
     for i, (ss, title) in enumerate(zip(stopping_strategies, titles)):
         plot_stopping_strategy(ss, ax=axs[i])
         axs[i].title.set_text(title)
 
     plt.show()
+
+
+@memoize("get_optimal_stopping_strategy")
+@forwards_to(make_and_solve_optimal_stopping_problem)
+def get_optimal_stopping_strategy(*args, **kwargs):
+    pi_solution, objective_value = make_and_solve_optimal_stopping_problem(*args, **kwargs)
+    return make_theta_from_pi(pi_solution)
+
 
 
 def main():
