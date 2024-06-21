@@ -176,36 +176,30 @@ def get_optimal_stopping_strategy(*args, **kwargs):
 
 
 def main():
-    from utils import cache
+    from ste.utils import cache
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-n", type=int, required=True)
     parser.add_argument("--alpha", "--aer", "-a", type=float, default=0.05)
-    parser.add_argument("--no-cache", action="store_true")
     parser.add_argument("--graph", "-g", action="store_true")
     args = parser.parse_args()
 
-    function = get_optimal_stopping_strategy
-
-    if args.no_cache:
-        function = function.__wrapped__
+    print(f"{cache.directory=}")
+    cache_key = get_optimal_stopping_strategy.__cache_key__(args.n, args.alpha)
+    if cache_key in cache:
+        print(f"{cache_key=} found in cache")
     else:
-        print(f"{cache.directory=}")
-        cache_key = function.__cache_key__(n_total=args.n, allowable_error=args.alpha)
-        if cache_key in cache:
-            print(f"{cache_key=} found in cache")
-        else:
-            print(f"{cache_key=} not found in cache")
+        print(f"{cache_key=} not found in cache")
 
     try:
-        oss = function(args.n, args.alpha)
+        oss = get_optimal_stopping_strategy(args.n, args.alpha)
     except OptimizationFailure as e:
         print(e.args[0])
         print(e.args[1])
         print(e.args[2])
         return
     else:
-        print(oss)
+        print(np.asarray(oss, dtype=float))
 
     if not args.graph:
         return
