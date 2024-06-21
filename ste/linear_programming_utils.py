@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import defaultdict
 from collections.abc import Mapping
 import dataclasses
 import re
@@ -9,9 +10,6 @@ from enum import Enum
 from fractions import Fraction
 from io import StringIO
 
-from frozendict import frozendict
-
-Constant = int | float | Fraction
 
 CONSTANT_COEFF_KEY = None
 
@@ -24,22 +22,17 @@ class OptimizationFailure(Exception):
     pass
 
 
-class Coefficients(frozendict[str | None, Constant]):
-    def __getitem__(self, item):
-        try:
-            return super().__getitem__(item)
-        except KeyError:
-            return 0
-
-
 class ComparisonOperator(Enum):
     Eq = "=="
     LEq = "<="
 
 
-@dataclasses.dataclass(frozen=True)
-class ArithmeticExpression:
-    coefficients: Coefficients
+Constant = int | float | Fraction
+
+
+class ArithmeticExpression(defaultdict[str | None, Constant]):
+    def __init__(self, items_source=(), /, **kwargs):
+        super().__init__(lambda: 0, items_source, **kwargs)
 
     def evaluate(self, context):
         # This insanity allows us to call ArithmeticExpression.evaluate() as if it were a static function,
@@ -47,7 +40,7 @@ class ArithmeticExpression:
         if isinstance(self, Constant):
             return self
 
-        return sum(context[name] * value for (name, value) in self.coefficients.items())
+        return sum(context[name] * value for (name, value) in self.items())
 
     @classmethod
     def from_constant(cls, const: Constant):
@@ -59,11 +52,13 @@ class ArithmeticExpression:
             coeff_items = coeffs_source.items()
         else:
             coeff_items = coeffs_source
-        return cls(Coefficients(
-            (key, value)
-            for (key, value) in coeff_items
-            if value != 0
-        ))
+        return cls(
+            [
+                (key, value)
+                for (key, value) in coeff_items
+                if value != 0
+            ]
+        )
 
     def __add__(self, other: ArithmeticExpression | Constant):
         if isinstance(other, ArithmeticExpression):
@@ -73,10 +68,10 @@ class ArithmeticExpression:
         raise TypeError(f"In {type(self)}.__add__, `other` must be an ArithmeticExpression or Constant")
 
     def _add_arithmetic_expression(self, other: ArithmeticExpression):
-        return ArithmeticExpression.from_coeffs(
-            (index, (self.coefficients[index] + other.coefficients[index]))
-            for index in (self.coefficients.keys() | other.coefficients.keys())
-        )
+        new = ArithmeticExpression(self)
+        for key, value in other.items():
+            new[key] += value
+        return new
 
     def _add_constant(self, const: Constant):
         return self + ArithmeticExpression.from_constant(const)
@@ -87,7 +82,7 @@ class ArithmeticExpression:
     def __mul__(self, other: Constant):
         return ArithmeticExpression.from_coeffs(
             (key, other * value)
-            for (key, value) in self.coefficients.items()
+            for (key, value) in self.items()
         )
 
     def __rmul__(self, other):
@@ -105,7 +100,7 @@ class ArithmeticExpression:
     def __truediv__(self, other: Constant):
         return ArithmeticExpression.from_coeffs(
             (key, value / other)
-            for (key, value) in self.coefficients.items()
+            for (key, value) in self.items()
         )
 
     def __eq__(self, other: ArithmeticExpression | Constant) -> LogicalExpression:
@@ -124,7 +119,7 @@ class ArithmeticExpression:
         return LogicalExpression(other, self, ComparisonOperator.LEq)
 
     def __repr__(self):
-        items = sorted(self.coefficients.items(), key=(lambda kv: (kv[0] is not None, kv[0])))
+        items = sorted(self.items(), key=(lambda kv: (kv[0] is not None, kv[0])))
         item_strings = []
 
         for name, value in items:
@@ -148,16 +143,17 @@ class LogicalExpression:
     operator: ComparisonOperator
 
     def isolate_constants_on_rhs(self) -> LogicalExpression:
-        lhs_coeffs = (self.lhs - self.rhs).coefficients.set(CONSTANT_COEFF_KEY, 0)
-        rhs_value = self.rhs.coefficients[CONSTANT_COEFF_KEY] - self.lhs.coefficients[CONSTANT_COEFF_KEY]
+        lhs = self.lhs - self.rhs
+        lhs.pop(CONSTANT_COEFF_KEY, None)
+        rhs_value = self.rhs[CONSTANT_COEFF_KEY] - self.lhs[CONSTANT_COEFF_KEY]
         return LogicalExpression(
-            lhs=ArithmeticExpression.from_coeffs(lhs_coeffs),
+            lhs=lhs,
             rhs=ArithmeticExpression.from_constant(rhs_value),
             operator=self.operator
         )
     
     def is_tautology(self) -> bool:
-        return len(self.isolate_constants_on_rhs().lhs.coefficients.keys()) == 0
+        return len(self.isolate_constants_on_rhs().lhs.keys()) == 0
 
     def __repr__(self):
         return f"{self.lhs!r} {self.operator.value} {self.rhs!r}"
@@ -165,22 +161,14 @@ class LogicalExpression:
 
 @dataclasses.dataclass
 class Problem:
-    variable_names_to_indices: dict[str, int] = dataclasses.field(default_factory=dict)
-    constraints: set[LogicalExpression] = dataclasses.field(default_factory=set)
+    constraints: list[LogicalExpression] = dataclasses.field(default_factory=list)
     objective: ArithmeticExpression = None
+    variable_names: set[str] = dataclasses.field(default_factory=set)
     # TODO: Allow maximization problems as well
 
-    @property
-    def n_variables(self):
-        return len(self.variable_names_to_indices)
-
     def add_variable(self, variable_name: str, lower_bound: Constant = None, upper_bound: Constant = None) -> ArithmeticExpression:
-        if variable_name in self.variable_names_to_indices:
-            raise ValueError(f"Variable name {variable_name} already in use")
-
-        self.variable_names_to_indices[variable_name] = len(self.variable_names_to_indices)
-
-        variable = ArithmeticExpression(Coefficients([(variable_name, 1)]))
+        variable = ArithmeticExpression.from_coeffs([(variable_name, 1)])
+        self.variable_names.add(variable_name)
 
         if lower_bound is not None:
             self.add_constraint(variable >= lower_bound)
@@ -190,7 +178,7 @@ class Problem:
         return variable
 
     def add_constraint(self, constraint: LogicalExpression):
-        self.constraints.add(constraint)
+        self.constraints.append(constraint)
 
     def set_objective(self, objective: ArithmeticExpression, override: bool = False):
         if self.objective is not None and not override:
@@ -228,7 +216,7 @@ class Problem:
             constraint_str = self._logical_expression_to_lp_format(constraint)
             file.write(f" c{i_constraint}: {constraint_str}\n")
         file.write("Generals\n")
-        for var_name in self.variable_names_to_indices.keys():
+        for var_name in self.variable_names:
             file.write(f" {var_name}")
         file.write("\n")
         file.write("End\n")
@@ -236,7 +224,7 @@ class Problem:
     @staticmethod
     def _arithmetic_expression_to_lp_format(expression: ArithmeticExpression):
         parts = []
-        for var_name, coef in expression.coefficients.items():
+        for var_name, coef in expression.items():
             if coef == 0:
                 continue
             parts.append("+" if coef > 0 else "-")
@@ -265,7 +253,7 @@ class Problem:
 
 @dataclasses.dataclass(frozen=True)
 class OptimizationResult:
-    variable_values: Coefficients
+    variable_values: Mapping[str, Constant]
     objective_value: Constant
 
     def __getitem__(self, item):
@@ -299,7 +287,7 @@ class OptimizationResult:
                 error_text
             )
 
-        variable_values = dict()
+        variable_values = defaultdict(lambda: 0)
         with solution_file:
             for line in solution_file:
                 if m := re.match(r"(\S+)\s+(\S+)$", line):
@@ -307,7 +295,7 @@ class OptimizationResult:
 
         return OptimizationResult(
             objective_value=objective_value,
-            variable_values=Coefficients(variable_values)
+            variable_values=variable_values
         )
 
 
