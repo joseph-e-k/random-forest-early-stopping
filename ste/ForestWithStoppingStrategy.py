@@ -178,7 +178,7 @@ class ForestWithGivenStoppingStrategy(ForestWithStoppingStrategy):
 
     def _get_log_prob_stop(self):
         with warnings.catch_warnings(category=RuntimeWarning, action="ignore"):
-            return np.log(self.stopping_strategy)
+            return np.log(np.asarray(self.stopping_strategy, dtype=float))
 
 
 @dataclasses.dataclass(frozen=True)
