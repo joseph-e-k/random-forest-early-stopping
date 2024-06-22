@@ -40,7 +40,8 @@ class ForestWithEnvelope(ForestWithStoppingStrategy):
 
     @classmethod
     def create_greedy(cls, n_total, n_positive, allowable_error):
-        log_allowable_error = np.log(allowable_error)
+        with warnings.catch_warnings(category=RuntimeWarning, action="ignore"):
+            log_allowable_error = np.log(allowable_error)
 
         envelope = get_null_envelope(n_total)
         forest_with_envelope = cls.create(n_total, math.ceil((n_total + 1) / 2), envelope)
