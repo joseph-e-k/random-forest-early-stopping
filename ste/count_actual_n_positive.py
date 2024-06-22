@@ -1,4 +1,7 @@
+import os
+import warnings
 from collections import Counter
+from itertools import product
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -10,13 +13,13 @@ from ste.Forest import Forest
 from ste.ForestWithEnvelope import ForestWithEnvelope
 from ste.ForestWithStoppingStrategy import ForestWithGivenStoppingStrategy, ForestAnalysis
 from ste.figure_utils import create_subplot_grid
+from ste.multiprocessing_utils import parallelize
 from ste.optimization import get_optimal_stopping_strategy
-from ste.utils import covariates_response_split, timed, memoize
+from ste.utils import covariates_response_split, memoize
 
 
-@timed
-@memoize()
-def analyse_fwe_or_get_cached(n_total, n_positive, allowable_error) -> ForestAnalysis:
+@memoize(args_to_ignore=["_"])
+def analyse_greedy_fwe_or_get_cached(n_total, n_positive, allowable_error, _) -> ForestAnalysis:
     fwe = ForestWithEnvelope.create_greedy(n_total, n_positive, allowable_error)
     return fwe.analyse()
 
@@ -41,7 +44,6 @@ def coerce_nonnumeric_columns_to_numeric(df: pd.DataFrame):
     return df
 
 
-@timed
 @memoize()
 def estimate_positive_tree_distribution(dataset: pd.DataFrame, n_trees=100, test_proportion=0.2, *, response_column=-1):
     # Processing: get covariates and responses, convert responses to binary classes, and split into train and test sets
@@ -58,9 +60,10 @@ def estimate_positive_tree_distribution(dataset: pd.DataFrame, n_trees=100, test
     X_test_neg = X_test[np.logical_not(y_test)]
 
     # Count number of "positive" trees for each testing observation, and add them up
-    tree_predictions = np.column_stack([tree.predict(X_test) for tree in rf_classifier.estimators_])
-    tree_predictions_for_pos = np.column_stack([tree.predict(X_test_pos) for tree in rf_classifier.estimators_])
-    tree_predictions_for_neg = np.column_stack([tree.predict(X_test_neg) for tree in rf_classifier.estimators_])
+    tree_predictions = np.vstack([tree.predict(X_test) for tree in rf_classifier.estimators_])
+    tree_predictions_for_pos = np.vstack([tree.predict(X_test_pos) for tree in rf_classifier.estimators_])
+    tree_predictions_for_neg = np.vstack([tree.predict(X_test_neg) for tree in rf_classifier.estimators_])
+
     return (
         len(y),
         sum(y),
@@ -87,26 +90,56 @@ def plot_n_positive_distributions(n_trees, datasets):
     return fig
 
 
-def get_error_rates_and_runtimes(n_trees, datasets, allowable_error_rates, analysis_getters):
-    runtimes = np.zeros((len(datasets), len(allowable_error_rates), len(analysis_getters)))
+def get_error_rates_and_runtimes(n_trees, datasets, aers, analysers):
+    positive_tree_counters = [None] * len(datasets)
+    runtimes = np.zeros((len(datasets), len(aers), len(analysers)))
     error_rates = np.zeros_like(runtimes)
 
-    for i_dataset, (dataset_name, dataset) in enumerate(datasets.items()):
+    for i_dataset, dataset in enumerate(datasets.values()):
         _, _, positive_tree_distribution, _, _ = estimate_positive_tree_distribution(dataset, n_trees=n_trees)
-        weights = Counter(positive_tree_distribution)
+        positive_tree_counters[i_dataset] = Counter({
+            int(index): int(value)
+            for (index, value) in enumerate(positive_tree_distribution)
+        })
 
-        for n_positive_trees in range(n_trees + 1):
-            weight = weights[n_positive_trees]
-            if weight == 0:
-                continue
+    task_outcomes = parallelize(
+        _do_analysis_if_relevant,
+        product(
+            enumerate(datasets),
+            range(n_trees + 1),
+            enumerate(aers),
+            enumerate(analysers),
+        ),
+        fixed_args=(n_trees, positive_tree_counters),
+        verbose=True
+    )
 
-            for i_aer, allowable_error_rate in enumerate(allowable_error_rates):
-                for i_analysis, get_analysis in enumerate(analysis_getters):
-                    analysis = get_analysis(n_trees, n_positive_trees, allowable_error_rate)
-                    runtimes[i_dataset, i_aer, i_analysis] += analysis.expected_runtime * weight / weights.total()
-                    error_rates[i_dataset, i_aer, i_analysis] += analysis.prob_error * weight / weights.total()
+    for (args, success, result, duration) in task_outcomes:
+        if not success:
+            raise result
+        
+        if result is None:
+            continue
+
+        (i_dataset, dataset), n_positive_trees, (i_aer, aer), (i_analyser, analyser), n_trees, positive_tree_counters = args
+        weights = positive_tree_counters[i_dataset]
+        weight = weights[n_positive_trees]
+        runtimes[i_dataset, i_aer, i_analyser] += result.expected_runtime * weight / weights.total()
+        error_rates[i_dataset, i_aer, i_analyser] += result.prob_error * weight / weights.total()
 
     return error_rates, runtimes
+
+
+def _do_analysis_if_relevant(*args):
+    (i_dataset, dataset), n_positive_trees, (i_aer, aer), (i_analyser, analyser), n_trees, positive_tree_counters = args
+
+    weights = positive_tree_counters[i_dataset]
+        
+    weight = weights[n_positive_trees]
+    if weight == 0:
+        return None
+
+    return analyser(n_trees, n_positive_trees, aer, weights)
 
 
 def show_error_rates_and_runtimes(error_rates, runtimes, dataset_names, allowable_error_rates, analysis_names):
@@ -118,7 +151,7 @@ def show_error_rates_and_runtimes(error_rates, runtimes, dataset_names, allowabl
     assert len(allowable_error_rates) == n_aers
     assert len(analysis_names) == n_analyses
 
-    fig, axs = plt.subplots(2, n_analyses, tight_layout=True)
+    fig, axs = plt.subplots(2, n_analyses, tight_layout=True, figsize=(40, 10))
     fig.patch.set_visible(False)
 
     for i_analysis in range(n_analyses):
@@ -150,40 +183,60 @@ def show_error_rates_and_runtimes(error_rates, runtimes, dataset_names, allowabl
     plt.show()
 
 
-def get_and_show_error_rates_and_runtimes(n_trees, datasets, allowable_error_rates, analysis_getters):
+def get_and_show_error_rates_and_runtimes(n_trees, datasets, allowable_error_rates, analysers):
     error_rates, runtimes = get_error_rates_and_runtimes(
-        n_trees, datasets, allowable_error_rates, analysis_getters
+        n_trees, datasets, allowable_error_rates, analysers
     )
     show_error_rates_and_runtimes(
         error_rates,
         runtimes,
         datasets.keys(),
         allowable_error_rates,
-        [func.__name__ for func in analysis_getters]
+        [func.__name__ for func in analysers]
     )
 
 
-@timed
+@memoize(args_to_ignore=["_"])
+def analyse_minimax_fwss_or_get_cached(n_total, n_positive, allowable_error, _):
+    optimal_stopping_strategy = get_optimal_stopping_strategy(n_total, allowable_error)
+    fwss = ForestWithGivenStoppingStrategy(Forest(n_total, n_positive), optimal_stopping_strategy)
+    return fwss.analyse()
+
+
 @memoize()
-def analyse_optimal_fwss_or_get_cached(n_total, n_positive, allowable_error):
-    optimal_stopping_strategy = get_optimal_stopping_strategy(n_total=n_total, allowable_error=allowable_error)
+def analyse_bayesian_fwss_or_get_cached(n_total, n_positive, allowable_error, weights):
+    if (n_total + 1) in weights:
+        print(f"{weights=}")
+
+    freqs_n_plus = np.zeros(n_total + 1)
+    for key, value in weights.items():
+        freqs_n_plus[key] = value
+    optimal_stopping_strategy = get_optimal_stopping_strategy(n_total, allowable_error, freqs_n_plus, error_minimax=False, runtime_minimax=False)
     fwss = ForestWithGivenStoppingStrategy(Forest(n_total, n_positive), optimal_stopping_strategy)
     return fwss.analyse()
 
 
 def main():
-    n_trees = 201
+    import random
+    random.seed(1234)
+
+    n_trees = 101
+    data_directory = os.path.join(os.path.dirname(__file__), "../data")
     datasets = {
-        "Banknotes": pd.read_csv(r"../data/data_banknote_authentication.txt"),
-        "Heart Attacks": pd.read_csv(r"../data/heart_attack.csv"),
-        "Salaries": pd.read_csv(r"../data/adult.data"),
-        "Dry Beans": pd.read_excel(r"../data/dry_beans.xlsx")
+        "Banknotes": pd.read_csv(os.path.join(data_directory, "data_banknote_authentication.txt")),
+        "Heart Attacks": pd.read_csv(os.path.join(data_directory, "heart_attack.csv")),
+        "Salaries": pd.read_csv(os.path.join(data_directory, "adult.data")),
+        "Dry Beans": pd.read_excel(os.path.join(data_directory, "dry_beans.xlsx"))
     }
 
-    get_and_show_error_rates_and_runtimes(n_trees, datasets, [10 ** -3, 10 ** -6, 0.0], [
-        analyse_fwe_or_get_cached,
-        analyse_optimal_fwss_or_get_cached
-    ])
+    pd.options.mode.chained_assignment = None
+
+    with warnings.catch_warnings(category=UserWarning, action="ignore"):
+        get_and_show_error_rates_and_runtimes(n_trees, datasets, [10 ** -3, 10 ** -6, 0.0], [
+            analyse_greedy_fwe_or_get_cached,
+            analyse_minimax_fwss_or_get_cached,
+            analyse_bayesian_fwss_or_get_cached
+        ])
 
 
 if __name__ == "__main__":
