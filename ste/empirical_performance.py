@@ -60,16 +60,16 @@ def estimate_positive_tree_distribution(dataset: pd.DataFrame, n_trees=100, test
     X_test_neg = X_test[np.logical_not(y_test)]
 
     # Count number of "positive" trees for each testing observation, and add them up
-    tree_predictions = np.vstack([tree.predict(X_test) for tree in rf_classifier.estimators_])
-    tree_predictions_for_pos = np.vstack([tree.predict(X_test_pos) for tree in rf_classifier.estimators_])
-    tree_predictions_for_neg = np.vstack([tree.predict(X_test_neg) for tree in rf_classifier.estimators_])
+    tree_predictions = np.array(np.vstack([tree.predict(X_test) for tree in rf_classifier.estimators_]), dtype=int)
+    tree_predictions_for_pos = np.asarray(np.vstack([tree.predict(X_test_pos) for tree in rf_classifier.estimators_]), dtype=int)
+    tree_predictions_for_neg = np.asarray(np.vstack([tree.predict(X_test_neg) for tree in rf_classifier.estimators_]), dtype=int)
 
     return (
         len(y),
         sum(y),
-        np.sum(tree_predictions, axis=1),
-        np.sum(tree_predictions_for_pos, axis=1),
-        np.sum(tree_predictions_for_neg, axis=1)
+        np.bincount(np.sum(tree_predictions, axis=0), minlength=n_trees + 1),
+        np.bincount(np.sum(tree_predictions_for_pos, axis=0), minlength=n_trees + 1),
+        np.bincount(np.sum(tree_predictions_for_neg, axis=0), minlength=n_trees + 1)
     )
 
 
