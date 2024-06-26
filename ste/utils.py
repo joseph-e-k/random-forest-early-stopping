@@ -135,6 +135,5 @@ def memoize(name=None, args_to_ignore=()):
 
 def forwards_to[RInner, ROuter, **P](inner_function: Callable[P, RInner]) -> Callable[[Callable[P, ROuter]], Callable[P, ROuter]]:
     def decorator(outer_function: Callable[P, ROuter], inner_function=inner_function) -> Callable[P, ROuter]:
-        functools.wraps(inner_function)(outer_function)
         return outer_function
     return decorator

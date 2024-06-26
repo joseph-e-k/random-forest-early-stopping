@@ -124,7 +124,8 @@ def get_error_rates_and_runtimes(n_trees, datasets, aers, analysers):
             enumerate(analysers),
         ),
         fixed_args=(n_trees, positive_tree_counters),
-        verbose=True
+        verbose=True,
+        n_tasks=len(datasets) * (n_trees + 1) * len(aers) * len(analysers)
     )
 
     for (args, success, result, duration) in task_outcomes:
