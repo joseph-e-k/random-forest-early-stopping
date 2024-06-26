@@ -16,8 +16,8 @@ N_WORKER_PROCESSES = int(os.getenv(_ENV_KEY_N_WORKER_PROCESSES, 32))
 
 
 class SharedValue:
-    def __init__(self, manager, ctype):
-        self.value = manager.Value(ctype, 0)
+    def __init__(self, manager, ctype, initial_value):
+        self.value = manager.Value(ctype, initial_value)
         self.lock = manager.RLock()
 
     def change(self, function):
@@ -27,23 +27,24 @@ class SharedValue:
             return new_value
         
     def get_value(self):
-        return self.value.get_value()
+        return self.value.get()
 
 
 class SharedCounter(SharedValue):
     def __init__(self, manager):
-        super().__init__(manager, c_uint)
+        super().__init__(manager, c_uint, 0)
 
     def increment(self):
         return self.change(lambda x: x + 1)
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass
 class _CallableForWorkerProcesses:
     function: Callable
-    job_start_time_ns: int
-    counter: SharedCounter = None
     n_total_tasks: int = None
+    verbose: bool = False
+    job_start_time_ns: int = dataclasses.field(default_factory=time.monotonic_ns)
+    counter: SharedCounter = dataclasses.field(default_factory=lambda: SharedCounter(mp.Manager()))
 
     def __call__(self, args_or_kwargs):
         try:
@@ -61,29 +62,32 @@ class _CallableForWorkerProcesses:
             self.finish()
     
     def finish(self):
-        if self.counter is not None:
-            n_completed_tasks = self.counter.increment()
-            timestamp = datetime.utcnow().isoformat()
-            message = f"Completed {n_completed_tasks} tasks"
-            if self.n_total_tasks is not None:
-                message += f" out of {self.n_total_tasks}"
-                ns_so_far = time.monotonic_ns() - self.job_start_time_ns
-                ns_per_task = ns_so_far / n_completed_tasks
-                n_remaining_tasks = self.n_total_tasks - n_completed_tasks
-                expected_time_remaining_ns = ns_per_task * n_remaining_tasks
-                expected_time_remaining = timedelta(microseconds=expected_time_remaining_ns // 1e3)
-                expected_end_time = datetime.utcnow() + expected_time_remaining
-                message += f" (expect to be finished at {expected_end_time.isoformat()})"
+        n_completed_tasks = self.counter.increment()
 
-            print(f"{timestamp}: {message}")
+        if not self.verbose:
+            return
+        
+        now = datetime.utcnow()
+        timestamp = now.isoformat()
+        message = f"Completed {n_completed_tasks} tasks"
+        if self.n_total_tasks is not None:
+            message += f" out of {self.n_total_tasks}"
+            ns_so_far = time.monotonic_ns() - self.job_start_time_ns
+            ns_per_task = ns_so_far / n_completed_tasks
+            n_remaining_tasks = self.n_total_tasks - n_completed_tasks
+            expected_time_remaining_ns = ns_per_task * n_remaining_tasks
+            expected_time_remaining = timedelta(microseconds=expected_time_remaining_ns // 1e3)
+            expected_end_time = now + expected_time_remaining
+            message += f" (expect to be finished at {expected_end_time.isoformat()})"
+
+        print(f"{timestamp}: {message}")
 
 
 def parallelize(function, iter_argses, fixed_args=(), n_workers=N_WORKER_PROCESSES, verbose=False, n_tasks=None):
-    manager = mp.Manager()
-    counter = SharedCounter(manager) if verbose else None
+    worker = _CallableForWorkerProcesses(function, n_tasks, verbose)
 
     with mp.Pool(n_workers) as pool:
         yield from pool.imap(
-            _CallableForWorkerProcesses(function, time.monotonic_ns(), counter, n_tasks),
+            worker,
             (iter_args + fixed_args for iter_args in iter_argses)
         )
