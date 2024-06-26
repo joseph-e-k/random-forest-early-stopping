@@ -82,7 +82,7 @@ def plot_n_positive_distributions(n_trees, datasets):
         distribution_total, distribution_for_pos, distribution_for_neg = distributions
 
         ax = axs[i_dataset // n_rows, i_dataset % n_rows]
-        ax.hist(distribution_total)
+        ax.bar(np.arange(n_trees + 1), distribution_total, width=1)
         ax.title.set_text(f"{dataset_name}")
         ax.set_xlim((0, n_trees))
         ax.set_yticks([])
