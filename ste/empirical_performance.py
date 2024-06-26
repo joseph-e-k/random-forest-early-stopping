@@ -1,7 +1,9 @@
+from collections.abc import Mapping, Sequence
 import os
 import random
 import warnings
 from collections import Counter
+from datetime import datetime
 from itertools import product
 
 import matplotlib.pyplot as plt
@@ -17,6 +19,10 @@ from ste.figure_utils import create_subplot_grid
 from ste.multiprocessing_utils import parallelize
 from ste.optimization import get_optimal_stopping_strategy
 from ste.utils import covariates_response_split, memoize
+
+
+DATA_DIRECTORY = os.path.join(os.path.dirname(__file__), "../data")
+RESULTS_DIRECTORY = os.path.join(os.path.dirname(__file__), "../results")
 
 
 @memoize(args_to_ignore=["_"])
@@ -152,7 +158,7 @@ def show_error_rates_and_runtimes(n_trees, error_rates, runtimes, dataset_names,
     assert len(allowable_error_rates) == n_aers
     assert len(analysis_names) == n_analyses
 
-    fig, axs = plt.subplots(2, n_analyses, tight_layout=True, figsize=(40, 10))
+    fig, axs = plt.subplots(2, n_analyses, tight_layout=True, figsize=(15, 5))
     fig.suptitle(f"Error rates and runtimes for early-stopping random forests with {n_trees} trees", fontsize=16)
     fig.patch.set_visible(False)
 
@@ -185,7 +191,10 @@ def show_error_rates_and_runtimes(n_trees, error_rates, runtimes, dataset_names,
     plt.show()
 
 
-def get_and_show_error_rates_and_runtimes(n_trees, datasets, allowable_error_rates, analysers):
+def get_and_show_error_rates_and_runtimes(n_trees, datasets, allowable_error_rates, analysers_by_name):
+    analyser_names, analysers = zip(*analysers_by_name.items())
+    
+
     error_rates, runtimes = get_error_rates_and_runtimes(
         n_trees, datasets, allowable_error_rates, analysers
     )
@@ -195,7 +204,7 @@ def get_and_show_error_rates_and_runtimes(n_trees, datasets, allowable_error_rat
         runtimes,
         datasets.keys(),
         allowable_error_rates,
-        [func.__name__ for func in analysers]
+        analyser_names or [func.__name__ for func in analysers]
     )
 
 
@@ -223,22 +232,30 @@ def main():
     random.seed(1234)
 
     n_trees = 101
-    data_directory = os.path.join(os.path.dirname(__file__), "../data")
     datasets = {
-        "Banknotes": pd.read_csv(os.path.join(data_directory, "data_banknote_authentication.txt")),
-        "Heart Attacks": pd.read_csv(os.path.join(data_directory, "heart_attack.csv")),
-        "Salaries": pd.read_csv(os.path.join(data_directory, "adult.data")),
-        "Dry Beans": pd.read_excel(os.path.join(data_directory, "dry_beans.xlsx"))
+        "Banknotes": pd.read_csv(os.path.join(DATA_DIRECTORY, "data_banknote_authentication.txt")),
+        "Heart Attacks": pd.read_csv(os.path.join(DATA_DIRECTORY, "heart_attack.csv")),
+        "Salaries": pd.read_csv(os.path.join(DATA_DIRECTORY, "adult.data")),
+        "Dry Beans": pd.read_excel(os.path.join(DATA_DIRECTORY, "dry_beans.xlsx"))
     }
 
     pd.options.mode.chained_assignment = None
 
     with warnings.catch_warnings(category=UserWarning, action="ignore"):
-        get_and_show_error_rates_and_runtimes(n_trees, datasets, [10 ** -3, 10 ** -6, 0.0], [
-            analyse_greedy_fwe_or_get_cached,
-            analyse_minimax_fwss_or_get_cached,
-            analyse_bayesian_fwss_or_get_cached
-        ])
+        get_and_show_error_rates_and_runtimes(
+            n_trees,
+            datasets,
+            [10 ** -3, 10 ** -6, 0.0],
+            {
+                "Greedy": analyse_greedy_fwe_or_get_cached,
+                "Minimax": analyse_minimax_fwss_or_get_cached,
+                "Bayesian": analyse_bayesian_fwss_or_get_cached
+            }
+        )
+
+    timestamp = datetime.utcnow().isoformat().replace(":", "_").replace(".", "_")
+    output_path = os.path.join(RESULTS_DIRECTORY, f"empirical_comparison_{n_trees}_trees_{timestamp}")
+    plt.savefig(output_path)
 
 
 if __name__ == "__main__":
