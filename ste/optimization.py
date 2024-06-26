@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
+import os
 from fractions import Fraction
 
 import numpy as np
@@ -12,7 +13,7 @@ from scipy.special import comb
 from ste.ForestWithEnvelope import get_greedy_stopping_strategy
 from ste.figure_utils import create_subplot_grid, plot_stopping_strategy
 from ste.linear_programming_utils import Problem, OptimizationResult, ArithmeticExpression, OptimizationFailure
-from ste.utils import forwards_to, memoize
+from ste.utils import RESULTS_DIRECTORY, forwards_to, get_output_path, memoize
 
 
 @dataclasses.dataclass(frozen=True)
@@ -182,6 +183,7 @@ def main():
     parser.add_argument("-n", type=int, required=True)
     parser.add_argument("--alpha", "--aer", "-a", type=float, default=0.05)
     parser.add_argument("--graph", "-g", action="store_true")
+    parser.add_argument("--output-path", "-o", type=str, default=None)
     args = parser.parse_args()
 
     print(f"{cache.directory=}")
@@ -206,6 +208,9 @@ def main():
 
     greedy_ss = get_greedy_stopping_strategy(args.n, args.alpha)
     show_stopping_strategies([oss, greedy_ss], ["Optimal stopping strategy", "Greedy envelope"])
+
+    output_path = args.output_path or get_output_path(f"ss_visualization_{args.n}_submodels_{args.alpha}_aer")
+    plt.savefig(output_path)
 
 
 if __name__ == "__main__":

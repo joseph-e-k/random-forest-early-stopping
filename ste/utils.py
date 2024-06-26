@@ -1,4 +1,5 @@
 import dataclasses
+from datetime import datetime, timezone
 import functools
 import inspect
 import itertools
@@ -11,6 +12,16 @@ import pandas as pd
 from diskcache import Cache
 from diskcache.core import full_name
 from scipy import stats
+
+
+DATA_DIRECTORY = os.path.join(os.path.dirname(__file__), "../data")
+RESULTS_DIRECTORY = os.path.join(os.path.dirname(__file__), "../results")
+DATASETS = {
+    "Banknotes": pd.read_csv(os.path.join(DATA_DIRECTORY, "data_banknote_authentication.txt")),
+    "Heart Attacks": pd.read_csv(os.path.join(DATA_DIRECTORY, "heart_attack.csv")),
+    "Salaries": pd.read_csv(os.path.join(DATA_DIRECTORY, "adult.data")),
+    "Dry Beans": pd.read_excel(os.path.join(DATA_DIRECTORY, "dry_beans.xlsx"))
+}
 
 
 cache = Cache(os.path.join(os.path.dirname(__file__), ".cache"))
@@ -137,3 +148,8 @@ def forwards_to[RInner, ROuter, **P](inner_function: Callable[P, RInner]) -> Cal
     def decorator(outer_function: Callable[P, ROuter], inner_function=inner_function) -> Callable[P, ROuter]:
         return outer_function
     return decorator
+
+
+def get_output_path(partial_file_name: str):
+    timestamp = datetime.now().astimezone(timezone.utc).isoformat().replace(":", "_").replace(".", "_")
+    return os.path.join(RESULTS_DIRECTORY, f"{partial_file_name}_{timestamp}")

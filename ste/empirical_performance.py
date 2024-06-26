@@ -18,17 +18,7 @@ from ste.ForestWithStoppingStrategy import ForestWithGivenStoppingStrategy, Fore
 from ste.figure_utils import create_subplot_grid
 from ste.multiprocessing_utils import parallelize
 from ste.optimization import get_optimal_stopping_strategy
-from ste.utils import covariates_response_split, memoize
-
-
-DATA_DIRECTORY = os.path.join(os.path.dirname(__file__), "../data")
-RESULTS_DIRECTORY = os.path.join(os.path.dirname(__file__), "../results")
-DATASETS = {
-    "Banknotes": pd.read_csv(os.path.join(DATA_DIRECTORY, "data_banknote_authentication.txt")),
-    "Heart Attacks": pd.read_csv(os.path.join(DATA_DIRECTORY, "heart_attack.csv")),
-    "Salaries": pd.read_csv(os.path.join(DATA_DIRECTORY, "adult.data")),
-    "Dry Beans": pd.read_excel(os.path.join(DATA_DIRECTORY, "dry_beans.xlsx"))
-}
+from ste.utils import DATASETS, covariates_response_split, get_output_path, memoize
 
 
 @memoize(args_to_ignore=["_"])
@@ -278,8 +268,7 @@ def main():
         elif args.action_name == "positive_tree_distribution":
             plot_n_positive_distributions(args.n_trees, DATASETS)
 
-    timestamp = datetime.utcnow().isoformat().replace(":", "_").replace(".", "_")
-    output_path = args.output_path or os.path.join(RESULTS_DIRECTORY, f"{args.action_name}_{args.n_trees}_trees_{timestamp}")
+    output_path = args.output_path or get_output_path(f"{args.action_name}_{args.n_trees}_trees")
     plt.savefig(output_path)
 
 
