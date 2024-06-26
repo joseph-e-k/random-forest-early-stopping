@@ -1,4 +1,4 @@
-from collections.abc import Mapping, Sequence
+import argparse
 import os
 import random
 import warnings
@@ -23,6 +23,12 @@ from ste.utils import covariates_response_split, memoize
 
 DATA_DIRECTORY = os.path.join(os.path.dirname(__file__), "../data")
 RESULTS_DIRECTORY = os.path.join(os.path.dirname(__file__), "../results")
+DATASETS = {
+    "Banknotes": pd.read_csv(os.path.join(DATA_DIRECTORY, "data_banknote_authentication.txt")),
+    "Heart Attacks": pd.read_csv(os.path.join(DATA_DIRECTORY, "heart_attack.csv")),
+    "Salaries": pd.read_csv(os.path.join(DATA_DIRECTORY, "adult.data")),
+    "Dry Beans": pd.read_excel(os.path.join(DATA_DIRECTORY, "dry_beans.xlsx"))
+}
 
 
 @memoize(args_to_ignore=["_"])
@@ -81,7 +87,7 @@ def estimate_positive_tree_distribution(dataset: pd.DataFrame, n_trees=100, test
 
 
 def plot_n_positive_distributions(n_trees, datasets):
-    fig, axs = create_subplot_grid(len(datasets))
+    fig, axs = create_subplot_grid(len(datasets), n_rows=2)
     n_rows = axs.shape[0]
 
     for i_dataset, (dataset_name, dataset) in enumerate(datasets.items()):
@@ -228,33 +234,51 @@ def analyse_bayesian_fwss_or_get_cached(n_total, n_positive, allowable_error, we
     return fwss.analyse()
 
 
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers()
+
+    ss_comparison_subparser = subparsers.add_parser("ss-comparison")
+    ss_comparison_subparser.set_defaults(action_name="empirical_comparison")
+    ss_comparison_subparser.add_argument("--n-trees", "--number-of-trees", "-n", type=int, default=101)
+    ss_comparison_subparser.add_argument("--alphas", "--aers", "-a", type=float, nargs="+", default=[10 ** -3, 10 ** -6, 0.0])
+    ss_comparison_subparser.add_argument("--output-path", "-o", type=str, default=None)
+    ss_comparison_subparser.add_argument("--random-seed", "-s", type=int, default=1234)
+
+    tree_distribution_subparser = subparsers.add_parser("tree-distribution")
+    tree_distribution_subparser.set_defaults(action_name="positive_tree_distribution")
+    tree_distribution_subparser.add_argument("--n-trees", "--number-of-trees", "-n", type=int, default=100)
+    tree_distribution_subparser.add_argument("--output-path", "-o", type=str, default=None)
+    tree_distribution_subparser.add_argument("--random-seed", "-s", type=int, default=1234)
+
+    return parser.parse_args()
+
+
+
 def main():
-    random.seed(1234)
+    args = parse_args()
 
-    n_trees = 101
-    datasets = {
-        "Banknotes": pd.read_csv(os.path.join(DATA_DIRECTORY, "data_banknote_authentication.txt")),
-        "Heart Attacks": pd.read_csv(os.path.join(DATA_DIRECTORY, "heart_attack.csv")),
-        "Salaries": pd.read_csv(os.path.join(DATA_DIRECTORY, "adult.data")),
-        "Dry Beans": pd.read_excel(os.path.join(DATA_DIRECTORY, "dry_beans.xlsx"))
-    }
-
+    random.seed(args.random_seed)
     pd.options.mode.chained_assignment = None
 
     with warnings.catch_warnings(category=UserWarning, action="ignore"):
-        get_and_show_error_rates_and_runtimes(
-            n_trees,
-            datasets,
-            [10 ** -3, 10 ** -6, 0.0],
-            {
-                "Greedy": analyse_greedy_fwe_or_get_cached,
-                "Minimax": analyse_minimax_fwss_or_get_cached,
-                "Bayesian": analyse_bayesian_fwss_or_get_cached
-            }
-        )
+        if args.action_name == "empirical_comparison":
+            get_and_show_error_rates_and_runtimes(
+                args.n_trees,
+                DATASETS,
+                args.alphas,
+                {
+                    "Greedy": analyse_greedy_fwe_or_get_cached,
+                    "Minimax": analyse_minimax_fwss_or_get_cached,
+                    "Bayesian": analyse_bayesian_fwss_or_get_cached
+                }
+            )
+        elif args.action_name == "positive_tree_distribution":
+            plot_n_positive_distributions(args.n_trees, DATASETS)
 
     timestamp = datetime.utcnow().isoformat().replace(":", "_").replace(".", "_")
-    output_path = os.path.join(RESULTS_DIRECTORY, f"empirical_comparison_{n_trees}_trees_{timestamp}")
+    output_path = args.output_path or os.path.join(RESULTS_DIRECTORY, f"{args.action_name}_{args.n_trees}_trees_{timestamp}")
     plt.savefig(output_path)
 
 
