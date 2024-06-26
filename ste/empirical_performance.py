@@ -1,4 +1,5 @@
 import os
+import random
 import warnings
 from collections import Counter
 from itertools import product
@@ -142,7 +143,7 @@ def _do_analysis_if_relevant(*args):
     return analyser(n_trees, n_positive_trees, aer, weights)
 
 
-def show_error_rates_and_runtimes(error_rates, runtimes, dataset_names, allowable_error_rates, analysis_names):
+def show_error_rates_and_runtimes(n_trees, error_rates, runtimes, dataset_names, allowable_error_rates, analysis_names):
     assert error_rates.shape == runtimes.shape
 
     n_datasets, n_aers, n_analyses = error_rates.shape
@@ -152,6 +153,7 @@ def show_error_rates_and_runtimes(error_rates, runtimes, dataset_names, allowabl
     assert len(analysis_names) == n_analyses
 
     fig, axs = plt.subplots(2, n_analyses, tight_layout=True, figsize=(40, 10))
+    fig.suptitle(f"Error rates and runtimes for early-stopping random forests with {n_trees} trees", fontsize=16)
     fig.patch.set_visible(False)
 
     for i_analysis in range(n_analyses):
@@ -188,6 +190,7 @@ def get_and_show_error_rates_and_runtimes(n_trees, datasets, allowable_error_rat
         n_trees, datasets, allowable_error_rates, analysers
     )
     show_error_rates_and_runtimes(
+        n_trees,
         error_rates,
         runtimes,
         datasets.keys(),
@@ -217,7 +220,6 @@ def analyse_bayesian_fwss_or_get_cached(n_total, n_positive, allowable_error, we
 
 
 def main():
-    import random
     random.seed(1234)
 
     n_trees = 101
