@@ -21,12 +21,6 @@ from ste.optimization import get_optimal_stopping_strategy
 from ste.utils import DATASETS, covariates_response_split, get_output_path, memoize
 
 
-@memoize(args_to_ignore=["_"])
-def analyse_greedy_fwe_or_get_cached(n_total, n_positive, allowable_error, _) -> ForestAnalysis:
-    fwe = ForestWithEnvelope.create_greedy(n_total, n_positive, allowable_error)
-    return fwe.analyse()
-
-
 def to_binary_classifications(classifications):
     classes = set(classifications)
     n_classes = len(classes)
@@ -203,6 +197,12 @@ def get_and_show_error_rates_and_runtimes(n_trees, datasets, allowable_error_rat
         allowable_error_rates,
         analyser_names or [func.__name__ for func in analysers]
     )
+
+
+@memoize(args_to_ignore=["_"])
+def analyse_greedy_fwe_or_get_cached(n_total, n_positive, allowable_error, _) -> ForestAnalysis:
+    fwe = ForestWithEnvelope.create_greedy(n_total, n_positive, allowable_error)
+    return fwe.analyse()
 
 
 @memoize(args_to_ignore=["_"])
