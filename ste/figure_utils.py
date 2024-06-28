@@ -87,10 +87,10 @@ def plot_function(ax, x_axis_arg_name, function, function_kwargs=None, plot_kwar
 
     results = parallelize(
         functools.partial(function, **function_kwargs),
-        ({x_axis_arg_name: x} for x in x_axis_values)
+        argses_to_iter=({x_axis_arg_name: x} for x in x_axis_values)
     )
 
-    for i, (kwargs, success, outcome, duration) in enumerate(results):
+    for (i, kwargs, success, outcome, duration) in results:
         if not success:
             raise outcome
         x = kwargs[x_axis_arg_name]

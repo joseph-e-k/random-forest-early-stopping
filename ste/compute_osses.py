@@ -1,6 +1,4 @@
 import argparse
-import functools
-import itertools
 
 from ste.multiprocessing_utils import parallelize
 from ste.optimization import get_optimal_stopping_strategy
@@ -14,10 +12,10 @@ def compute_optimal_stopping_strategies(low_n_total, high_n_total, aers):
     n_totals = range(low_n_total, high_n_total + 1)
     results = parallelize(
         get_optimal_stopping_strategy,
-        itertools.product(n_totals, aers)
+        argses_to_combine=(n_totals, aers)
     )
     with TimerContext("total"):
-        for ((n_total, aer), success, outcome, duration) in results:
+        for (i, (n_total, aer), success, outcome, duration) in results:
             if success:
                 print(f"success ({duration:.1f}s): {n_total=}, {aer=}")
             else:

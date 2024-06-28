@@ -155,12 +155,11 @@ def get_output_path(partial_file_name: str):
     return os.path.join(RESULTS_DIRECTORY, f"{partial_file_name}_{timestamp}")
 
 def enumerate_product(*iterables):
+    indices = itertools.product(*(
+        range(len(iterable))
+        for iterable in iterables  
+    ))
     return zip(
-        itertools.product(
-            *(
-                range(len(iterable))
-                for iterable in iterables
-            )
-        ),
+        indices,
         itertools.product(*iterables)
     )

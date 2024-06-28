@@ -1,10 +1,8 @@
 import argparse
-import os
+import functools
 import random
 import warnings
 from collections import Counter
-from datetime import datetime
-from itertools import product
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -14,11 +12,11 @@ from sklearn.model_selection import train_test_split
 
 from ste.Forest import Forest
 from ste.ForestWithEnvelope import ForestWithEnvelope
-from ste.ForestWithStoppingStrategy import ForestWithGivenStoppingStrategy, ForestAnalysis
+from ste.ForestWithStoppingStrategy import ForestWithGivenStoppingStrategy
 from ste.figure_utils import create_subplot_grid
 from ste.multiprocessing_utils import parallelize
 from ste.optimization import get_optimal_stopping_strategy
-from ste.utils import DATASETS, covariates_response_split, enumerate_product, get_output_path, memoize
+from ste.utils import DATASETS, covariates_response_split, get_output_path, memoize
 
 
 def to_binary_classifications(classifications):
@@ -87,9 +85,7 @@ def plot_n_positive_distributions(n_trees, datasets):
     return fig
 
 
-# TODO: Rejigger parallelize() so we don't have to keep passing indices into the task just to use them once it returns
-def _apply_ss_getter(indices, args, n_trees):
-    dataset, aer, ss_getter = args
+def _apply_ss_getter(dataset, aer, ss_getter, n_trees):
     return ss_getter(n_trees, aer, dataset)
 
 
@@ -105,27 +101,22 @@ def _get_stopping_strategies(n_trees, datasets, aers, stopping_strategy_getters)
     )
 
     task_outcomes = parallelize(
-        _apply_ss_getter,
-        iter_argses=enumerate_product(datasets, aers, stopping_strategy_getters),
-        fixed_args=(n_trees,),
+        functools.partial(_apply_ss_getter, n_trees=n_trees),
+        argses_to_combine=(datasets, aers, stopping_strategy_getters),
         n_tasks=len(datasets) * len(aers) * len(stopping_strategy_getters),
         verbose=True
     )
 
-    for ((indices, args, *_), success, result, duration) in task_outcomes:
+    for (indices, args, success, result, duration) in task_outcomes:
         if not success:
             raise result
         
         stopping_strategies[indices] = result
 
     return stopping_strategies
-        
 
 
-def _analyse_stopping_strategy_if_relevant(indices, args, n_trees, positive_tree_counters, stopping_strategies):
-    i_dataset, i_aer, i_ss_kind, _ = indices
-    _, _, _, n_positive_trees = args
-
+def _analyse_stopping_strategy_if_relevant(i_dataset, i_aer, i_ss_kind, n_positive_trees, n_trees, positive_tree_counters, stopping_strategies):
     if positive_tree_counters[i_dataset][n_positive_trees] == 0:
         return None
 
@@ -155,19 +146,23 @@ def get_error_rates_and_runtimes(n_trees, datasets, aers, stopping_strategy_gett
         })
 
     task_outcomes = parallelize(
-        _analyse_stopping_strategy_if_relevant,
-        enumerate_product(
-            datasets.values(),
-            aers,
-            stopping_strategy_getters,
+        functools.partial(
+            _analyse_stopping_strategy_if_relevant,
+            n_trees=n_trees,
+            positive_tree_counters=positive_tree_counters,
+            stopping_strategies=stopping_strategies
+        ),
+        argses_to_combine=(
+            range(n_datasets),
+            range(n_aers),
+            range(n_ss_kinds),
             range(n_trees + 1),
         ),
-        fixed_args=(n_trees, positive_tree_counters, stopping_strategies),
         verbose=True,
         n_tasks=n_datasets * n_aers * n_ss_kinds * (n_trees + 1)
     )
 
-    for ((indices, iter_args, *fixed_args), success, result, duration) in task_outcomes:
+    for (indices, (_, _, _, n_positive_trees, *_), success, result, duration) in task_outcomes:
         if not success:
             raise result
         
@@ -175,7 +170,6 @@ def get_error_rates_and_runtimes(n_trees, datasets, aers, stopping_strategy_gett
             continue
 
         i_dataset, i_aer, i_ss_kind, _ = indices
-        _, _, _, n_positive_trees = iter_args
         weights = positive_tree_counters[i_dataset]
         weight = weights[n_positive_trees]
         runtimes[i_dataset, i_aer, i_ss_kind] += result.expected_runtime * weight / weights.total()

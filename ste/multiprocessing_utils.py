@@ -8,7 +8,7 @@ from ctypes import c_uint
 from datetime import datetime, timedelta
 from typing import Callable
 
-from ste.utils import TimerContext
+from ste.utils import TimerContext, enumerate_product
 
 
 _ENV_KEY_N_WORKER_PROCESSES = "STE_N_WORKER_PROCESSES"
@@ -46,7 +46,8 @@ class _CallableForWorkerProcesses:
     job_start_time_ns: int = dataclasses.field(default_factory=time.monotonic_ns)
     counter: SharedCounter = dataclasses.field(default_factory=lambda: SharedCounter(mp.Manager()))
 
-    def __call__(self, args_or_kwargs):
+    def __call__(self, index_and_args_or_kwargs):
+        index, args_or_kwargs = index_and_args_or_kwargs
         try:
             with TimerContext(verbose=False) as timer:
                 if isinstance(args_or_kwargs, Mapping):
@@ -55,9 +56,10 @@ class _CallableForWorkerProcesses:
                     result = self.function(*args_or_kwargs)
         except Exception as e:
             traceback.print_exc()
-            return args_or_kwargs, False, e, timer.elapsed_time
+            print(f"{index=}, {len(args_or_kwargs)=}, {args_or_kwargs=}")
+            return index, args_or_kwargs, False, e, timer.elapsed_time
         else:
-            return args_or_kwargs, True, result, timer.elapsed_time
+            return index, args_or_kwargs, True, result, timer.elapsed_time
         finally:
             self.finish()
     
@@ -83,11 +85,19 @@ class _CallableForWorkerProcesses:
         print(f"{timestamp}: {message}")
 
 
-def parallelize(function, iter_argses, fixed_args=(), n_workers=N_WORKER_PROCESSES, verbose=False, n_tasks=None):
+def parallelize(function, argses_to_iter=None, argses_to_combine=None, n_workers=N_WORKER_PROCESSES, verbose=False, n_tasks=None):
+    if not ((argses_to_iter is None) ^ (argses_to_combine is None)):
+        raise TypeError("argses_to_iter or argses_to_multiply must be specified (but not both)")
+    
+    if argses_to_iter is None:
+        indices_and_argses = enumerate_product(*argses_to_combine)
+    else:
+        indices_and_argses = enumerate(argses_to_iter)
+
     worker = _CallableForWorkerProcesses(function, n_tasks, verbose)
 
     with mp.Pool(n_workers) as pool:
         yield from pool.imap(
             worker,
-            (iter_args + fixed_args for iter_args in iter_argses)
+            indices_and_argses
         )
