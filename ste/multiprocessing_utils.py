@@ -1,4 +1,5 @@
 import dataclasses
+import functools
 import multiprocessing as mp
 import os
 import time
@@ -88,6 +89,13 @@ class _CallableForWorkerProcesses:
 def parallelize(function, argses_to_iter=None, argses_to_combine=None, n_workers=N_WORKER_PROCESSES, verbose=False, n_tasks=None):
     if not ((argses_to_iter is None) ^ (argses_to_combine is None)):
         raise TypeError("argses_to_iter or argses_to_multiply must be specified (but not both)")
+    
+    if verbose:
+        if isinstance(function, functools.partial):
+            name = function.func.__name__
+        else:
+            name = getattr(function, "name", "<function name unknown>")
+        print(f"{datetime.utcnow().isoformat()}: preparing task pool for {name}")
     
     if argses_to_iter is None:
         indices_and_argses = enumerate_product(*argses_to_combine)
