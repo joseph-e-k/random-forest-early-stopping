@@ -39,8 +39,7 @@ def coerce_nonnumeric_columns_to_numeric(df: pd.DataFrame):
     return df
 
 
-@memoize()
-def estimate_positive_tree_distribution(dataset: pd.DataFrame, n_trees=100, test_proportion=0.2, *, response_column=-1):
+def _estimate_positive_tree_distribution_single_forest(dataset: pd.DataFrame, *, n_trees=100, test_proportion=0.2, response_column=-1):
     # Processing: get covariates and responses, convert responses to binary classes, and split into train and test sets
     X, y = covariates_response_split(dataset, response_column)
     X = coerce_nonnumeric_columns_to_numeric(X)
@@ -59,13 +58,26 @@ def estimate_positive_tree_distribution(dataset: pd.DataFrame, n_trees=100, test
     tree_predictions_for_pos = np.asarray(np.vstack([tree.predict(X_test_pos) for tree in rf_classifier.estimators_]), dtype=int)
     tree_predictions_for_neg = np.asarray(np.vstack([tree.predict(X_test_neg) for tree in rf_classifier.estimators_]), dtype=int)
 
-    return (
-        len(y),
-        sum(y),
+    return np.stack([
         np.bincount(np.sum(tree_predictions, axis=0), minlength=n_trees + 1),
         np.bincount(np.sum(tree_predictions_for_pos, axis=0), minlength=n_trees + 1),
         np.bincount(np.sum(tree_predictions_for_neg, axis=0), minlength=n_trees + 1)
-    )
+    ])
+
+
+@memoize()
+def estimate_positive_tree_distribution(dataset: pd.DataFrame, *, n_trees=100, n_forests=100, test_proportion=0.2, response_column=-1):
+    estimates = np.empty(shape=(n_forests, 3, n_trees + 1))
+
+    for i_forest in range(n_forests):
+        estimates[i_forest, :, :] = _estimate_positive_tree_distribution_single_forest(
+            dataset=dataset,
+            n_trees=n_trees,
+            test_proportion=test_proportion,
+            response_column=response_column,
+        )
+
+    return np.mean(estimates, axis=0)
 
 
 def plot_n_positive_distributions(n_trees, datasets):
@@ -73,11 +85,10 @@ def plot_n_positive_distributions(n_trees, datasets):
     n_rows = axs.shape[0]
 
     for i_dataset, (dataset_name, dataset) in enumerate(datasets.items()):
-        n_observations, n_positive_observations, *distributions = estimate_positive_tree_distribution(dataset, n_trees)
-        distribution_total, distribution_for_pos, distribution_for_neg = distributions
+        distribution = estimate_positive_tree_distribution(dataset, n_trees=n_trees)[0]
 
         ax = axs[i_dataset // n_rows, i_dataset % n_rows]
-        ax.bar(np.arange(n_trees + 1), distribution_total, width=1)
+        ax.bar(np.arange(n_trees + 1), distribution, width=1)
         ax.title.set_text(f"{dataset_name}")
         ax.set_xlim((0, n_trees))
         ax.set_yticks([])
@@ -139,7 +150,7 @@ def get_error_rates_and_runtimes(n_trees, datasets, aers, stopping_strategy_gett
     stopping_strategies = _get_stopping_strategies(n_trees, datasets.values(), aers, stopping_strategy_getters)
 
     for i_dataset, dataset in enumerate(datasets.values()):
-        _, _, positive_tree_distribution, _, _ = estimate_positive_tree_distribution(dataset, n_trees=n_trees)
+        positive_tree_distribution = estimate_positive_tree_distribution(dataset, n_trees=n_trees)[0]
         positive_tree_counters[i_dataset] = Counter({
             int(index): int(value)
             for (index, value) in enumerate(positive_tree_distribution)
@@ -197,15 +208,13 @@ def show_error_rates_and_runtimes(n_trees, error_rates, runtimes, dataset_names,
             [f"Expected Runtime ({name})", f"Error Rate ({name})"],
             axs[:, i_analysis],
             [runtimes[:, :, i_analysis], error_rates[:, :, i_analysis]],
-            [2, 6]
+            ["{:.2f}", "{:.2e}"]
         )
 
-        for (title, ax, table_content, precision) in table_specs:
+        for (title, ax, table_content, cell_format) in table_specs:
             ax.axis("off")
             ax.axis("tight")
             ax.title.set_text(title)
-
-            cell_format = f"{{:.{precision}f}}"
 
             ax.table(
                 cellText=[
@@ -213,7 +222,7 @@ def show_error_rates_and_runtimes(n_trees, error_rates, runtimes, dataset_names,
                     for i_dataset in range(n_datasets)
                 ],
                 rowLabels=list(dataset_names),
-                colLabels=[str(aer) for aer in allowable_error_rates],
+                colLabels=[f"{aer:.0e}" for aer in allowable_error_rates],
                 loc="center"
             )
 
@@ -251,9 +260,8 @@ def get_minimax_ss(n_trees: int, allowable_error: float, dataset: pd.DataFrame) 
 @memoize()
 def get_bayesian_ss(n_trees: int, allowable_error: float, dataset: pd.DataFrame) -> np.ndarray:
     bs_dataset = dataset.sample(frac=1, replace=True)
-    _, _, freqs_n_plus, _, _ = estimate_positive_tree_distribution(bs_dataset, n_trees)
+    freqs_n_plus = estimate_positive_tree_distribution(bs_dataset, n_trees=n_trees)[0]
     return get_optimal_stopping_strategy(n_trees, allowable_error, freqs_n_plus, error_minimax=False, runtime_minimax=False)
-
 
 
 def parse_args():
