@@ -151,7 +151,7 @@ def forwards_to[RInner, ROuter, **P](inner_function: Callable[P, RInner]) -> Cal
 
 
 def get_output_path(partial_file_name: str):
-    timestamp = datetime.now().astimezone(timezone.utc).isoformat().replace(":", "_").replace(".", "_")
+    timestamp = datetime.now().astimezone(timezone.utc).strftime("%Y%m%d%H%M%S")
     return os.path.join(RESULTS_DIRECTORY, f"{partial_file_name}_{timestamp}")
 
 def enumerate_product(*iterables):
