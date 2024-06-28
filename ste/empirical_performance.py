@@ -18,7 +18,7 @@ from ste.ForestWithStoppingStrategy import ForestWithGivenStoppingStrategy, Fore
 from ste.figure_utils import create_subplot_grid
 from ste.multiprocessing_utils import parallelize
 from ste.optimization import get_optimal_stopping_strategy
-from ste.utils import DATASETS, covariates_response_split, get_output_path, memoize
+from ste.utils import DATASETS, covariates_response_split, enumerate_product, get_output_path, memoize
 
 
 def to_binary_classifications(classifications):
@@ -87,10 +87,65 @@ def plot_n_positive_distributions(n_trees, datasets):
     return fig
 
 
-def get_error_rates_and_runtimes(n_trees, datasets, aers, analysers):
-    positive_tree_counters = [None] * len(datasets)
-    runtimes = np.zeros((len(datasets), len(aers), len(analysers)))
+# TODO: Rejigger parallelize() so we don't have to keep passing indices into the task just to use them once it returns
+def _apply_ss_getter(indices, args, n_trees):
+    dataset, aer, ss_getter = args
+    return ss_getter(n_trees, aer, dataset)
+
+
+def _get_stopping_strategies(n_trees, datasets, aers, stopping_strategy_getters):
+    stopping_strategies = np.empty(
+        shape=(
+            len(datasets),
+            len(aers),
+            len(stopping_strategy_getters),
+            n_trees + 1,
+            n_trees + 1
+        )
+    )
+
+    task_outcomes = parallelize(
+        _apply_ss_getter,
+        iter_argses=enumerate_product(datasets, aers, stopping_strategy_getters),
+        fixed_args=(n_trees,),
+        n_tasks=len(datasets) * len(aers) * len(stopping_strategy_getters),
+        verbose=True
+    )
+
+    for ((indices, args, *_), success, result, duration) in task_outcomes:
+        if not success:
+            raise result
+        
+        stopping_strategies[indices] = result
+
+    return stopping_strategies
+        
+
+
+def _analyse_stopping_strategy_if_relevant(indices, args, n_trees, positive_tree_counters, stopping_strategies):
+    i_dataset, i_aer, i_ss_kind, _ = indices
+    _, _, _, n_positive_trees = args
+
+    if positive_tree_counters[i_dataset][n_positive_trees] == 0:
+        return None
+
+    ss = stopping_strategies[i_dataset, i_aer, i_ss_kind]
+    forest = Forest(n_trees, n_positive_trees)
+    fwss = ForestWithGivenStoppingStrategy(forest, ss)
+
+    return fwss.analyse()
+
+
+def get_error_rates_and_runtimes(n_trees, datasets, aers, stopping_strategy_getters):
+    n_datasets = len(datasets)
+    n_aers = len(aers)
+    n_ss_kinds = len(stopping_strategy_getters)
+
+    positive_tree_counters = [None] * n_datasets
+    runtimes = np.zeros((n_datasets, n_aers, n_ss_kinds))
     error_rates = np.zeros_like(runtimes)
+
+    stopping_strategies = _get_stopping_strategies(n_trees, datasets.values(), aers, stopping_strategy_getters)
 
     for i_dataset, dataset in enumerate(datasets.values()):
         _, _, positive_tree_distribution, _, _ = estimate_positive_tree_distribution(dataset, n_trees=n_trees)
@@ -100,44 +155,33 @@ def get_error_rates_and_runtimes(n_trees, datasets, aers, analysers):
         })
 
     task_outcomes = parallelize(
-        _do_analysis_if_relevant,
-        product(
-            enumerate(datasets),
+        _analyse_stopping_strategy_if_relevant,
+        enumerate_product(
+            datasets.values(),
+            aers,
+            stopping_strategy_getters,
             range(n_trees + 1),
-            enumerate(aers),
-            enumerate(analysers),
         ),
-        fixed_args=(n_trees, positive_tree_counters),
+        fixed_args=(n_trees, positive_tree_counters, stopping_strategies),
         verbose=True,
-        n_tasks=len(datasets) * (n_trees + 1) * len(aers) * len(analysers)
+        n_tasks=n_datasets * n_aers * n_ss_kinds * (n_trees + 1)
     )
 
-    for (args, success, result, duration) in task_outcomes:
+    for ((indices, iter_args, *fixed_args), success, result, duration) in task_outcomes:
         if not success:
             raise result
         
         if result is None:
             continue
 
-        (i_dataset, dataset), n_positive_trees, (i_aer, aer), (i_analyser, analyser), n_trees, positive_tree_counters = args
+        i_dataset, i_aer, i_ss_kind, _ = indices
+        _, _, _, n_positive_trees = iter_args
         weights = positive_tree_counters[i_dataset]
         weight = weights[n_positive_trees]
-        runtimes[i_dataset, i_aer, i_analyser] += result.expected_runtime * weight / weights.total()
-        error_rates[i_dataset, i_aer, i_analyser] += result.prob_error * weight / weights.total()
+        runtimes[i_dataset, i_aer, i_ss_kind] += result.expected_runtime * weight / weights.total()
+        error_rates[i_dataset, i_aer, i_ss_kind] += result.prob_error * weight / weights.total()
 
     return error_rates, runtimes
-
-
-def _do_analysis_if_relevant(*args):
-    (i_dataset, dataset), n_positive_trees, (i_aer, aer), (i_analyser, analyser), n_trees, positive_tree_counters = args
-
-    weights = positive_tree_counters[i_dataset]
-        
-    weight = weights[n_positive_trees]
-    if weight == 0:
-        return None
-
-    return analyser(n_trees, n_positive_trees, aer, weights)
 
 
 def show_error_rates_and_runtimes(n_trees, error_rates, runtimes, dataset_names, allowable_error_rates, analysis_names):
@@ -199,30 +243,22 @@ def get_and_show_error_rates_and_runtimes(n_trees, datasets, allowable_error_rat
     )
 
 
-@memoize(args_to_ignore=["_"])
-def analyse_greedy_fwe_or_get_cached(n_total, n_positive, allowable_error, _) -> ForestAnalysis:
-    fwe = ForestWithEnvelope.create_greedy(n_total, n_positive, allowable_error)
-    return fwe.analyse()
+@memoize(args_to_ignore=["dataset"])
+def get_greedy_ss(n_trees: int, allowable_error: float, dataset: pd.DataFrame) -> np.ndarray:
+    fwe = ForestWithEnvelope.create_greedy(n_trees, n_trees, allowable_error)
+    return fwe.get_prob_stop()
 
 
-@memoize(args_to_ignore=["_"])
-def analyse_minimax_fwss_or_get_cached(n_total, n_positive, allowable_error, _):
-    optimal_stopping_strategy = get_optimal_stopping_strategy(n_total, allowable_error)
-    fwss = ForestWithGivenStoppingStrategy(Forest(n_total, n_positive), optimal_stopping_strategy)
-    return fwss.analyse()
+@memoize(args_to_ignore=["dataset"])
+def get_minimax_ss(n_trees: int, allowable_error: float, dataset: pd.DataFrame) -> np.ndarray:
+    return get_optimal_stopping_strategy(n_trees, allowable_error)
 
 
 @memoize()
-def analyse_bayesian_fwss_or_get_cached(n_total, n_positive, allowable_error, weights):
-    if (n_total + 1) in weights:
-        print(f"{weights=}")
-
-    freqs_n_plus = np.zeros(n_total + 1)
-    for key, value in weights.items():
-        freqs_n_plus[key] = value
-    optimal_stopping_strategy = get_optimal_stopping_strategy(n_total, allowable_error, freqs_n_plus, error_minimax=False, runtime_minimax=False)
-    fwss = ForestWithGivenStoppingStrategy(Forest(n_total, n_positive), optimal_stopping_strategy)
-    return fwss.analyse()
+def get_bayesian_ss(n_trees: int, allowable_error: float, dataset: pd.DataFrame) -> np.ndarray:
+    bs_dataset = dataset.sample(frac=1, replace=True)
+    _, _, freqs_n_plus, _, _ = estimate_positive_tree_distribution(bs_dataset, n_trees)
+    return get_optimal_stopping_strategy(n_trees, allowable_error, freqs_n_plus, error_minimax=False, runtime_minimax=False)
 
 
 
@@ -260,9 +296,9 @@ def main():
                 DATASETS,
                 args.alphas,
                 {
-                    "Greedy": analyse_greedy_fwe_or_get_cached,
-                    "Minimax": analyse_minimax_fwss_or_get_cached,
-                    "Bayesian": analyse_bayesian_fwss_or_get_cached
+                    "Greedy": get_greedy_ss,
+                    "Minimax": get_minimax_ss,
+                    "Bayesian": get_bayesian_ss
                 }
             )
         elif args.action_name == "positive_tree_distribution":

@@ -153,3 +153,14 @@ def forwards_to[RInner, ROuter, **P](inner_function: Callable[P, RInner]) -> Cal
 def get_output_path(partial_file_name: str):
     timestamp = datetime.now().astimezone(timezone.utc).isoformat().replace(":", "_").replace(".", "_")
     return os.path.join(RESULTS_DIRECTORY, f"{partial_file_name}_{timestamp}")
+
+def enumerate_product(*iterables):
+    return zip(
+        itertools.product(
+            *(
+                range(len(iterable))
+                for iterable in iterables
+            )
+        ),
+        itertools.product(*iterables)
+    )
