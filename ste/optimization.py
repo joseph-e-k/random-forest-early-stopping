@@ -13,7 +13,7 @@ from scipy.special import comb
 from ste.ForestWithEnvelope import get_greedy_stopping_strategy
 from ste.figure_utils import create_subplot_grid, plot_stopping_strategy
 from ste.linear_programming_utils import Problem, OptimizationResult, ArithmeticExpression, OptimizationFailure
-from ste.utils import RESULTS_DIRECTORY, forwards_to, get_output_path, memoize
+from ste.utils import forwards_to, get_output_path, memoize
 
 
 @dataclasses.dataclass(frozen=True)
