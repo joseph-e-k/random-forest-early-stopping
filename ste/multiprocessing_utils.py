@@ -94,7 +94,7 @@ def parallelize(function, argses_to_iter=None, argses_to_combine=None, n_workers
         if isinstance(function, functools.partial):
             name = function.func.__name__
         else:
-            name = getattr(function, "name", "<function name unknown>")
+            name = getattr(function, "__name__", "<function name unknown>")
         print(f"{datetime.utcnow().isoformat()}: preparing task pool for {name}")
     
     if argses_to_iter is None:
