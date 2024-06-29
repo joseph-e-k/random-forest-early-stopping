@@ -98,7 +98,7 @@ def plot_function(ax, x_axis_arg_name, function, function_kwargs=None, plot_kwar
     for outcome in task_outcomes:
         x = outcome.args_or_kwargs[x_axis_arg_name]
         _logger.debug(f"Computed {function.__name__} value at {x!r} in {outcome.duration:.1f}s")
-        y_axis_values[outcome.index] = outcome
+        y_axis_values[outcome.index] = outcome.result
 
     y_axis_values = results_transform(y_axis_values)
     x_axis_values = x_axis_values_transform(x_axis_values)
