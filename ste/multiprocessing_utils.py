@@ -18,28 +18,6 @@ _ENV_KEY_N_WORKER_PROCESSES = "STE_N_WORKER_PROCESSES"
 N_WORKER_PROCESSES = int(os.getenv(_ENV_KEY_N_WORKER_PROCESSES, 32))
 
 
-class SharedValue:
-    def __init__(self, manager, ctype, initial_value):
-        self.value = manager.Value(ctype, initial_value)
-        self.lock = manager.RLock()
-
-    def change(self, function):
-        with self.lock:
-            new_value = function(self.value.get())
-            self.value.set(new_value)
-            return new_value
-        
-    def get_value(self):
-        return self.value.get()
-
-
-class SharedCounter(SharedValue):
-    def __init__(self, manager):
-        super().__init__(manager, c_uint, 0)
-
-    def increment(self):
-        return self.change(lambda x: x + 1)
-
 @dataclasses.dataclass
 class _RawTaskOutcome:
     index: int | tuple[int, ...]
@@ -64,8 +42,8 @@ class _Job:
     function: Callable
     n_total_tasks: int = None
     verbose: bool = False
-    job_start_time_ns: int = dataclasses.field(default_factory=time.monotonic_ns)
-    counter: SharedCounter = dataclasses.field(default_factory=lambda: SharedCounter(mp.Manager()))
+    start_time_ns: int = dataclasses.field(default_factory=time.monotonic_ns)
+    n_completed_tasks: int = 0
 
     def __call__(self, index_and_args_or_kwargs):
         index, args_or_kwargs = index_and_args_or_kwargs
@@ -93,19 +71,19 @@ class _Job:
             )
     
     def finish_one_task(self):
-        n_completed_tasks = self.counter.increment()
+        self.n_completed_tasks += 1
 
         if not self.verbose:
             return
         
         now = datetime.utcnow()
         timestamp = now.isoformat()
-        message = f"Completed {n_completed_tasks} tasks"
+        message = f"Completed {self.n_completed_tasks} tasks"
         if self.n_total_tasks is not None:
             message += f" out of {self.n_total_tasks}"
-            ns_so_far = time.monotonic_ns() - self.job_start_time_ns
-            ns_per_task = ns_so_far / n_completed_tasks
-            n_remaining_tasks = self.n_total_tasks - n_completed_tasks
+            ns_so_far = time.monotonic_ns() - self.start_time_ns
+            ns_per_task = ns_so_far / self.n_completed_tasks
+            n_remaining_tasks = self.n_total_tasks - self.n_completed_tasks
             expected_time_remaining_ns = ns_per_task * n_remaining_tasks
             expected_time_remaining = timedelta(microseconds=expected_time_remaining_ns // 1e3)
             expected_end_time = now + expected_time_remaining
