@@ -75,7 +75,7 @@ def save_figure(fig, name):
 
 
 def plot_function(ax, x_axis_arg_name, function, function_kwargs=None, plot_kwargs=None, results_transform=lambda y: y,
-                  x_axis_values_transform=lambda x: x, verbose=False):
+                  x_axis_values_transform=lambda x: x):
     function_kwargs = function_kwargs or {}
     plot_kwargs = plot_kwargs or {}
 
@@ -108,15 +108,14 @@ def plot_function(ax, x_axis_arg_name, function, function_kwargs=None, plot_kwar
 
 def plot_functions(ax, x_axis_arg_name, functions, function_kwargs=None, plot_kwargs=None,
                    results_transform=lambda y: y,
-                   x_axis_values_transform=lambda x: x,
-                   verbose=False):
+                   x_axis_values_transform=lambda x: x):
     if plot_kwargs is None:
         plot_kwargs = {}
 
     for function in functions:
         _logger.info(f"Plotting {function.__name__}")
         plot_function(ax, x_axis_arg_name, function, dict(function_kwargs), plot_kwargs | dict(label=function.__name__),
-                      results_transform, x_axis_values_transform, verbose)
+                      results_transform, x_axis_values_transform)
 
     title = ", ".join(function.__name__ for function in functions)
     if function_kwargs:

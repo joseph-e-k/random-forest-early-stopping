@@ -44,7 +44,6 @@ class TaskOutcome:
 class _Job:
     function: Callable
     n_total_tasks: int = None
-    verbose: bool = False
     start_time_ns: int = dataclasses.field(default_factory=time.monotonic_ns)
     n_completed_tasks: int = 0
 
@@ -75,9 +74,6 @@ class _Job:
     
     def finish_one_task(self):
         self.n_completed_tasks += 1
-
-        if not self.verbose:
-            return
         
         now = datetime.now().astimezone(timezone.utc)
         log_message = f"Completed {self.n_completed_tasks} tasks"
@@ -115,23 +111,22 @@ def _process_raw_task_outcome(task: _Job, raw_outcome: _RawTaskOutcome, reraise_
     )
 
 
-def parallelize(function, argses_to_iter=None, argses_to_combine=None, n_workers=N_WORKER_PROCESSES, verbose=False, n_tasks=None, reraise_exceptions=True):
+def parallelize(function, argses_to_iter=None, argses_to_combine=None, n_workers=N_WORKER_PROCESSES, n_tasks=None, reraise_exceptions=True):
     if not ((argses_to_iter is None) ^ (argses_to_combine is None)):
         raise TypeError("argses_to_iter or argses_to_multiply must be specified (but not both)")
     
-    if verbose:
-        if isinstance(function, functools.partial):
-            name = function.func.__name__
-        else:
-            name = getattr(function, "__name__", "<function name unknown>")
-        _logger.info(f"Preparing task pool for {name}")
+    if isinstance(function, functools.partial):
+        name = function.func.__name__
+    else:
+        name = getattr(function, "__name__", "<function name unknown>")
+    _logger.info(f"Preparing task pool for {name}")
     
     if argses_to_iter is None:
         indices_and_argses = enumerate_product(*argses_to_combine)
     else:
         indices_and_argses = enumerate(argses_to_iter)
 
-    job = _Job(function, n_tasks, verbose)
+    job = _Job(function, n_tasks)
 
     with mp.Pool(n_workers) as pool:
         for raw_outcome in pool.imap_unordered(job, indices_and_argses):
