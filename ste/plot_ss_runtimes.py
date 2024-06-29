@@ -61,7 +61,7 @@ def main():
 
     this_module_name = os.path.splitext(os.path.basename(__file__))[0]
     output_path = get_output_path(f"{this_module_name}_{args.n_lower_bound}_to_{args.n_upper_bound}")
-    plt.savefig(output_path)
+    plt.savefig(output_path, bbox_inches="tight")
 
 
 if __name__ == "__main__":
