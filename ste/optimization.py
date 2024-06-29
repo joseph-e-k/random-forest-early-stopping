@@ -13,7 +13,11 @@ from scipy.special import comb
 from ste.ForestWithEnvelope import get_greedy_stopping_strategy
 from ste.figure_utils import create_subplot_grid, plot_stopping_strategy
 from ste.linear_programming_utils import Problem, OptimizationResult, ArithmeticExpression, OptimizationFailure
+from ste.logging_utils import configure_logging, get_module_logger
 from ste.utils import forwards_to, get_output_path, memoize
+
+
+_logger = get_module_logger()
 
 
 @dataclasses.dataclass(frozen=True)
@@ -179,6 +183,8 @@ def get_optimal_stopping_strategy(*args, **kwargs):
 def main():
     from ste.utils import cache
 
+    configure_logging()
+
     parser = argparse.ArgumentParser()
     parser.add_argument("-n", type=int, required=True)
     parser.add_argument("--alpha", "--aer", "-a", type=float, default=0.05)
@@ -186,22 +192,20 @@ def main():
     parser.add_argument("--output-path", "-o", type=str, default=None)
     args = parser.parse_args()
 
-    print(f"{cache.directory=}")
+    _logger.debug(f"{cache.directory=}")
     cache_key = get_optimal_stopping_strategy.__cache_key__(args.n, args.alpha)
     if cache_key in cache:
-        print(f"{cache_key=} found in cache")
+        _logger.debug(f"{cache_key=} found in cache")
     else:
-        print(f"{cache_key=} not found in cache")
+        _logger.debug(f"{cache_key=} not found in cache")
 
     try:
         oss = get_optimal_stopping_strategy(args.n, args.alpha)
     except OptimizationFailure as e:
-        print(e.args[0])
-        print(e.args[1])
-        print(e.args[2])
+        _logger.exception()
         return
     else:
-        print(np.asarray(oss, dtype=float))
+        _logger.info(f"{np.asarray(oss, dtype=float)=}")
 
     if not args.graph:
         return
