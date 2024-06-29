@@ -1,6 +1,7 @@
 import dataclasses
 import functools
-import multiprocessing as mp
+import multiprocessing
+import multiprocessing.dummy
 import operator
 import os
 import time
@@ -151,7 +152,12 @@ def parallelize(function, argses_to_iter=None, argses_to_combine=None, n_workers
 
     job = _Job(function, job_name, n_tasks)
 
-    with mp.Pool(n_workers) as pool:
+    if multiprocessing.current_process().daemon:
+        Pool = multiprocessing.dummy.Pool
+    else:
+        Pool = multiprocessing.Pool
+
+    with Pool(n_workers) as pool:
         for raw_outcome in pool.imap_unordered(job.run_single_task, indices_and_argses):
             outcome = _process_raw_task_outcome(raw_outcome, reraise_exceptions)
             job.single_task_completed()
