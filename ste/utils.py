@@ -13,6 +13,11 @@ from diskcache import Cache
 from diskcache.core import full_name
 from scipy import stats
 
+from ste.logging_utils import get_module_logger
+
+
+_logger = get_module_logger()
+
 
 DATA_DIRECTORY = os.path.join(os.path.dirname(__file__), "../data")
 RESULTS_DIRECTORY = os.path.join(os.path.dirname(__file__), "../results")
@@ -63,7 +68,7 @@ class TimerContext:
         if self.verbose:
             message = f"Time ({self.tag})" if self.tag is not None else "Time"
             message += f": {self.elapsed_time}s"
-            print(message)
+            _logger.info(message)
 
 
 def timed(function):
@@ -153,6 +158,7 @@ def forwards_to[RInner, ROuter, **P](inner_function: Callable[P, RInner]) -> Cal
 def get_output_path(partial_file_name: str):
     timestamp = datetime.now().astimezone(timezone.utc).strftime("%Y%m%d%H%M%S")
     return os.path.join(RESULTS_DIRECTORY, f"{partial_file_name}_{timestamp}")
+
 
 def enumerate_product(*iterables):
     indices = itertools.product(*(

@@ -1,8 +1,12 @@
 import argparse
 
+from ste.logging_utils import configure_logging, get_module_logger
 from ste.multiprocessing_utils import parallelize
 from ste.optimization import get_optimal_stopping_strategy
 from ste.utils import TimerContext
+
+
+_logger = get_module_logger()
 
 
 DEFAULT_AERS = (0.0, 1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6)
@@ -19,9 +23,9 @@ def compute_optimal_stopping_strategies(low_n_total, high_n_total, aers):
         for outcome in task_outcomes:
             n_total, aer = outcome.args_or_kwargs
             if outcome.exception is None:
-                print(f"success ({outcome.duration:.1f}s): {n_total=}, {aer=}")
+                _logger.info(f"success ({outcome.duration:.1f}s): {n_total=}, {aer=}")
             else:
-                print(f"error ({outcome.duration:.1f}s): {n_total=}, {aer=}, {outcome.exception=}")
+                _logger.error(f"error ({outcome.duration:.1f}s): {n_total=}, {aer=}, {outcome.exception=}")
 
 
 def _parse_args():
@@ -33,6 +37,7 @@ def _parse_args():
 
 
 if __name__ == "__main__":
+    configure_logging()
     cmd_args = _parse_args()
     compute_optimal_stopping_strategies(
         cmd_args.n_lower_bound,

@@ -14,9 +14,13 @@ from ste.Forest import Forest
 from ste.ForestWithEnvelope import ForestWithEnvelope
 from ste.ForestWithStoppingStrategy import ForestWithGivenStoppingStrategy
 from ste.figure_utils import create_subplot_grid
+from ste.logging_utils import configure_logging, get_module_logger
 from ste.multiprocessing_utils import parallelize
 from ste.optimization import get_optimal_stopping_strategy
 from ste.utils import DATASETS, covariates_response_split, get_output_path, memoize
+
+
+_logger = get_module_logger()
 
 
 def to_binary_classifications(classifications):
@@ -67,6 +71,7 @@ def _estimate_positive_tree_distribution_single_forest(dataset: pd.DataFrame, *,
 
 @memoize()
 def estimate_positive_tree_distribution(dataset: pd.DataFrame, *, n_trees=100, n_forests=100, test_proportion=0.2, response_column=-1):
+    _logger.info(f"Estimating positive tree distribution with {n_forests} forests of {n_trees} trees")
     estimates = np.empty(shape=(n_forests, 3, n_trees + 1))
 
     for i_forest in range(n_forests):
@@ -282,6 +287,7 @@ def parse_args():
 def main():
     args = parse_args()
 
+    configure_logging()
     random.seed(args.random_seed)
     pd.options.mode.chained_assignment = None
 

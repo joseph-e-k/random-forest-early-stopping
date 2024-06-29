@@ -5,13 +5,16 @@ import os
 import time
 import traceback
 from collections.abc import Mapping
-from ctypes import c_uint
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Callable
 
 import tblib
 
+from ste.logging_utils import get_module_logger
 from ste.utils import TimerContext, enumerate_product
+
+
+_logger = get_module_logger()
 
 
 _ENV_KEY_N_WORKER_PROCESSES = "STE_N_WORKER_PROCESSES"
@@ -76,20 +79,19 @@ class _Job:
         if not self.verbose:
             return
         
-        now = datetime.utcnow()
-        timestamp = now.isoformat()
-        message = f"Completed {self.n_completed_tasks} tasks"
+        now = datetime.now().astimezone(timezone.utc)
+        log_message = f"Completed {self.n_completed_tasks} tasks"
         if self.n_total_tasks is not None:
-            message += f" out of {self.n_total_tasks}"
+            log_message += f" out of {self.n_total_tasks}"
             ns_so_far = time.monotonic_ns() - self.start_time_ns
             ns_per_task = ns_so_far / self.n_completed_tasks
             n_remaining_tasks = self.n_total_tasks - self.n_completed_tasks
             expected_time_remaining_ns = ns_per_task * n_remaining_tasks
             expected_time_remaining = timedelta(microseconds=expected_time_remaining_ns // 1e3)
             expected_end_time = now + expected_time_remaining
-            message += f" (expect to be finished at {expected_end_time.isoformat()})"
+            log_message += f" (expect to be finished at {expected_end_time.strftime('%Y-%m-%dT%H:%M:%S')})"
 
-        print(f"{timestamp}: {message}")
+        _logger.info(log_message)
 
 
 def _process_raw_task_outcome(task: _Job, raw_outcome: _RawTaskOutcome, reraise_exceptions: bool) -> TaskOutcome:
@@ -122,7 +124,7 @@ def parallelize(function, argses_to_iter=None, argses_to_combine=None, n_workers
             name = function.func.__name__
         else:
             name = getattr(function, "__name__", "<function name unknown>")
-        print(f"{datetime.utcnow().isoformat()}: preparing task pool for {name}")
+        _logger.info(f"Preparing task pool for {name}")
     
     if argses_to_iter is None:
         indices_and_argses = enumerate_product(*argses_to_combine)

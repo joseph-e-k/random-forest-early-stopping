@@ -16,8 +16,13 @@ import matplotlib
 import numpy as np
 from matplotlib import pyplot as plt
 
+from ste.logging_utils import get_module_logger
 from ste.multiprocessing_utils import parallelize
 from ste.utils import stringify_kwargs
+
+
+_logger = get_module_logger()
+
 
 FIGURES_PATH = r"C:\Users\Josep\Dropbox\Joseph's Dropbox\School\Thesis\Graphs"
 DPI = 600
@@ -65,7 +70,7 @@ RCPARAMS_ONE_TIME_THING = {**_RCPARAMS_LATEX_SINGLE_COLUMN, 'figure.figsize': (_
 def save_figure(fig, name):
     os.makedirs(FIGURES_PATH, exist_ok=True)
     filename = os.path.join(FIGURES_PATH, name).replace('.', '_') + '.pdf'
-    print(f'Saving figure to "{os.path.realpath(filename)}"')
+    _logger.info(f'Saving figure to "{os.path.realpath(filename)}"')
     fig.savefig(filename, dpi=DPI, bbox_inches='tight')
 
 
@@ -92,8 +97,7 @@ def plot_function(ax, x_axis_arg_name, function, function_kwargs=None, plot_kwar
 
     for outcome in task_outcomes:
         x = outcome.args_or_kwargs[x_axis_arg_name]
-        if verbose:
-            print(f"Computed {function.__name__} value at {x!r} in {outcome.duration:.1f}s")
+        _logger.debug(f"Computed {function.__name__} value at {x!r} in {outcome.duration:.1f}s")
         y_axis_values[outcome.index] = outcome
 
     y_axis_values = results_transform(y_axis_values)
@@ -110,8 +114,7 @@ def plot_functions(ax, x_axis_arg_name, functions, function_kwargs=None, plot_kw
         plot_kwargs = {}
 
     for function in functions:
-        if verbose:
-            print(f"Plotting {function.__name__}")
+        _logger.info(f"Plotting {function.__name__}")
         plot_function(ax, x_axis_arg_name, function, dict(function_kwargs), plot_kwargs | dict(label=function.__name__),
                       results_transform, x_axis_values_transform, verbose)
 
