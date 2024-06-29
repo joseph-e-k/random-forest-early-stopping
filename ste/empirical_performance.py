@@ -118,11 +118,8 @@ def _get_stopping_strategies(n_trees, datasets, aers, stopping_strategy_getters)
         verbose=True
     )
 
-    for (indices, args, success, result, duration) in task_outcomes:
-        if not success:
-            raise result
-        
-        stopping_strategies[indices] = result
+    for outcome in task_outcomes:
+        stopping_strategies[outcome.index] = outcome.result
 
     return stopping_strategies
 
@@ -173,18 +170,15 @@ def get_error_rates_and_runtimes(n_trees, datasets, aers, stopping_strategy_gett
         n_tasks=n_datasets * n_aers * n_ss_kinds * (n_trees + 1)
     )
 
-    for (indices, (_, _, _, n_positive_trees, *_), success, result, duration) in task_outcomes:
-        if not success:
-            raise result
-        
-        if result is None:
+    for outcome in task_outcomes:
+        if outcome.result is None:
             continue
-
-        i_dataset, i_aer, i_ss_kind, _ = indices
+        _, _, _, n_positive_trees, *_ = outcome.args_or_kwargs
+        i_dataset, i_aer, i_ss_kind, _ = outcome.index
         weights = positive_tree_counters[i_dataset]
         weight = weights[n_positive_trees]
-        runtimes[i_dataset, i_aer, i_ss_kind] += result.expected_runtime * weight / weights.total()
-        error_rates[i_dataset, i_aer, i_ss_kind] += result.prob_error * weight / weights.total()
+        runtimes[i_dataset, i_aer, i_ss_kind] += outcome.result.expected_runtime * weight / weights.total()
+        error_rates[i_dataset, i_aer, i_ss_kind] += outcome.result.prob_error * weight / weights.total()
 
     return error_rates, runtimes
 

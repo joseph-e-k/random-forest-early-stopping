@@ -85,18 +85,16 @@ def plot_function(ax, x_axis_arg_name, function, function_kwargs=None, plot_kwar
 
     y_axis_values = np.zeros(len(x_axis_values))
 
-    results = parallelize(
+    task_outcomes = parallelize(
         functools.partial(function, **function_kwargs),
         argses_to_iter=({x_axis_arg_name: x} for x in x_axis_values)
     )
 
-    for (i, kwargs, success, outcome, duration) in results:
-        if not success:
-            raise outcome
-        x = kwargs[x_axis_arg_name]
+    for outcome in task_outcomes:
+        x = outcome.args_or_kwargs[x_axis_arg_name]
         if verbose:
-            print(f"Computed {function.__name__} value at {x!r} in {duration:.1f}s")
-        y_axis_values[i] = outcome
+            print(f"Computed {function.__name__} value at {x!r} in {outcome.duration:.1f}s")
+        y_axis_values[outcome.index] = outcome
 
     y_axis_values = results_transform(y_axis_values)
     x_axis_values = x_axis_values_transform(x_axis_values)

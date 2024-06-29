@@ -7,7 +7,9 @@ import traceback
 from collections.abc import Mapping
 from ctypes import c_uint
 from datetime import datetime, timedelta
-from typing import Callable
+from typing import Any, Callable
+
+import tblib
 
 from ste.utils import TimerContext, enumerate_product
 
@@ -38,9 +40,27 @@ class SharedCounter(SharedValue):
     def increment(self):
         return self.change(lambda x: x + 1)
 
+@dataclasses.dataclass
+class _RawTaskOutcome:
+    index: int | tuple[int, ...]
+    args_or_kwargs: tuple | dict
+    duration: timedelta
+    result: Any = None
+    exception: Exception = None
+    traceback_string: str = None
+
+
+@dataclasses.dataclass(frozen=True)
+class TaskOutcome:
+    index: int | tuple[int, ...]
+    args_or_kwargs: tuple | dict
+    duration: timedelta
+    result: Any = None
+    exception: Exception = None
+
 
 @dataclasses.dataclass
-class _CallableForWorkerProcesses:
+class _Job:
     function: Callable
     n_total_tasks: int = None
     verbose: bool = False
@@ -56,15 +76,23 @@ class _CallableForWorkerProcesses:
                 else:
                     result = self.function(*args_or_kwargs)
         except Exception as e:
-            traceback.print_exc()
-            print(f"{index=}, {len(args_or_kwargs)=}, {args_or_kwargs=}")
-            return index, args_or_kwargs, False, e, timer.elapsed_time
+            tb_string = traceback.format_exc()
+            return _RawTaskOutcome(
+                index,
+                args_or_kwargs,
+                timer.elapsed_time,
+                exception=e,
+                traceback_string=tb_string
+            )
         else:
-            return index, args_or_kwargs, True, result, timer.elapsed_time
-        finally:
-            self.finish()
+            return _RawTaskOutcome(
+                index,
+                args_or_kwargs,
+                timer.elapsed_time,
+                result=result
+            )
     
-    def finish(self):
+    def finish_one_task(self):
         n_completed_tasks = self.counter.increment()
 
         if not self.verbose:
@@ -86,7 +114,28 @@ class _CallableForWorkerProcesses:
         print(f"{timestamp}: {message}")
 
 
-def parallelize(function, argses_to_iter=None, argses_to_combine=None, n_workers=N_WORKER_PROCESSES, verbose=False, n_tasks=None):
+def _process_raw_task_outcome(task: _Job, raw_outcome: _RawTaskOutcome, reraise_exceptions: bool) -> TaskOutcome:
+    if raw_outcome.exception is None:
+        return TaskOutcome(
+            index=raw_outcome.index,
+            args_or_kwargs=raw_outcome.args_or_kwargs,
+            duration=raw_outcome.duration,
+            result=raw_outcome.result
+        )
+    
+    traceback = tblib.Traceback.from_string(raw_outcome.traceback_string).as_traceback()
+    exception = raw_outcome.exception.with_traceback(traceback)
+    if reraise_exceptions:
+        raise exception
+    return TaskOutcome(
+        index=raw_outcome.index,
+        args_or_kwargs=raw_outcome.args_or_kwargs,
+        duration=raw_outcome.duration,
+        exception=exception
+    )
+
+
+def parallelize(function, argses_to_iter=None, argses_to_combine=None, n_workers=N_WORKER_PROCESSES, verbose=False, n_tasks=None, reraise_exceptions=True):
     if not ((argses_to_iter is None) ^ (argses_to_combine is None)):
         raise TypeError("argses_to_iter or argses_to_multiply must be specified (but not both)")
     
@@ -102,10 +151,10 @@ def parallelize(function, argses_to_iter=None, argses_to_combine=None, n_workers
     else:
         indices_and_argses = enumerate(argses_to_iter)
 
-    worker = _CallableForWorkerProcesses(function, n_tasks, verbose)
+    job = _Job(function, n_tasks, verbose)
 
     with mp.Pool(n_workers) as pool:
-        yield from pool.imap(
-            worker,
-            indices_and_argses
-        )
+        for raw_outcome in pool.imap_unordered(job, indices_and_argses):
+            outcome = _process_raw_task_outcome(job, raw_outcome, reraise_exceptions)
+            job.finish_one_task()
+            yield outcome
