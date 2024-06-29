@@ -1,4 +1,5 @@
 import argparse
+import os
 
 from matplotlib import pyplot as plt
 
@@ -6,14 +7,14 @@ from ste.Forest import Forest
 from ste.optimization import get_optimal_stopping_strategy
 from ste.ForestWithEnvelope import ForestWithEnvelope
 from ste.ForestWithStoppingStrategy import ForestWithGivenStoppingStrategy
-from ste.utils import timed, memoize
+from ste.utils import get_output_path, timed, memoize
 from ste.figure_utils import plot_functions
 
 
 @timed
 @memoize()
 def optimal_expected_runtime(n_total, prop_positive, aer, relative=False):
-    stopping_strategy = get_optimal_stopping_strategy(n_total=n_total, allowable_error=aer)
+    stopping_strategy = get_optimal_stopping_strategy(n=n_total, alpha=aer)
     fwss = ForestWithGivenStoppingStrategy(Forest(n_total, int(n_total * prop_positive)), stopping_strategy)
     expected_runtime = fwss.analyse().expected_runtime
 
@@ -58,7 +59,9 @@ def main():
         )
     )
 
-    plt.show()
+    this_module_name = os.path.splitext(os.path.basename(__file__))[0]
+    output_path = get_output_path(f"{this_module_name}_{args.n_lower_bound}_to_{args.n_upper_bound}")
+    plt.savefig(output_path)
 
 
 if __name__ == "__main__":
