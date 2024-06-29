@@ -74,13 +74,19 @@ def estimate_positive_tree_distribution(dataset: pd.DataFrame, *, n_trees=100, n
     _logger.info(f"Estimating positive tree distribution with {n_forests} forests of {n_trees} trees")
     estimates = np.empty(shape=(n_forests, 3, n_trees + 1))
 
-    for i_forest in range(n_forests):
-        estimates[i_forest, :, :] = _estimate_positive_tree_distribution_single_forest(
+    task_outcomes = parallelize(
+        functools.partial(
+            _estimate_positive_tree_distribution_single_forest,
             dataset=dataset,
             n_trees=n_trees,
             test_proportion=test_proportion,
-            response_column=response_column,
-        )
+            response_column=response_column
+        ),
+        argses_to_iter=[()] * n_forests
+    )
+
+    for outcome in task_outcomes:
+        estimates[outcome.index, :, :] = outcome.result
 
     return np.mean(estimates, axis=0)
 
