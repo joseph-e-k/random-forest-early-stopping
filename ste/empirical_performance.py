@@ -118,8 +118,7 @@ def _get_stopping_strategies(n_trees, datasets, aers, stopping_strategy_getters)
 
     task_outcomes = parallelize(
         functools.partial(_apply_ss_getter, n_trees=n_trees),
-        argses_to_combine=(datasets, aers, stopping_strategy_getters),
-        n_tasks=len(datasets) * len(aers) * len(stopping_strategy_getters)
+        argses_to_combine=(datasets, aers, stopping_strategy_getters)
     )
 
     for outcome in task_outcomes:
@@ -169,8 +168,7 @@ def get_error_rates_and_runtimes(n_trees, datasets, aers, stopping_strategy_gett
             range(n_aers),
             range(n_ss_kinds),
             range(n_trees + 1),
-        ),
-        n_tasks=n_datasets * n_aers * n_ss_kinds * (n_trees + 1)
+        )
     )
 
     for outcome in task_outcomes:

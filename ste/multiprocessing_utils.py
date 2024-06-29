@@ -1,6 +1,7 @@
 import dataclasses
 import functools
 import multiprocessing as mp
+import operator
 import os
 import time
 import traceback
@@ -43,11 +44,12 @@ class TaskOutcome:
 @dataclasses.dataclass
 class _Job:
     function: Callable
+    name: str
     n_total_tasks: int = None
     start_time_ns: int = dataclasses.field(default_factory=time.monotonic_ns)
     n_completed_tasks: int = 0
 
-    def __call__(self, index_and_args_or_kwargs):
+    def run_single_task(self, index_and_args_or_kwargs):
         index, args_or_kwargs = index_and_args_or_kwargs
         try:
             with TimerContext(verbose=False) as timer:
@@ -72,11 +74,11 @@ class _Job:
                 result=result
             )
     
-    def finish_one_task(self):
+    def single_task_completed(self):
         self.n_completed_tasks += 1
         
         now = datetime.now().astimezone(timezone.utc)
-        log_message = f"Completed {self.n_completed_tasks} tasks"
+        log_message = f"{self.name}: Completed {self.n_completed_tasks} tasks"
         if self.n_total_tasks is not None:
             log_message += f" out of {self.n_total_tasks}"
             ns_so_far = time.monotonic_ns() - self.start_time_ns
@@ -90,7 +92,26 @@ class _Job:
         _logger.info(log_message)
 
 
-def _process_raw_task_outcome(task: _Job, raw_outcome: _RawTaskOutcome, reraise_exceptions: bool) -> TaskOutcome:
+def _infer_n_tasks(argses_to_iter, argses_to_combine):
+    try:
+        return len(argses_to_iter)
+    except TypeError:
+        try:
+            return functools.reduce(
+                operator.mul,
+                (len(values) for values in argses_to_combine)
+            )
+        except TypeError:
+            return None
+
+
+def _infer_job_name(callable):
+    if isinstance(callable, functools.partial):
+        return callable.func.__name__
+    return getattr(callable, "__name__", "<job name unknown>")
+
+
+def _process_raw_task_outcome(raw_outcome: _RawTaskOutcome, reraise_exceptions: bool) -> TaskOutcome:
     if raw_outcome.exception is None:
         return TaskOutcome(
             index=raw_outcome.index,
@@ -111,25 +132,27 @@ def _process_raw_task_outcome(task: _Job, raw_outcome: _RawTaskOutcome, reraise_
     )
 
 
-def parallelize(function, argses_to_iter=None, argses_to_combine=None, n_workers=N_WORKER_PROCESSES, n_tasks=None, reraise_exceptions=True):
+def parallelize(function, argses_to_iter=None, argses_to_combine=None, n_workers=N_WORKER_PROCESSES, n_tasks=None, reraise_exceptions=True, job_name=None):
     if not ((argses_to_iter is None) ^ (argses_to_combine is None)):
         raise TypeError("argses_to_iter or argses_to_multiply must be specified (but not both)")
     
-    if isinstance(function, functools.partial):
-        name = function.func.__name__
-    else:
-        name = getattr(function, "__name__", "<function name unknown>")
-    _logger.info(f"Preparing task pool for {name}")
+    if job_name is None:
+        job_name = _infer_job_name(function)
+    
+    _logger.info(f"{job_name}: Preparing task pool")
+
+    if n_tasks is None:
+        n_tasks = _infer_n_tasks(argses_to_iter, argses_to_combine)
     
     if argses_to_iter is None:
         indices_and_argses = enumerate_product(*argses_to_combine)
     else:
         indices_and_argses = enumerate(argses_to_iter)
 
-    job = _Job(function, n_tasks)
+    job = _Job(function, job_name, n_tasks)
 
     with mp.Pool(n_workers) as pool:
-        for raw_outcome in pool.imap_unordered(job, indices_and_argses):
-            outcome = _process_raw_task_outcome(job, raw_outcome, reraise_exceptions)
-            job.finish_one_task()
+        for raw_outcome in pool.imap_unordered(job.run_single_task, indices_and_argses):
+            outcome = _process_raw_task_outcome(raw_outcome, reraise_exceptions)
+            job.single_task_completed()
             yield outcome
