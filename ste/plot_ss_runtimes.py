@@ -4,6 +4,7 @@ import os
 from matplotlib import pyplot as plt
 
 from ste.Forest import Forest
+from ste.logging_utils import configure_logging
 from ste.optimization import get_optimal_stopping_strategy
 from ste.ForestWithEnvelope import ForestWithEnvelope
 from ste.ForestWithStoppingStrategy import ForestWithGivenStoppingStrategy
@@ -45,6 +46,8 @@ def _parse_args():
 
 
 def main():
+    configure_logging()
+
     args = _parse_args()
 
     plot_functions(
