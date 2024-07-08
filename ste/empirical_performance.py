@@ -2,7 +2,6 @@ import argparse
 import functools
 import random
 import warnings
-from collections import Counter
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -123,8 +122,8 @@ def _get_stopping_strategies(n_trees, datasets, aers, stopping_strategy_getters)
     return stopping_strategies
 
 
-def _analyse_stopping_strategy_if_relevant(i_dataset, i_aer, i_ss_kind, n_positive_trees, n_trees, positive_tree_counters, stopping_strategies):
-    if positive_tree_counters[i_dataset][n_positive_trees] == 0:
+def _analyse_stopping_strategy_if_relevant(i_dataset, i_aer, i_ss_kind, n_positive_trees, n_trees, positive_tree_freqs, stopping_strategies):
+    if positive_tree_freqs[i_dataset, n_positive_trees] == 0:
         return None
 
     ss = stopping_strategies[i_dataset, i_aer, i_ss_kind]
@@ -139,24 +138,20 @@ def get_error_rates_and_runtimes(n_trees, datasets, aers, stopping_strategy_gett
     n_aers = len(aers)
     n_ss_kinds = len(stopping_strategy_getters)
 
-    positive_tree_counters = [None] * n_datasets
+    positive_tree_freqs = np.zeros((n_datasets, n_trees + 1), dtype=int)
     runtimes = np.zeros((n_datasets, n_aers, n_ss_kinds))
     error_rates = np.zeros_like(runtimes)
 
     stopping_strategies = _get_stopping_strategies(n_trees, datasets.values(), aers, stopping_strategy_getters)
 
     for i_dataset, dataset in enumerate(datasets.values()):
-        positive_tree_distribution = estimate_positive_tree_distribution(dataset, n_trees=n_trees)
-        positive_tree_counters[i_dataset] = Counter({
-            int(index): int(value)
-            for (index, value) in enumerate(positive_tree_distribution)
-        })
+        positive_tree_freqs[i_dataset, :] = estimate_positive_tree_distribution(dataset, n_trees=n_trees)
 
     task_outcomes = parallelize(
         functools.partial(
             _analyse_stopping_strategy_if_relevant,
             n_trees=n_trees,
-            positive_tree_counters=positive_tree_counters,
+            positive_tree_freqs=positive_tree_freqs,
             stopping_strategies=stopping_strategies
         ),
         argses_to_combine=(
@@ -172,10 +167,9 @@ def get_error_rates_and_runtimes(n_trees, datasets, aers, stopping_strategy_gett
             continue
         _, _, _, n_positive_trees, *_ = outcome.args_or_kwargs
         i_dataset, i_aer, i_ss_kind, _ = outcome.index
-        weights = positive_tree_counters[i_dataset]
-        weight = weights[n_positive_trees]
-        runtimes[i_dataset, i_aer, i_ss_kind] += outcome.result.expected_runtime * weight / weights.total()
-        error_rates[i_dataset, i_aer, i_ss_kind] += outcome.result.prob_error * weight / weights.total()
+        n_positive_prob = positive_tree_freqs[i_dataset, n_positive_trees] / positive_tree_freqs[i_dataset, :].sum()
+        runtimes[i_dataset, i_aer, i_ss_kind] += outcome.result.expected_runtime * n_positive_prob
+        error_rates[i_dataset, i_aer, i_ss_kind] += outcome.result.prob_error * n_positive_prob
 
     return error_rates, runtimes
 
