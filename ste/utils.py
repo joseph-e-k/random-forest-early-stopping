@@ -21,12 +21,15 @@ _logger = get_module_logger()
 
 DATA_DIRECTORY = os.path.join(os.path.dirname(__file__), "../data")
 RESULTS_DIRECTORY = os.path.join(os.path.dirname(__file__), "../results")
-DATASETS = {
-    "Banknotes": pd.read_csv(os.path.join(DATA_DIRECTORY, "data_banknote_authentication.txt")),
-    "Heart Attacks": pd.read_csv(os.path.join(DATA_DIRECTORY, "heart_attack.csv")),
-    "Salaries": pd.read_csv(os.path.join(DATA_DIRECTORY, "adult.data")),
-    "Dry Beans": pd.read_excel(os.path.join(DATA_DIRECTORY, "dry_beans.xlsx"))
-}
+
+
+def load_datasets():
+    return {
+        "Banknotes": pd.read_csv(os.path.join(DATA_DIRECTORY, "data_banknote_authentication.txt")),
+        "Heart Attacks": pd.read_csv(os.path.join(DATA_DIRECTORY, "heart_attack.csv")),
+        "Salaries": pd.read_csv(os.path.join(DATA_DIRECTORY, "adult.data")),
+        "Dry Beans": pd.read_excel(os.path.join(DATA_DIRECTORY, "dry_beans.xlsx"))
+    }
 
 
 cache = Cache(os.path.join(os.path.dirname(__file__), ".cache"))

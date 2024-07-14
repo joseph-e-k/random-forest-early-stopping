@@ -16,7 +16,7 @@ from ste.figure_utils import create_subplot_grid
 from ste.logging_utils import configure_logging, get_module_logger
 from ste.multiprocessing_utils import parallelize
 from ste.optimization import get_optimal_stopping_strategy
-from ste.utils import DATASETS, covariates_response_split, get_output_path, memoize
+from ste.utils import load_datasets, covariates_response_split, get_output_path, memoize
 
 
 _logger = get_module_logger()
@@ -276,11 +276,13 @@ def main():
     random.seed(args.random_seed)
     pd.options.mode.chained_assignment = None
 
+    datasets = load_datasets()
+
     with warnings.catch_warnings(category=UserWarning, action="ignore"):
         if args.action_name == "empirical_comparison":
             get_and_show_error_rates_and_runtimes(
                 args.n_trees,
-                DATASETS,
+                datasets,
                 args.alphas,
                 {
                     "Greedy": get_greedy_ss,
@@ -289,7 +291,7 @@ def main():
                 }
             )
         elif args.action_name == "positive_tree_distribution":
-            plot_n_positive_distributions(args.n_trees, DATASETS)
+            plot_n_positive_distributions(args.n_trees, datasets)
 
     output_path = args.output_path or get_output_path(f"{args.action_name}_{args.n_trees}_trees")
     plt.savefig(output_path)
