@@ -38,19 +38,19 @@ def load_local_dataset(file_name: str, reader: Callable[[str], pd.DataFrame] = p
     return covariates_response_split(reader(os.path.join(DATA_DIRECTORY, file_name)), response_column)
 
 
-def load_uci_dataset(dataset_id: int) -> Dataset:
-    whole_dataset = fetch_ucirepo(id=dataset_id)
-    return whole_dataset.data.features, whole_dataset.data.targets.iloc[:, 0]
+def load_uci_dataset(id: int) -> Dataset:
+    uci_dataset = fetch_ucirepo(id=id)
+    return uci_dataset.data.features, uci_dataset.data.targets.iloc[:, 0]
 
 
 def load_datasets():
     return {
-        "Banknotes": load_local_dataset("data_banknote_authentication.txt"),
-        "Heart Attacks": load_local_dataset("heart_attack.csv"),
         "Salaries": load_local_dataset("adult.data"),
         "Dry Beans": load_local_dataset("dry_beans.xlsx", reader=pd.read_excel),
-        "Phishing": load_uci_dataset(dataset_id=327),
-        "Diabetes": load_uci_dataset(dataset_id=891)
+        "Phishing": load_uci_dataset(id=327),
+        "Diabetes": load_uci_dataset(id=891),
+        "IoT": load_uci_dataset(id=942),
+        "Android Permissions": load_uci_dataset(id=722)
     }
 
 
