@@ -16,7 +16,7 @@ from ste.figure_utils import create_subplot_grid
 from ste.logging_utils import configure_logging, get_module_logger
 from ste.multiprocessing_utils import parallelize
 from ste.optimization import get_optimal_stopping_strategy
-from ste.utils import load_datasets, covariates_response_split, get_output_path, memoize
+from ste.utils import Dataset, load_datasets, covariates_response_split, get_output_path, memoize
 
 
 _logger = get_module_logger()
@@ -42,9 +42,9 @@ def coerce_nonnumeric_columns_to_numeric(df: pd.DataFrame):
     return df
 
 
-def _estimate_positive_tree_distribution_single_forest(dataset: pd.DataFrame, *, n_trees=100, test_proportion=0.2, response_column=-1):
+def _estimate_positive_tree_distribution_single_forest(dataset: Dataset, *, n_trees=100, test_proportion=0.2, response_column=-1):
     # Processing: get covariates and responses, convert responses to binary classes, and split into train and test sets
-    X, y = covariates_response_split(dataset, response_column)
+    X, y = dataset
     X = coerce_nonnumeric_columns_to_numeric(X)
     y = to_binary_classifications(y)
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_proportion)
@@ -59,7 +59,7 @@ def _estimate_positive_tree_distribution_single_forest(dataset: pd.DataFrame, *,
     return np.bincount(np.sum(tree_predictions, axis=0), minlength=n_trees + 1)
 
 
-def estimate_positive_tree_distribution(dataset: pd.DataFrame, *, n_trees=100, n_forests=100, test_proportion=0.2, response_column=-1):
+def estimate_positive_tree_distribution(dataset: Dataset, *, n_trees=100, n_forests=100, test_proportion=0.2, response_column=-1):
     _logger.info(f"Estimating positive tree distribution with {n_forests} forests of {n_trees} trees")
     estimates = np.empty(shape=(n_forests, n_trees + 1))
 
@@ -142,10 +142,10 @@ def get_error_rates_and_runtimes(n_trees, datasets, aers, stopping_strategy_gett
     runtimes = np.zeros((n_datasets, n_aers, n_ss_kinds))
     error_rates = np.zeros_like(runtimes)
 
-    stopping_strategies = _get_stopping_strategies(n_trees, datasets.values(), aers, stopping_strategy_getters)
-
     for i_dataset, dataset in enumerate(datasets.values()):
         positive_tree_freqs[i_dataset, :] = estimate_positive_tree_distribution(dataset, n_trees=n_trees)
+
+    stopping_strategies = _get_stopping_strategies(n_trees, datasets.values(), aers, stopping_strategy_getters)
 
     task_outcomes = parallelize(
         functools.partial(
@@ -232,20 +232,22 @@ def get_and_show_error_rates_and_runtimes(n_trees, datasets, allowable_error_rat
 
 
 @memoize(args_to_ignore=["dataset"])
-def get_greedy_ss(n_trees: int, allowable_error: float, dataset: pd.DataFrame) -> np.ndarray:
+def get_greedy_ss(n_trees: int, allowable_error: float, dataset: Dataset) -> np.ndarray:
     fwe = ForestWithEnvelope.create_greedy(n_trees, n_trees, allowable_error)
     return fwe.get_prob_stop()
 
 
 @memoize(args_to_ignore=["dataset"])
-def get_minimax_ss(n_trees: int, allowable_error: float, dataset: pd.DataFrame) -> np.ndarray:
+def get_minimax_ss(n_trees: int, allowable_error: float, dataset: Dataset) -> np.ndarray:
     return get_optimal_stopping_strategy(n_trees, allowable_error)
 
 
 @memoize()
-def get_bayesian_ss(n_trees: int, allowable_error: float, dataset: pd.DataFrame) -> np.ndarray:
-    bs_dataset = dataset.sample(frac=1, replace=True)
-    freqs_n_plus = estimate_positive_tree_distribution(bs_dataset, n_trees=n_trees)
+def get_bayesian_ss(n_trees: int, allowable_error: float, dataset: Dataset) -> np.ndarray:
+    X, y = dataset
+    X_bs = X.sample(frac=1, replace=True)
+    y_bs = y[X_bs.index]
+    freqs_n_plus = estimate_positive_tree_distribution((X_bs, y_bs), n_trees=n_trees)
     return get_optimal_stopping_strategy(n_trees, allowable_error, freqs_n_plus, error_minimax=False, runtime_minimax=False)
 
 

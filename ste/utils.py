@@ -12,6 +12,7 @@ import pandas as pd
 from diskcache import Cache
 from diskcache.core import full_name
 from scipy import stats
+from ucimlrepo import fetch_ucirepo
 
 from ste.logging_utils import get_module_logger
 
@@ -23,12 +24,33 @@ DATA_DIRECTORY = os.path.join(os.path.dirname(__file__), "../data")
 RESULTS_DIRECTORY = os.path.join(os.path.dirname(__file__), "../results")
 
 
+type Dataset = tuple[pd.DataFrame, pd.Series]
+
+
+def covariates_response_split(dataframe: pd.DataFrame, response_column=-1) -> Dataset:
+    if isinstance(response_column, int):
+        response_column = dataframe.columns[response_column]
+    
+    return dataframe.drop([response_column], axis=1), dataframe[response_column]
+
+
+def load_local_dataset(file_name: str, reader: Callable[[str], pd.DataFrame] = pd.read_csv, response_column: str | int = -1) -> Dataset:
+    return covariates_response_split(reader(os.path.join(DATA_DIRECTORY, file_name)), response_column)
+
+
+def load_uci_dataset(dataset_id: int) -> Dataset:
+    whole_dataset = fetch_ucirepo(id=dataset_id)
+    return whole_dataset.data.features, whole_dataset.data.targets.iloc[:, 0]
+
+
 def load_datasets():
     return {
-        "Banknotes": pd.read_csv(os.path.join(DATA_DIRECTORY, "data_banknote_authentication.txt")),
-        "Heart Attacks": pd.read_csv(os.path.join(DATA_DIRECTORY, "heart_attack.csv")),
-        "Salaries": pd.read_csv(os.path.join(DATA_DIRECTORY, "adult.data")),
-        "Dry Beans": pd.read_excel(os.path.join(DATA_DIRECTORY, "dry_beans.xlsx"))
+        "Banknotes": load_local_dataset("data_banknote_authentication.txt"),
+        "Heart Attacks": load_local_dataset("heart_attack.csv"),
+        "Salaries": load_local_dataset("adult.data"),
+        "Dry Beans": load_local_dataset("dry_beans.xlsx", reader=pd.read_excel),
+        "Phishing": load_uci_dataset(dataset_id=327),
+        "Diabetes": load_uci_dataset(dataset_id=891)
     }
 
 
@@ -105,13 +127,6 @@ def iter_unique_combinations(iterable, length):
     for index, item in enumerate(items[:last_index + 1]):
         for combination in iter_unique_combinations(items[index + 1:], length - 1):
             yield (item,) + combination
-
-
-def covariates_response_split(dataset: pd.DataFrame, response_column=-1):
-    if response_column < 0:
-        response_column = dataset.shape[1] + response_column
-    covariate_columns = [j for j in range(dataset.shape[1]) if j != response_column]
-    return dataset.iloc[:, covariate_columns], dataset.iloc[:, response_column]
 
 
 def stringify_kwargs(kwargs: dict) -> str:
