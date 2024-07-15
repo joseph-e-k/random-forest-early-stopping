@@ -1,3 +1,4 @@
+import contextlib
 import dataclasses
 import functools
 import multiprocessing
@@ -19,8 +20,7 @@ from ste.utils import TimerContext, enumerate_product
 _logger = get_module_logger()
 
 
-_ENV_KEY_N_WORKER_PROCESSES = "STE_N_WORKER_PROCESSES"
-N_WORKER_PROCESSES = int(os.getenv(_ENV_KEY_N_WORKER_PROCESSES, 32))
+N_WORKER_PROCESSES = int(os.getenv("STE_N_WORKER_PROCESSES", 32))
 
 
 @dataclasses.dataclass
@@ -29,7 +29,7 @@ class _RawTaskOutcome:
     args_or_kwargs: tuple | dict
     duration: timedelta
     result: Any = None
-    exception: Exception = None
+    exception: Exception | None = None
     traceback_string: str = None
 
 
@@ -133,7 +133,7 @@ def _process_raw_task_outcome(raw_outcome: _RawTaskOutcome, reraise_exceptions: 
     )
 
 
-def parallelize(function, argses_to_iter=None, argses_to_combine=None, n_workers=N_WORKER_PROCESSES, n_tasks=None, reraise_exceptions=True, job_name=None):
+def parallelize(function, argses_to_iter=None, argses_to_combine=None, n_workers=N_WORKER_PROCESSES, n_tasks=None, reraise_exceptions=True, job_name=None, dummy=False):
     if not ((argses_to_iter is None) ^ (argses_to_combine is None)):
         raise TypeError("argses_to_iter or argses_to_multiply must be specified (but not both)")
     
@@ -152,13 +152,17 @@ def parallelize(function, argses_to_iter=None, argses_to_combine=None, n_workers
 
     job = _Job(function, job_name, n_tasks)
 
-    if multiprocessing.current_process().daemon:
-        Pool = multiprocessing.dummy.Pool
-    else:
-        Pool = multiprocessing.Pool
+    dummy = dummy or multiprocessing.current_process().daemon
 
-    with Pool(n_workers) as pool:
-        for raw_outcome in pool.imap_unordered(job.run_single_task, indices_and_argses):
+    if dummy:
+        context = contextlib.nullcontext()
+        mapper = map
+    else:
+        context = multiprocessing.Pool(n_workers)
+        mapper = context.imap_unordered
+
+    with context:
+        for raw_outcome in mapper(job.run_single_task, indices_and_argses):
             outcome = _process_raw_task_outcome(raw_outcome, reraise_exceptions)
             job.single_task_completed()
             yield outcome
