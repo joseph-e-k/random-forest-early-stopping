@@ -13,7 +13,7 @@ from typing import Any, Callable
 
 import tblib
 
-from ste.logging_utils import get_module_logger
+from ste.logging_utils import get_module_logger, logged
 from ste.utils import TimerContext, enumerate_product
 
 
@@ -133,6 +133,7 @@ def _process_raw_task_outcome(raw_outcome: _RawTaskOutcome, reraise_exceptions: 
     )
 
 
+@logged()
 def parallelize(function, argses_to_iter=None, argses_to_combine=None, n_workers=N_WORKER_PROCESSES, n_tasks=None, reraise_exceptions=True, job_name=None, dummy=False):
     if not ((argses_to_iter is None) ^ (argses_to_combine is None)):
         raise TypeError("argses_to_iter or argses_to_multiply must be specified (but not both)")
@@ -140,7 +141,7 @@ def parallelize(function, argses_to_iter=None, argses_to_combine=None, n_workers
     if job_name is None:
         job_name = _infer_job_name(function)
     
-    _logger.info(f"{job_name}: Preparing task pool")
+    _logger.info(f"Preparing task pool for {job_name}")
 
     if n_tasks is None:
         n_tasks = _infer_n_tasks(argses_to_iter, argses_to_combine)
@@ -152,7 +153,9 @@ def parallelize(function, argses_to_iter=None, argses_to_combine=None, n_workers
 
     job = _Job(function, job_name, n_tasks)
 
-    dummy = dummy or multiprocessing.current_process().daemon
+    if multiprocessing.current_process().daemon:
+        _logger.warning("Daemon process; falling back to dummy behaviour")
+        dummy = True
 
     if dummy:
         context = contextlib.nullcontext()

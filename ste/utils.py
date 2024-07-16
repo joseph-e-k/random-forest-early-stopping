@@ -44,6 +44,7 @@ def load_uci_dataset(id: int) -> Dataset:
 
 
 def load_datasets():
+    _logger.info("Loading datasets")
     return {
         "Salaries": load_local_dataset("adult.data"),
         "Dry Beans": load_local_dataset("dry_beans.xlsx", reader=pd.read_excel),
