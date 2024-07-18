@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 import functools
 import inspect
 import itertools
+import logging
 import os
 import time
 from typing import Callable
@@ -14,7 +15,7 @@ from diskcache.core import full_name
 from scipy import stats
 from ucimlrepo import fetch_ucirepo
 
-from ste.logging_utils import get_module_logger
+from ste.logging_utils import get_module_logger, logged
 
 
 _logger = get_module_logger()
@@ -43,8 +44,8 @@ def load_uci_dataset(id: int) -> Dataset:
     return uci_dataset.data.features, uci_dataset.data.targets.iloc[:, 0]
 
 
+@logged(message_level=logging.INFO)
 def load_datasets():
-    _logger.info("Loading datasets")
     return {
         "Salaries": load_local_dataset("adult.data"),
         "Dry Beans": load_local_dataset("dry_beans.xlsx", reader=pd.read_excel),

@@ -13,7 +13,7 @@ from typing import Any, Callable
 
 import tblib
 
-from ste.logging_utils import get_module_logger, logged
+from ste.logging_utils import get_breadcrumbs, get_module_logger, logged, breadcrumbs
 from ste.utils import TimerContext, enumerate_product
 
 
@@ -46,14 +46,17 @@ class TaskOutcome:
 class _Job:
     function: Callable
     name: str
+    breadcrumbs_at_creation: tuple[str, ...]
     n_total_tasks: int = None
     start_time_ns: int = dataclasses.field(default_factory=time.monotonic_ns)
     n_completed_tasks: int = 0
 
     def run_single_task(self, index_and_args_or_kwargs):
         index, args_or_kwargs = index_and_args_or_kwargs
+        task_name = self.get_single_task_name(index)
+        
         try:
-            with TimerContext(verbose=False) as timer:
+            with breadcrumbs(self.breadcrumbs_at_creation + (task_name,)), TimerContext(verbose=False) as timer:
                 if isinstance(args_or_kwargs, Mapping):
                     result = self.function(**args_or_kwargs)
                 else:
@@ -74,21 +77,28 @@ class _Job:
                 timer.elapsed_time,
                 result=result
             )
-    
-    def single_task_completed(self):
-        self.n_completed_tasks += 1
         
+    def get_single_task_name(self, index):
+        if isinstance(index, int):
+            return f"{self.name}[{index}]"
+        return f"{self.name}[{', '.join(str(i) for i in index)}]"
+    
+    def single_task_completed(self, task_index):
+        self.n_completed_tasks += 1
         now = datetime.now().astimezone(timezone.utc)
-        log_message = f"{self.name}: Completed {self.n_completed_tasks} tasks"
-        if self.n_total_tasks is not None:
-            log_message += f" out of {self.n_total_tasks}"
+        task_name = self.get_single_task_name(task_index)
+
+        if self.n_total_tasks is None:
+            log_message = f"{task_name} completed ({self.n_completed_tasks} total)"
+        else:
             ns_so_far = time.monotonic_ns() - self.start_time_ns
             ns_per_task = ns_so_far / self.n_completed_tasks
             n_remaining_tasks = self.n_total_tasks - self.n_completed_tasks
             expected_time_remaining_ns = ns_per_task * n_remaining_tasks
             expected_time_remaining = timedelta(microseconds=expected_time_remaining_ns // 1e3)
             expected_end_time = now + expected_time_remaining
-            log_message += f" (expect to be finished at {expected_end_time.strftime('%Y-%m-%dT%H:%M:%S')})"
+            timing_estimate = f"expect to be finished at {expected_end_time.strftime('%Y-%m-%d %H:%M:%S')}"
+            log_message= log_message = f"{task_name} completed ({self.n_completed_tasks} / {self.n_total_tasks}; {timing_estimate})"
 
         _logger.info(log_message)
 
@@ -151,7 +161,7 @@ def parallelize(function, argses_to_iter=None, argses_to_combine=None, n_workers
     else:
         indices_and_argses = enumerate(argses_to_iter)
 
-    job = _Job(function, job_name, n_tasks)
+    job = _Job(function, job_name, get_breadcrumbs(), n_tasks)
 
     if multiprocessing.current_process().daemon:
         _logger.warning("Daemon process; falling back to dummy behaviour")
@@ -167,5 +177,5 @@ def parallelize(function, argses_to_iter=None, argses_to_combine=None, n_workers
     with context:
         for raw_outcome in mapper(job.run_single_task, indices_and_argses):
             outcome = _process_raw_task_outcome(raw_outcome, reraise_exceptions)
-            job.single_task_completed()
+            job.single_task_completed(raw_outcome.index)
             yield outcome

@@ -16,7 +16,7 @@ from ste.figure_utils import create_subplot_grid
 from ste.logging_utils import configure_logging, get_module_logger
 from ste.multiprocessing_utils import parallelize
 from ste.optimization import get_optimal_stopping_strategy
-from ste.utils import Dataset, load_datasets, covariates_response_split, get_output_path, memoize
+from ste.utils import Dataset, load_datasets, get_output_path, memoize
 
 
 _logger = get_module_logger()
@@ -71,7 +71,8 @@ def estimate_positive_tree_distribution(dataset: Dataset, *, n_trees=100, n_fore
             test_proportion=test_proportion,
             response_column=response_column
         ),
-        argses_to_iter=[()] * n_forests
+        argses_to_iter=[()] * n_forests,
+        job_name="est_distribution"
     )
 
     for outcome in task_outcomes:
@@ -113,7 +114,8 @@ def _get_stopping_strategies(n_trees, datasets, aers, stopping_strategy_getters)
 
     task_outcomes = parallelize(
         functools.partial(_apply_ss_getter, n_trees=n_trees),
-        argses_to_combine=(datasets, aers, stopping_strategy_getters)
+        argses_to_combine=(datasets, aers, stopping_strategy_getters),
+        job_name="get_ss"
     )
 
     for outcome in task_outcomes:
@@ -159,7 +161,8 @@ def get_error_rates_and_runtimes(n_trees, datasets, aers, stopping_strategy_gett
             range(n_aers),
             range(n_ss_kinds),
             range(n_trees + 1),
-        )
+        ),
+        job_name="analyse",
     )
 
     for outcome in task_outcomes:
@@ -216,7 +219,6 @@ def show_error_rates_and_runtimes(n_trees, error_rates, runtimes, dataset_names,
 
 def get_and_show_error_rates_and_runtimes(n_trees, datasets, allowable_error_rates, analysers_by_name):
     analyser_names, analysers = zip(*analysers_by_name.items())
-    
 
     error_rates, runtimes = get_error_rates_and_runtimes(
         n_trees, datasets, allowable_error_rates, analysers
