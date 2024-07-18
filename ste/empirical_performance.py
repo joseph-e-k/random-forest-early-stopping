@@ -22,31 +22,8 @@ from ste.utils import Dataset, load_datasets, get_output_path, memoize
 _logger = get_module_logger()
 
 
-def to_binary_classifications(classifications):
-    classes = set(classifications)
-    n_classes = len(classes)
-
-    if n_classes < 2:
-        raise ValueError("Cannot make binary classification from fewer than 2 classes")
-
-    positive_classes = np.random.choice(np.array(list(classes)), size=n_classes // 2, replace=False)
-
-    return np.isin(classifications, positive_classes)
-
-
-def coerce_nonnumeric_columns_to_numeric(df: pd.DataFrame):
-    object_columns = df.select_dtypes(["object"]).columns
-    df[object_columns] = df[object_columns].astype("category")
-    category_columns = df.select_dtypes(["category"]).columns
-    df[category_columns] = df[category_columns].apply(lambda x: x.cat.codes)
-    return df
-
-
 def _estimate_positive_tree_distribution_single_forest(dataset: Dataset, *, n_trees=100, test_proportion=0.2, response_column=-1):
-    # Processing: get covariates and responses, convert responses to binary classes, and split into train and test sets
     X, y = dataset
-    X = coerce_nonnumeric_columns_to_numeric(X)
-    y = to_binary_classifications(y)
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_proportion)
 
     # Train a random forest classifier

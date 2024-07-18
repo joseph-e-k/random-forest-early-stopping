@@ -44,15 +44,48 @@ def load_uci_dataset(id: int) -> Dataset:
     return uci_dataset.data.features, uci_dataset.data.targets.iloc[:, 0]
 
 
+def to_binary_classifications(classifications, seed=0):
+    classes = set(classifications)
+    n_classes = len(classes)
+
+    if n_classes < 2:
+        raise ValueError("Cannot make binary classification from fewer than 2 classes")
+
+    randomizer = np.random.RandomState(seed=seed)
+    positive_classes = randomizer.choice(np.array(list(classes)), size=n_classes // 2, replace=False)
+
+    return np.isin(classifications, positive_classes)
+
+
+def coerce_nonnumeric_columns_to_numeric(df: pd.DataFrame):
+    object_columns = df.select_dtypes(["object"]).columns
+    df[object_columns] = df[object_columns].astype("category")
+    category_columns = df.select_dtypes(["category"]).columns
+    df[category_columns] = df[category_columns].apply(lambda x: x.cat.codes)
+    return df
+
+
+def enforce_nice_dataset(dataset: Dataset, coercion_seed=0) -> Dataset:
+    X, y = dataset
+    X = coerce_nonnumeric_columns_to_numeric(X)
+    y = to_binary_classifications(y, coercion_seed)
+    return X, y
+
+
 @logged(message_level=logging.INFO)
-def load_datasets():
-    return {
+def load_datasets(coercion_seed=0):
+    raw_datasets = {
         "Salaries": load_local_dataset("adult.data"),
         "Dry Beans": load_local_dataset("dry_beans.xlsx", reader=pd.read_excel),
         "Phishing": load_uci_dataset(id=327),
         "Diabetes": load_uci_dataset(id=891),
         "IoT": load_uci_dataset(id=942),
         "Android Permissions": load_uci_dataset(id=722)
+    }
+
+    return {
+        name: enforce_nice_dataset(dataset, coercion_seed)
+        for name, dataset in raw_datasets.items()
     }
 
 
