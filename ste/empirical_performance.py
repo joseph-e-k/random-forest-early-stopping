@@ -36,7 +36,7 @@ def _estimate_positive_tree_distribution_single_forest(dataset: Dataset, *, n_tr
     return np.bincount(np.sum(tree_predictions, axis=0), minlength=n_trees + 1)
 
 
-def estimate_positive_tree_distribution(dataset: Dataset, *, n_trees=100, n_forests=100, test_proportion=0.2, response_column=-1):
+def estimate_positive_tree_distribution(dataset: Dataset, *, n_trees=100, n_forests=30, test_proportion=0.2, response_column=-1):
     _logger.info(f"Estimating positive tree distribution with {n_forests} forests of {n_trees} trees")
     estimates = np.empty(shape=(n_forests, n_trees + 1))
 
@@ -112,19 +112,12 @@ def _analyse_stopping_strategy_if_relevant(i_dataset, i_aer, i_ss_kind, n_positi
     return fwss.analyse()
 
 
-def get_error_rates_and_runtimes(n_trees, datasets, aers, stopping_strategy_getters):
-    n_datasets = len(datasets)
-    n_aers = len(aers)
-    n_ss_kinds = len(stopping_strategy_getters)
+def _analyse_stopping_strategies(stopping_strategies, positive_tree_freqs):
+    n_datasets, n_aers, n_ss_kinds, n_trees_plus_one, _ = stopping_strategies.shape
+    n_trees = n_trees_plus_one - 1
 
-    positive_tree_freqs = np.zeros((n_datasets, n_trees + 1), dtype=int)
     runtimes = np.zeros((n_datasets, n_aers, n_ss_kinds))
     error_rates = np.zeros_like(runtimes)
-
-    for i_dataset, dataset in enumerate(datasets.values()):
-        positive_tree_freqs[i_dataset, :] = estimate_positive_tree_distribution(dataset, n_trees=n_trees)
-
-    stopping_strategies = _get_stopping_strategies(n_trees, datasets.values(), aers, stopping_strategy_getters)
 
     task_outcomes = parallelize(
         functools.partial(
@@ -152,6 +145,19 @@ def get_error_rates_and_runtimes(n_trees, datasets, aers, stopping_strategy_gett
         error_rates[i_dataset, i_aer, i_ss_kind] += outcome.result.prob_error * n_positive_prob
 
     return error_rates, runtimes
+
+
+def get_error_rates_and_runtimes(n_trees, datasets, aers, stopping_strategy_getters):
+    n_datasets = len(datasets)
+
+    positive_tree_freqs = np.zeros((n_datasets, n_trees + 1), dtype=int)
+
+    for i_dataset, dataset in enumerate(datasets.values()):
+        positive_tree_freqs[i_dataset, :] = estimate_positive_tree_distribution(dataset, n_trees=n_trees)
+
+    stopping_strategies = _get_stopping_strategies(n_trees, datasets.values(), aers, stopping_strategy_getters)
+
+    return _analyse_stopping_strategies(stopping_strategies, positive_tree_freqs)
 
 
 def show_error_rates_and_runtimes(n_trees, error_rates, runtimes, dataset_names, allowable_error_rates, analysis_names):
