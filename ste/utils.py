@@ -6,7 +6,7 @@ import itertools
 import logging
 import os
 import time
-from typing import Callable
+from typing import Callable, Iterable, Sequence
 
 import numpy as np
 import pandas as pd
@@ -25,7 +25,7 @@ DATA_DIRECTORY = os.path.join(os.path.dirname(__file__), "../data")
 RESULTS_DIRECTORY = os.path.join(os.path.dirname(__file__), "../results")
 
 
-type Dataset = tuple[pd.DataFrame, pd.Series]
+type Dataset = tuple[pd.DataFrame, np.ndarray]
 
 
 def covariates_response_split(dataframe: pd.DataFrame, response_column=-1) -> Dataset:
@@ -87,6 +87,29 @@ def load_datasets(coercion_seed=0):
         name: enforce_nice_dataset(dataset, coercion_seed)
         for name, dataset in raw_datasets.items()
     }
+
+
+def split_dataset(dataset: Dataset, relative_proportions: Sequence[float | int]) -> Iterable[Dataset]:
+    X, y = dataset
+    n_rows = len(X)
+
+    cumulative_proportion = 0
+    partition_indices = []
+    for relative_proportion in relative_proportions[:-1]:
+        proportion = relative_proportion / sum(relative_proportions)
+        cumulative_proportion += proportion
+        partition_indices.append(int(np.round(cumulative_proportion * n_rows)))
+
+    row_indices = np.arange(n_rows)
+    np.random.shuffle(row_indices)
+    print(f"{partition_indices=}")
+    part_indiceses = np.split(row_indices, partition_indices)
+
+    parts = []
+    for part_indices in part_indiceses:
+        parts.append((X.iloc[part_indices, :], y[part_indices]))
+    
+    return parts
 
 
 cache = Cache(os.path.join(os.path.dirname(__file__), ".cache"))
