@@ -1,6 +1,8 @@
 import argparse
 import functools
+import operator
 import random
+from typing import Callable
 import warnings
 
 import matplotlib.pyplot as plt
@@ -16,54 +18,20 @@ from ste.figure_utils import create_subplot_grid
 from ste.logging_utils import configure_logging, get_module_logger
 from ste.multiprocessing_utils import parallelize
 from ste.optimization import get_optimal_stopping_strategy
-from ste.utils import Dataset, load_datasets, get_output_path, memoize
+from ste.utils import Dataset, load_datasets, get_output_path, memoize, split_dataset
 
 
 _logger = get_module_logger()
 
 
-def _estimate_positive_tree_distribution_single_forest(dataset: Dataset, *, n_trees=100, test_proportion=0.2, response_column=-1):
-    X, y = dataset
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_proportion)
+def plot_smopdises(n_trees, datasets):
+    raise NotImplementedError()
 
-    # Train a random forest classifier
-    rf_classifier = RandomForestClassifier(n_estimators=n_trees)
-    rf_classifier.fit(X_train, y_train)
-
-    # Count number of "positive" trees for each testing observation, and add them up
-    tree_predictions = np.array(np.vstack([tree.predict(X_test) for tree in rf_classifier.estimators_]), dtype=int)
-
-    return np.bincount(np.sum(tree_predictions, axis=0), minlength=n_trees + 1)
-
-
-def estimate_positive_tree_distribution(dataset: Dataset, *, n_trees=100, n_forests=30, test_proportion=0.2, response_column=-1):
-    _logger.info(f"Estimating positive tree distribution with {n_forests} forests of {n_trees} trees")
-    estimates = np.empty(shape=(n_forests, n_trees + 1))
-
-    task_outcomes = parallelize(
-        functools.partial(
-            _estimate_positive_tree_distribution_single_forest,
-            dataset=dataset,
-            n_trees=n_trees,
-            test_proportion=test_proportion,
-            response_column=response_column
-        ),
-        argses_to_iter=[()] * n_forests,
-        job_name="est_distribution"
-    )
-
-    for outcome in task_outcomes:
-        estimates[outcome.index, :] = outcome.result
-
-    return np.mean(estimates, axis=0)
-
-
-def plot_n_positive_distributions(n_trees, datasets):
     fig, axs = create_subplot_grid(len(datasets), n_rows=2)
     n_rows = axs.shape[0]
 
     for i_dataset, (dataset_name, dataset) in enumerate(datasets.items()):
-        distribution = estimate_positive_tree_distribution(dataset, n_trees=n_trees)
+        distribution = estimate_smopdis(dataset, n_trees=n_trees)
 
         ax = axs[i_dataset // n_rows, i_dataset % n_rows]
         ax.bar(np.arange(n_trees + 1), distribution, width=1)
@@ -74,15 +42,9 @@ def plot_n_positive_distributions(n_trees, datasets):
     return fig
 
 
-def _apply_ss_getter(dataset, aer, ss_getter, n_trees):
-    return ss_getter(n_trees, aer, dataset)
-
-
-def _get_stopping_strategies(n_trees, datasets, aers, stopping_strategy_getters):
+def _get_stopping_strategies(n_trees, smopdis_estimate, aer, stopping_strategy_getters):
     stopping_strategies = np.empty(
         shape=(
-            len(datasets),
-            len(aers),
             len(stopping_strategy_getters),
             n_trees + 1,
             n_trees + 1
@@ -90,8 +52,16 @@ def _get_stopping_strategies(n_trees, datasets, aers, stopping_strategy_getters)
     )
 
     task_outcomes = parallelize(
-        functools.partial(_apply_ss_getter, n_trees=n_trees),
-        argses_to_combine=(datasets, aers, stopping_strategy_getters),
+        operator.call,
+        argses_to_iter=[
+            (functools.partial(
+                ss_getter,
+                n_trees=n_trees,
+                allowable_error=aer,
+                smopdis_estimate=smopdis_estimate
+            ),)
+            for ss_getter in stopping_strategy_getters
+        ],
         job_name="get_ss"
     )
 
@@ -101,63 +71,101 @@ def _get_stopping_strategies(n_trees, datasets, aers, stopping_strategy_getters)
     return stopping_strategies
 
 
-def _analyse_stopping_strategy_if_relevant(i_dataset, i_aer, i_ss_kind, n_positive_trees, n_trees, positive_tree_freqs, stopping_strategies):
-    if positive_tree_freqs[i_dataset, n_positive_trees] == 0:
+def _analyse_stopping_strategy_if_relevant(i_ss_kind, n_positive_trees, n_trees, smopdis_estimate, stopping_strategies):
+    if smopdis_estimate[n_positive_trees] == 0:
         return None
 
-    ss = stopping_strategies[i_dataset, i_aer, i_ss_kind]
+    ss = stopping_strategies[i_ss_kind]
     forest = Forest(n_trees, n_positive_trees)
     fwss = ForestWithGivenStoppingStrategy(forest, ss)
 
     return fwss.analyse()
 
 
-def _analyse_stopping_strategies(stopping_strategies, positive_tree_freqs):
-    n_datasets, n_aers, n_ss_kinds, n_trees_plus_one, _ = stopping_strategies.shape
+def _analyse_stopping_strategies(stopping_strategies, smopdis_estimate):
+    n_ss_kinds, n_trees_plus_one, _ = stopping_strategies.shape
     n_trees = n_trees_plus_one - 1
 
-    runtimes = np.zeros((n_datasets, n_aers, n_ss_kinds))
+    runtimes = np.zeros(n_ss_kinds)
     error_rates = np.zeros_like(runtimes)
 
-    task_outcomes = parallelize(
+    tasks = parallelize(
         functools.partial(
             _analyse_stopping_strategy_if_relevant,
             n_trees=n_trees,
-            positive_tree_freqs=positive_tree_freqs,
+            smopdis_estimate=smopdis_estimate,
             stopping_strategies=stopping_strategies
         ),
         argses_to_combine=(
-            range(n_datasets),
-            range(n_aers),
             range(n_ss_kinds),
             range(n_trees + 1),
         ),
-        job_name="analyse",
+        job_name="analyse"
     )
 
-    for outcome in task_outcomes:
-        if outcome.result is None:
+    for task in tasks:
+        if task.result is None:
             continue
-        _, _, _, n_positive_trees, *_ = outcome.args_or_kwargs
-        i_dataset, i_aer, i_ss_kind, _ = outcome.index
-        n_positive_prob = positive_tree_freqs[i_dataset, n_positive_trees] / positive_tree_freqs[i_dataset, :].sum()
-        runtimes[i_dataset, i_aer, i_ss_kind] += outcome.result.expected_runtime * n_positive_prob
-        error_rates[i_dataset, i_aer, i_ss_kind] += outcome.result.prob_error * n_positive_prob
+        i_ss_kind, n_positive_trees = task.args_or_kwargs
+        prob_n_positive_trees = smopdis_estimate[n_positive_trees] / smopdis_estimate.sum()
+        runtimes[i_ss_kind] += task.result.expected_runtime * prob_n_positive_trees
+        error_rates[i_ss_kind] += task.result.prob_error * prob_n_positive_trees
 
     return error_rates, runtimes
 
 
-def get_error_rates_and_runtimes(n_trees, datasets, aers, stopping_strategy_getters):
-    n_datasets = len(datasets)
+type StoppingStrategyGetter = Callable[[int, float, Dataset], np.ndarray]
 
-    positive_tree_freqs = np.zeros((n_datasets, n_trees + 1), dtype=int)
 
-    for i_dataset, dataset in enumerate(datasets.values()):
-        positive_tree_freqs[i_dataset, :] = estimate_positive_tree_distribution(dataset, n_trees=n_trees)
+def train_forest(n_trees, training_data) -> RandomForestClassifier:
+    rf_classifier = RandomForestClassifier(n_estimators=n_trees)
+    rf_classifier.fit(*training_data)
+    return rf_classifier
 
-    stopping_strategies = _get_stopping_strategies(n_trees, datasets.values(), aers, stopping_strategy_getters)
 
-    return _analyse_stopping_strategies(stopping_strategies, positive_tree_freqs)
+def estimate_smopdis(rf_classifier: RandomForestClassifier, calibration_data: Dataset):
+    X, y = calibration_data
+    n_trees = len(rf_classifier.estimators_)
+    tree_predictions = np.array(np.vstack([tree.predict(X) for tree in rf_classifier.estimators_]), dtype=int)
+    return np.bincount(np.sum(tree_predictions, axis=0), minlength=n_trees + 1)
+
+
+def get_error_rates_and_runtimes_once(_, data: Dataset, aer: float, n_trees: int, stopping_strategy_getters: list[StoppingStrategyGetter], data_partition_ratios):
+    training_data, calibration_data_for_evaluation, calibration_data_for_bayesian_ss, testing_data = split_dataset(data, data_partition_ratios)
+
+    forest = train_forest(n_trees, training_data)
+    smopdis_estimate_for_evaluation = estimate_smopdis(forest, calibration_data_for_evaluation)
+    smopdis_estimate_for_bayesian_ss = estimate_smopdis(forest, calibration_data_for_bayesian_ss)
+
+    stopping_strategies = _get_stopping_strategies(n_trees, smopdis_estimate_for_bayesian_ss, aer, stopping_strategy_getters)
+
+    return _analyse_stopping_strategies(stopping_strategies, smopdis_estimate_for_evaluation)
+
+
+def get_error_rates_and_runtimes(n_forests, n_trees, datasets, aers, stopping_strategy_getters, data_partition_ratios=(0.6, 0.1, 0.1, 0.2)):
+    error_rates = np.zeros((n_forests, len(datasets), len(aers), len(stopping_strategy_getters)))
+    runtimes = np.zeros_like(error_rates)
+    
+    tasks = parallelize(
+        function=functools.partial(
+            get_error_rates_and_runtimes_once,
+            n_trees=n_trees,
+            data_partition_ratios=data_partition_ratios,
+            stopping_strategy_getters=stopping_strategy_getters
+        ),
+        argses_to_combine=[
+            range(n_forests),
+            datasets,
+            aers
+        ]
+    )
+
+    for task in tasks:
+        task_error_rates, task_runtimes = task.result
+        error_rates[task.index] = task_error_rates
+        runtimes[task.index] = task_runtimes
+
+    return error_rates, runtimes
 
 
 def show_error_rates_and_runtimes(n_trees, error_rates, runtimes, dataset_names, allowable_error_rates, analysis_names):
@@ -200,40 +208,40 @@ def show_error_rates_and_runtimes(n_trees, error_rates, runtimes, dataset_names,
     plt.show()
 
 
-def get_and_show_error_rates_and_runtimes(n_trees, datasets, allowable_error_rates, analysers_by_name):
-    analyser_names, analysers = zip(*analysers_by_name.items())
+def get_and_show_error_rates_and_runtimes(n_trees, datasets, allowable_error_rates, ss_getters_by_name):
+    ss_names, ss_getters = zip(*ss_getters_by_name.items())
 
     error_rates, runtimes = get_error_rates_and_runtimes(
-        n_trees, datasets, allowable_error_rates, analysers
+        2, n_trees, datasets.values(), allowable_error_rates, ss_getters
     )
+
+    mean_error_rates = error_rates.mean(axis=0)
+    mean_runtimes = runtimes.mean(axis=0)
+
     show_error_rates_and_runtimes(
         n_trees,
-        error_rates,
-        runtimes,
+        mean_error_rates,
+        mean_runtimes,
         datasets.keys(),
         allowable_error_rates,
-        analyser_names or [func.__name__ for func in analysers]
+        ss_names or [func.__name__ for func in ss_getters]
     )
 
 
-@memoize(args_to_ignore=["dataset"])
-def get_greedy_ss(n_trees: int, allowable_error: float, dataset: Dataset) -> np.ndarray:
+@memoize(args_to_ignore=["smopdis_estimate"])
+def get_greedy_ss(n_trees: int, allowable_error: float, smopdis_estimate: np.ndarray) -> np.ndarray:
     fwe = ForestWithEnvelope.create_greedy(n_trees, n_trees, allowable_error)
     return fwe.get_prob_stop()
 
 
-@memoize(args_to_ignore=["dataset"])
-def get_minimax_ss(n_trees: int, allowable_error: float, dataset: Dataset) -> np.ndarray:
+@memoize(args_to_ignore=["smopdis_estimate"])
+def get_minimax_ss(n_trees: int, allowable_error: float, smopdis_estimate: np.ndarray) -> np.ndarray:
     return get_optimal_stopping_strategy(n_trees, allowable_error)
 
 
 @memoize()
-def get_bayesian_ss(n_trees: int, allowable_error: float, dataset: Dataset) -> np.ndarray:
-    X, y = dataset
-    X_bs = X.sample(frac=1, replace=True)
-    y_bs = y[X_bs.index]
-    freqs_n_plus = estimate_positive_tree_distribution((X_bs, y_bs), n_trees=n_trees)
-    return get_optimal_stopping_strategy(n_trees, allowable_error, freqs_n_plus, error_minimax=False, runtime_minimax=False)
+def get_bayesian_ss(n_trees: int, allowable_error: float, smopdis_estimate: np.ndarray) -> np.ndarray:
+    return get_optimal_stopping_strategy(n_trees, allowable_error, smopdis_estimate, error_minimax=False, runtime_minimax=False)
 
 
 def parse_args():
@@ -278,7 +286,7 @@ def main():
                 }
             )
         elif args.action_name == "positive_tree_distribution":
-            plot_n_positive_distributions(args.n_trees, datasets)
+            plot_smopdises(args.n_trees, datasets)
 
     output_path = args.output_path or get_output_path(f"{args.action_name}_{args.n_trees}_trees")
     plt.savefig(output_path)
