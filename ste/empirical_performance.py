@@ -9,7 +9,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split
 
 from ste.Forest import Forest
 from ste.ForestWithEnvelope import ForestWithEnvelope
@@ -24,17 +23,45 @@ from ste.utils import Dataset, load_datasets, get_output_path, memoize, split_da
 _logger = get_module_logger()
 
 
-def plot_smopdises(n_trees, datasets):
-    raise NotImplementedError()
+def _split_and_train_and_estimate_smopdis(i_forest, dataset, n_trees, eval_proportion):
+    training_data, evaluation_data = split_dataset(dataset, (1-eval_proportion, eval_proportion))
+    forest = RandomForestClassifier(n_trees)
+    forest.fit(*training_data)
+    return estimate_smopdis(forest, evaluation_data)
 
+
+def plot_smopdises(n_trees, datasets, eval_proportion=0.2, n_forests=30):
     fig, axs = create_subplot_grid(len(datasets), n_rows=2)
-    n_rows = axs.shape[0]
+    try:
+        n_columns = axs.shape[1]
+    except IndexError:
+        n_columns = 1
+
+    smopdis_estimates = np.zeros((n_forests, len(datasets), n_trees + 1))
+
+    tasks = parallelize(
+        functools.partial(
+            _split_and_train_and_estimate_smopdis,
+            n_trees=n_trees,
+            eval_proportion=eval_proportion
+        ),
+        argses_to_combine=[
+            range(n_forests),
+            datasets.values()
+        ]
+    )
+
+    for task in tasks:
+        smopdis_estimates[task.index] = task.result
+
+    mean_smopdises = smopdis_estimates.mean(axis=0)
 
     for i_dataset, (dataset_name, dataset) in enumerate(datasets.items()):
-        distribution = estimate_smopdis(dataset, n_trees=n_trees)
-
-        ax = axs[i_dataset // n_rows, i_dataset % n_rows]
-        ax.bar(np.arange(n_trees + 1), distribution, width=1)
+        if (len(axs.shape) == 1):
+            ax = axs[i_dataset]
+        else:
+            ax = axs[i_dataset // n_columns, i_dataset % n_columns]
+        ax.bar(np.arange(n_trees + 1), mean_smopdises[i_dataset], width=1)
         ax.title.set_text(f"{dataset_name}")
         ax.set_xlim((0, n_trees))
         ax.set_yticks([])

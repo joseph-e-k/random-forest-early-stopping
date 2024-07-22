@@ -102,7 +102,6 @@ def split_dataset(dataset: Dataset, relative_proportions: Sequence[float | int])
 
     row_indices = np.arange(n_rows)
     np.random.shuffle(row_indices)
-    print(f"{partition_indices=}")
     part_indiceses = np.split(row_indices, partition_indices)
 
     parts = []
