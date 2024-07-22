@@ -13,7 +13,7 @@ from sklearn.ensemble import RandomForestClassifier
 from ste.Forest import Forest
 from ste.ForestWithEnvelope import ForestWithEnvelope
 from ste.ForestWithStoppingStrategy import ForestWithGivenStoppingStrategy
-from ste.figure_utils import create_subplot_grid
+from ste.figure_utils import create_subplot_grid, plot_functions
 from ste.logging_utils import configure_logging, get_module_logger
 from ste.multiprocessing_utils import parallelize
 from ste.optimization import get_optimal_stopping_strategy
@@ -169,6 +169,7 @@ def get_error_rates_and_runtimes_once(_, data: Dataset, aer: float, n_trees: int
     return _analyse_stopping_strategies(stopping_strategies, smopdis_estimate_for_evaluation)
 
 
+@memoize()
 def get_error_rates_and_runtimes(n_forests, n_trees, datasets, aers, stopping_strategy_getters, data_partition_ratios=(0.6, 0.1, 0.1, 0.2)):
     error_rates = np.zeros((n_forests, len(datasets), len(aers), len(stopping_strategy_getters)))
     runtimes = np.zeros_like(error_rates)
@@ -195,51 +196,57 @@ def get_error_rates_and_runtimes(n_forests, n_trees, datasets, aers, stopping_st
     return error_rates, runtimes
 
 
-def show_error_rates_and_runtimes(n_trees, error_rates, runtimes, dataset_names, allowable_error_rates, analysis_names):
+def _getitem(sequence, index):
+    return sequence[index]
+
+
+def show_error_rates_and_runtimes(n_trees, error_rates, runtimes, dataset_names, allowable_error_rates, ss_names):
     assert error_rates.shape == runtimes.shape
 
-    n_datasets, n_aers, n_analyses = error_rates.shape
+    n_datasets, n_aers, n_ss_kinds = error_rates.shape
 
     assert len(dataset_names) == n_datasets
     assert len(allowable_error_rates) == n_aers
-    assert len(analysis_names) == n_analyses
+    assert len(ss_names) == n_ss_kinds
 
-    fig, axs = plt.subplots(2, n_analyses, tight_layout=True, figsize=(15, 5))
-    fig.suptitle(f"Error rates and runtimes for early-stopping random forests with {n_trees} trees", fontsize=16)
-    fig.patch.set_visible(False)
+    fig, axs = create_subplot_grid(2 * n_datasets, n_rows=n_datasets, tight_layout=False, figsize=(10, 15))
+    fig.suptitle(f"Empirical performance of early-stopping random forests with {n_trees} trees", fontsize=16)
 
-    for i_analysis in range(n_analyses):
-        name = analysis_names[i_analysis]
-        table_specs = zip(
-            [f"Expected Runtime ({name})", f"Error Rate ({name})"],
-            axs[:, i_analysis],
-            [runtimes[:, :, i_analysis], error_rates[:, :, i_analysis]],
-            ["{:.2f}", "{:.2e}"]
-        )
+    metric_names = ["Error Rate", "Expected Runtime"]
 
-        for (title, ax, table_content, cell_format) in table_specs:
-            ax.axis("off")
-            ax.axis("tight")
-            ax.title.set_text(title)
+    for i_dataset, dataset_name in enumerate(dataset_names):
+        for i_metric, metric in enumerate([error_rates, runtimes]):
+            ax = axs[i_dataset, i_metric]
 
-            ax.table(
-                cellText=[
-                    [cell_format.format(table_content[i_dataset, i_aer]) for (i_aer, aer) in enumerate(allowable_error_rates)]
-                    for i_dataset in range(n_datasets)
-                ],
-                rowLabels=list(dataset_names),
-                colLabels=[f"{aer:.0e}" for aer in allowable_error_rates],
-                loc="center"
+            metric_value_getters = [
+                functools.partial(_getitem, metric[i_dataset, :, i_ss])
+                for i_ss in range(n_ss_kinds)
+            ]
+            
+            plot_functions(
+                ax=ax,
+                x_axis_arg_name="index",
+                functions=metric_value_getters,
+                function_kwargs=dict(
+                    index=range(n_aers)[::-1],
+                ),
+                concurrently=False,
+                labels=ss_names,
+                x_axis_values_transform=lambda i_aers: [allowable_error_rates[i_aer] for i_aer in i_aers],
+                plot_kwargs=dict(marker="o")
             )
-
+            ax.set_xscale("log")
+            ax.set_xlabel("allowable error rate")
+            ax.set_title(f"{metric_names[i_metric]} ({dataset_names[i_dataset]})")
+    
     plt.show()
 
 
-def get_and_show_error_rates_and_runtimes(n_trees, datasets, allowable_error_rates, ss_getters_by_name):
+def get_and_show_error_rates_and_runtimes(n_trees, datasets, dataset_names, allowable_error_rates, ss_getters_by_name):
     ss_names, ss_getters = zip(*ss_getters_by_name.items())
 
     error_rates, runtimes = get_error_rates_and_runtimes(
-        2, n_trees, datasets.values(), allowable_error_rates, ss_getters
+        2, n_trees, datasets, allowable_error_rates, ss_getters
     )
 
     mean_error_rates = error_rates.mean(axis=0)
@@ -249,7 +256,7 @@ def get_and_show_error_rates_and_runtimes(n_trees, datasets, allowable_error_rat
         n_trees,
         mean_error_rates,
         mean_runtimes,
-        datasets.keys(),
+        dataset_names,
         allowable_error_rates,
         ss_names or [func.__name__ for func in ss_getters]
     )
@@ -271,6 +278,8 @@ def get_bayesian_ss(n_trees: int, allowable_error: float, smopdis_estimate: np.n
     return get_optimal_stopping_strategy(n_trees, allowable_error, smopdis_estimate, error_minimax=False, runtime_minimax=False)
 
 
+DEFAULT_AERS = tuple(10 ** -(i/2) for i in range(2, 13)) + (0,)
+
 def parse_args():
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers()
@@ -278,7 +287,7 @@ def parse_args():
     ss_comparison_subparser = subparsers.add_parser("ss-comparison")
     ss_comparison_subparser.set_defaults(action_name="empirical_comparison")
     ss_comparison_subparser.add_argument("--n-trees", "--number-of-trees", "-n", type=int, default=101)
-    ss_comparison_subparser.add_argument("--alphas", "--aers", "-a", type=float, nargs="+", default=[10 ** -3, 10 ** -6, 0.0])
+    ss_comparison_subparser.add_argument("--alphas", "--aers", "-a", type=float, nargs="+", default=DEFAULT_AERS)
     ss_comparison_subparser.add_argument("--output-path", "-o", type=str, default=None)
     ss_comparison_subparser.add_argument("--random-seed", "-s", type=int, default=1234)
 
@@ -298,13 +307,14 @@ def main():
     random.seed(args.random_seed)
     pd.options.mode.chained_assignment = None
 
-    datasets = load_datasets()
+    dataset_names, datasets = load_datasets()
 
     with warnings.catch_warnings(category=UserWarning, action="ignore"):
         if args.action_name == "empirical_comparison":
             get_and_show_error_rates_and_runtimes(
                 args.n_trees,
                 datasets,
+                dataset_names,
                 args.alphas,
                 {
                     "Greedy": get_greedy_ss,

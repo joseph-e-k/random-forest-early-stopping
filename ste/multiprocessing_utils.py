@@ -14,7 +14,7 @@ from typing import Any, Callable
 import tblib
 
 from ste.logging_utils import get_breadcrumbs, get_module_logger, logged, breadcrumbs
-from ste.utils import TimerContext, enumerate_product
+from ste.utils import TimerContext, enumerate_product, get_name
 
 
 _logger = get_module_logger()
@@ -116,12 +116,6 @@ def _infer_n_tasks(argses_to_iter, argses_to_combine):
             return None
 
 
-def _infer_job_name(callable):
-    if isinstance(callable, functools.partial):
-        return callable.func.__name__
-    return getattr(callable, "__name__", "<job name unknown>")
-
-
 def _process_raw_task_outcome(raw_outcome: _RawTaskOutcome, reraise_exceptions: bool) -> TaskOutcome:
     if raw_outcome.exception is None:
         return TaskOutcome(
@@ -149,7 +143,7 @@ def parallelize(function, argses_to_iter=None, argses_to_combine=None, n_workers
         raise TypeError("argses_to_iter or argses_to_multiply must be specified (but not both)")
     
     if job_name is None:
-        job_name = _infer_job_name(function)
+        job_name = get_name(function)
     
     _logger.info(f"Preparing task pool for {job_name}")
 

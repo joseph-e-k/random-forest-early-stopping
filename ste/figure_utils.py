@@ -18,7 +18,7 @@ from matplotlib import pyplot as plt
 
 from ste.logging_utils import get_module_logger
 from ste.multiprocessing_utils import parallelize
-from ste.utils import stringify_kwargs
+from ste.utils import get_name, stringify_kwargs
 
 
 _logger = get_module_logger()
@@ -75,7 +75,7 @@ def save_figure(fig, name):
 
 
 def plot_function(ax, x_axis_arg_name, function, function_kwargs=None, plot_kwargs=None, results_transform=lambda y: y,
-                  x_axis_values_transform=lambda x: x):
+                  x_axis_values_transform=lambda x: x, concurrently=True):
     function_kwargs = function_kwargs or {}
     plot_kwargs = plot_kwargs or {}
 
@@ -83,22 +83,23 @@ def plot_function(ax, x_axis_arg_name, function, function_kwargs=None, plot_kwar
 
     ax.set_xlabel(x_axis_arg_name)
 
-    title = function.__name__
+    title = get_name(function)
     if function_kwargs:
         title += f" ({stringify_kwargs(function_kwargs)})"
     ax.set_title(title)
 
     y_axis_values = np.zeros(len(x_axis_values))
 
-    task_outcomes = parallelize(
+    tasks = parallelize(
         functools.partial(function, **function_kwargs),
-        argses_to_iter=({x_axis_arg_name: x} for x in x_axis_values)
+        argses_to_iter=({x_axis_arg_name: x} for x in x_axis_values),
+        dummy=(not concurrently)
     )
 
-    for outcome in task_outcomes:
-        x = outcome.args_or_kwargs[x_axis_arg_name]
-        _logger.debug(f"Computed {function.__name__} value at {x!r} in {outcome.duration:.1f}s")
-        y_axis_values[outcome.index] = outcome.result
+    for task in tasks:
+        x = task.args_or_kwargs[x_axis_arg_name]
+        _logger.debug(f"Computed {get_name(function)} value at {x!r} in {task.duration:.1f}s")
+        y_axis_values[task.index] = task.result
 
     y_axis_values = results_transform(y_axis_values)
     x_axis_values = x_axis_values_transform(x_axis_values)
@@ -106,18 +107,20 @@ def plot_function(ax, x_axis_arg_name, function, function_kwargs=None, plot_kwar
     ax.plot(x_axis_values, y_axis_values, **plot_kwargs)
 
 
-def plot_functions(ax, x_axis_arg_name, functions, function_kwargs=None, plot_kwargs=None,
-                   results_transform=lambda y: y,
-                   x_axis_values_transform=lambda x: x):
+def plot_functions(ax, x_axis_arg_name, functions, function_kwargs=None, plot_kwargs=None, results_transform=lambda y: y,
+                   x_axis_values_transform=lambda x: x, concurrently=True, labels=None):
     if plot_kwargs is None:
         plot_kwargs = {}
 
-    for function in functions:
-        _logger.info(f"Plotting {function.__name__}")
-        plot_function(ax, x_axis_arg_name, function, dict(function_kwargs), plot_kwargs | dict(label=function.__name__),
-                      results_transform, x_axis_values_transform)
+    if labels is None:
+        labels = [get_name(function) for function in functions]
 
-    title = ", ".join(function.__name__ for function in functions)
+    for label, function in zip(labels, functions):
+        _logger.info(f"Plotting {get_name(function)}")
+        plot_function(ax, x_axis_arg_name, function, dict(function_kwargs), plot_kwargs | dict(label=label),
+                      results_transform, x_axis_values_transform, concurrently)
+
+    title = ", ".join(get_name(function) for function in functions)
     if function_kwargs:
         function_kwargs.pop(x_axis_arg_name)
         title += f" ({stringify_kwargs(function_kwargs)})"
@@ -127,7 +130,7 @@ def plot_functions(ax, x_axis_arg_name, functions, function_kwargs=None, plot_kw
 
 
 def plot_function_many_curves(ax, x_axis_arg_name, distinct_curves_arg_name, function,
-                              function_kwargs=None, plot_kwargs=None):
+                              function_kwargs=None, plot_kwargs=None, concurrently=True):
     function_kwargs = function_kwargs or {}
     plot_kwargs = plot_kwargs or {}
 
@@ -139,10 +142,11 @@ def plot_function_many_curves(ax, x_axis_arg_name, distinct_curves_arg_name, fun
             x_axis_arg_name,
             function,
             function_kwargs | {distinct_curves_arg_name: distinct_curves_arg_value},
-            plot_kwargs | dict(label=f"{distinct_curves_arg_name}={distinct_curves_arg_value}")
+            plot_kwargs | dict(label=f"{distinct_curves_arg_name}={distinct_curves_arg_value}"),
+            concurrently=concurrently
         )
 
-    title = function.__name__
+    title = get_name(function)
     if function_kwargs:
         title_kwargs = dict(function_kwargs)
         title_kwargs.pop(x_axis_arg_name)
@@ -152,13 +156,13 @@ def plot_function_many_curves(ax, x_axis_arg_name, distinct_curves_arg_name, fun
     ax.legend()
 
 
-def create_subplot_grid(n_subplots, n_rows=None, n_columns=None):
+def create_subplot_grid(n_subplots, n_rows=None, n_columns=None, tight_layout=True, figsize=None):
     n_rows = n_rows or 1
     n_columns = n_columns or n_subplots // n_rows
     if n_columns * n_rows != n_subplots:
         raise ValueError("Number of subplots does not fit evenly into given number of rows and columns")
 
-    return plt.subplots(nrows=n_rows, ncols=n_columns, tight_layout=True)
+    return plt.subplots(nrows=n_rows, ncols=n_columns, tight_layout=tight_layout, figsize=figsize)
 
 
 def plot_stopping_strategy(ss, ax, ytick_gap=None):

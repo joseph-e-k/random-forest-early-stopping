@@ -28,6 +28,28 @@ RESULTS_DIRECTORY = os.path.join(os.path.dirname(__file__), "../results")
 type Dataset = tuple[pd.DataFrame, np.ndarray]
 
 
+cache = Cache(os.path.join(os.path.dirname(__file__), ".cache"))
+
+
+def _robust_cache_key(function, name, args_to_ignore, *args, **kwargs):
+    signature = inspect.signature(function)
+    bound_arguments = signature.bind(*args, **kwargs)
+    bound_arguments.apply_defaults()
+    return (name,) + tuple(
+        (key, value) for (key, value) in bound_arguments.arguments.items() if key not in args_to_ignore
+    )
+
+
+def memoize(name=None, args_to_ignore=()):
+    def decorator(function, name=name, args_to_ignore=args_to_ignore):
+        if name is None:
+            name = full_name(function)
+        memoized = cache.memoize(name=name)(function)
+        memoized.__cache_key__ = functools.partial(_robust_cache_key, memoized, name, args_to_ignore)
+        return memoized
+    return decorator
+
+
 def covariates_response_split(dataframe: pd.DataFrame, response_column=-1) -> Dataset:
     if isinstance(response_column, int):
         response_column = dataframe.columns[response_column]
@@ -72,9 +94,14 @@ def enforce_nice_dataset(dataset: Dataset, coercion_seed=0) -> Dataset:
     return X, y
 
 
+def unzip(sequence_of_tuples):
+    return list(zip(*sequence_of_tuples))
+
+
 @logged(message_level=logging.INFO)
+@memoize()
 def load_datasets(coercion_seed=0):
-    raw_datasets = {
+    named_raw_datasets = {
         "Salaries": load_local_dataset("adult.data"),
         "Dry Beans": load_local_dataset("dry_beans.xlsx", reader=pd.read_excel),
         "Phishing": load_uci_dataset(id=327),
@@ -83,10 +110,10 @@ def load_datasets(coercion_seed=0):
         "Android Permissions": load_uci_dataset(id=722)
     }
 
-    return {
-        name: enforce_nice_dataset(dataset, coercion_seed)
-        for name, dataset in raw_datasets.items()
-    }
+    return unzip([
+        (name, enforce_nice_dataset(dataset, coercion_seed))
+        for name, dataset in named_raw_datasets.items()
+    ])
 
 
 def split_dataset(dataset: Dataset, relative_proportions: Sequence[float | int]) -> Iterable[Dataset]:
@@ -109,9 +136,6 @@ def split_dataset(dataset: Dataset, relative_proportions: Sequence[float | int])
         parts.append((X.iloc[part_indices, :], y[part_indices]))
     
     return parts
-
-
-cache = Cache(os.path.join(os.path.dirname(__file__), ".cache"))
 
 
 def shift_array(arr, num, fill_value=np.nan):
@@ -205,25 +229,6 @@ def is_proportion_surprising(observations, expected_proportion, confidence_level
     return stats.binomtest(sum(observations), len(observations), expected_proportion).pvalue < 1 - confidence_level
 
 
-def _robust_cache_key(function, name, args_to_ignore, *args, **kwargs):
-    signature = inspect.signature(function)
-    bound_arguments = signature.bind(*args, **kwargs)
-    bound_arguments.apply_defaults()
-    return (name,) + tuple(
-        (key, value) for (key, value) in bound_arguments.arguments.items() if key not in args_to_ignore
-    )
-
-
-def memoize(name=None, args_to_ignore=()):
-    def decorator(function, name=name, args_to_ignore=args_to_ignore):
-        if name is None:
-            name = full_name(function)
-        memoized = cache.memoize(name=name)(function)
-        memoized.__cache_key__ = functools.partial(_robust_cache_key, memoized, name, args_to_ignore)
-        return memoized
-    return decorator
-
-
 def forwards_to[RInner, ROuter, **P](inner_function: Callable[P, RInner]) -> Callable[[Callable[P, ROuter]], Callable[P, ROuter]]:
     def decorator(outer_function: Callable[P, ROuter], inner_function=inner_function) -> Callable[P, ROuter]:
         return outer_function
@@ -244,3 +249,9 @@ def enumerate_product(*iterables):
         indices,
         itertools.product(*iterables)
     )
+
+
+def get_name(callable):
+    if isinstance(callable, functools.partial):
+        return callable.func.__name__
+    return getattr(callable, "__name__", "<unnamed>")
