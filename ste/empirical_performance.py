@@ -254,11 +254,11 @@ def show_error_rates_and_runtimes(n_trees, error_rates, runtimes, dataset_names,
     plt.show()
 
 
-def get_and_show_error_rates_and_runtimes(n_trees, datasets, dataset_names, allowable_error_rates, ss_getters_by_name):
+def get_and_show_error_rates_and_runtimes(n_forests, n_trees, datasets, dataset_names, allowable_error_rates, ss_getters_by_name):
     ss_names, ss_getters = zip(*ss_getters_by_name.items())
 
     error_rates, runtimes = get_error_rates_and_runtimes(
-        2, n_trees, datasets, allowable_error_rates, ss_getters
+        n_forests, n_trees, datasets, allowable_error_rates, ss_getters
     )
 
     mean_error_rates = error_rates.mean(axis=0)
@@ -302,12 +302,14 @@ def parse_args():
     ss_comparison_subparser.add_argument("--alphas", "--aers", "-a", type=float, nargs="+", default=DEFAULT_AERS)
     ss_comparison_subparser.add_argument("--output-path", "-o", type=str, default=None)
     ss_comparison_subparser.add_argument("--random-seed", "-s", type=int, default=1234)
+    ss_comparison_subparser.add_argument("--n-forests", "--number-of-forests", "-f", type=int, default=30)
 
     tree_distribution_subparser = subparsers.add_parser("tree-distribution")
-    tree_distribution_subparser.set_defaults(action_name="positive_tree_distribution")
+    tree_distribution_subparser.set_defaults(action_name="smopdis")
     tree_distribution_subparser.add_argument("--n-trees", "--number-of-trees", "-n", type=int, default=100)
     tree_distribution_subparser.add_argument("--output-path", "-o", type=str, default=None)
     tree_distribution_subparser.add_argument("--random-seed", "-s", type=int, default=1234)
+    tree_distribution_subparser.add_argument("--n-forests", "--number-of-forests", "-f", type=int, default=30)
 
     return parser.parse_args()
 
@@ -324,6 +326,7 @@ def main():
     with warnings.catch_warnings(category=UserWarning, action="ignore"):
         if args.action_name == "empirical_comparison":
             get_and_show_error_rates_and_runtimes(
+                args.n_forests,
                 args.n_trees,
                 datasets,
                 dataset_names,
@@ -334,10 +337,10 @@ def main():
                     "Bayesian": get_bayesian_ss
                 }
             )
-        elif args.action_name == "positive_tree_distribution":
-            plot_smopdises(args.n_trees, datasets)
+        elif args.action_name == "smopdis":
+            plot_smopdises(args.n_trees, datasets, n_forests=args.n_forests)
 
-    output_path = args.output_path or get_output_path(f"{args.action_name}_{args.n_trees}_trees")
+    output_path = args.output_path or get_output_path(f"{args.action_name}_{args.n_forests}_forests_of_{args.n_trees}_trees")
     plt.savefig(output_path)
 
 
