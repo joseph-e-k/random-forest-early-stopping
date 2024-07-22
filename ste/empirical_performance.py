@@ -213,6 +213,7 @@ def show_error_rates_and_runtimes(n_trees, error_rates, runtimes, dataset_names,
     fig.suptitle(f"Empirical performance of early-stopping random forests with {n_trees} trees", fontsize=16)
 
     metric_names = ["Error Rate", "Expected Runtime"]
+    metric_maxima = [np.max(error_rates), np.max(runtimes)]
 
     for i_dataset, dataset_name in enumerate(dataset_names):
         for i_metric, metric in enumerate([error_rates, runtimes]):
@@ -235,7 +236,18 @@ def show_error_rates_and_runtimes(n_trees, error_rates, runtimes, dataset_names,
                 x_axis_values_transform=lambda i_aers: [allowable_error_rates[i_aer] for i_aer in i_aers],
                 plot_kwargs=dict(marker="o")
             )
-            ax.set_xscale("log")
+
+            if i_metric == 0:
+                ax.set_yscale("symlog", linthresh=min(set(allowable_error_rates) - {0}), linscale=0.5)
+                ax.plot([0, 1], [0, 1], color="black", label="AER", linestyle='dashed')
+                ax.legend()
+            else:
+                ax.set_yticks(list(range(0, int(metric_maxima[i_metric]), 5)), minor=True)
+                ax.grid(visible=True, axis='y', which='both')
+
+            ax.set_ylim((0, metric_maxima[i_metric]))
+            ax.set_xscale("symlog", linthresh=min(set(allowable_error_rates) - {0}), linscale=0.5)
+            ax.set_xlim((min(allowable_error_rates), max(allowable_error_rates)))
             ax.set_xlabel("allowable error rate")
             ax.set_title(f"{metric_names[i_metric]} ({dataset_names[i_dataset]})")
     
