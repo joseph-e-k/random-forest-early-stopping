@@ -13,8 +13,8 @@ from typing import Any, Callable
 
 import tblib
 
-from ste.logging_utils import get_breadcrumbs, get_module_logger, logged, breadcrumbs
-from ste.utils import TimerContext, enumerate_product, get_name
+from ste.utils.logging import get_breadcrumbs, get_module_logger, logged, breadcrumbs
+from ste.utils.misc import TimerContext, enumerate_product, get_name
 
 
 _logger = get_module_logger()

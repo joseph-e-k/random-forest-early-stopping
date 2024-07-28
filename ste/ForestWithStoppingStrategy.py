@@ -8,7 +8,7 @@ import numpy as np
 from scipy.special import logsumexp
 
 from .Forest import Forest
-from .utils import shift_array
+from .utils.misc import shift_array
 
 
 class ForestExecutionError(Exception):

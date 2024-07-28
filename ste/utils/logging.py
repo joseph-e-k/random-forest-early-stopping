@@ -10,7 +10,7 @@ from types import GeneratorType
 from typing import Callable
 
 
-LOG_DIRECTORY = os.path.join(os.path.dirname(__file__), "../logs")
+LOG_DIRECTORY = os.path.join(os.path.dirname(__file__), "../../logs")
 
 
 _TLS = threading.local()

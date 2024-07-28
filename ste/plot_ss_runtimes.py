@@ -4,12 +4,13 @@ import os
 from matplotlib import pyplot as plt
 
 from ste.Forest import Forest
-from ste.logging_utils import configure_logging
+from ste.utils.logging import configure_logging
 from ste.optimization import get_optimal_stopping_strategy
 from ste.ForestWithEnvelope import ForestWithEnvelope
 from ste.ForestWithStoppingStrategy import ForestWithGivenStoppingStrategy
-from ste.utils import get_output_path, timed, memoize
-from ste.figure_utils import plot_functions
+from ste.utils.misc import get_output_path, timed
+from ste.utils.caching import memoize
+from ste.utils.figures import plot_functions
 
 
 @timed

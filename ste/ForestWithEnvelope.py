@@ -10,7 +10,7 @@ from scipy.special import logsumexp
 from .Forest import Forest
 from .ForestWithStoppingStrategy import ForestWithStoppingStrategy
 from .envelopes import Envelope, get_null_envelope, add_increment_to_envelope
-from .utils import memoize
+from .utils.caching import memoize
 
 
 @dataclasses.dataclass

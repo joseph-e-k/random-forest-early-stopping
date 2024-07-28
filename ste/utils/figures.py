@@ -16,9 +16,9 @@ import matplotlib
 import numpy as np
 from matplotlib import pyplot as plt
 
-from ste.logging_utils import get_module_logger
-from ste.multiprocessing_utils import parallelize
-from ste.utils import get_name, stringify_kwargs
+from ste.utils.logging import get_module_logger
+from ste.utils.multiprocessing import parallelize
+from ste.utils.misc import get_name, stringify_kwargs
 
 
 _logger = get_module_logger()

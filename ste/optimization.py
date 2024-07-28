@@ -11,10 +11,11 @@ from scipy import stats
 from scipy.special import comb
 
 from ste.ForestWithEnvelope import get_greedy_stopping_strategy
-from ste.figure_utils import create_subplot_grid, plot_stopping_strategy
-from ste.linear_programming_utils import Problem, OptimizationResult, ArithmeticExpression, OptimizationFailure
-from ste.logging_utils import configure_logging, get_module_logger
-from ste.utils import forwards_to, get_output_path, memoize
+from ste.utils.figures import create_subplot_grid, plot_stopping_strategy
+from ste.utils.linear_programming import Problem, OptimizationResult, ArithmeticExpression, OptimizationFailure
+from ste.utils.logging import configure_logging, get_module_logger
+from ste.utils.misc import forwards_to, get_output_path
+from ste.utils.caching import memoize
 
 
 _logger = get_module_logger()
@@ -181,7 +182,7 @@ def get_optimal_stopping_strategy(*args, **kwargs):
 
 
 def main():
-    from ste.utils import cache
+    from ste.utils.caching import cache
 
     configure_logging()
 

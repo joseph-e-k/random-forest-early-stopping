@@ -13,11 +13,13 @@ from sklearn.ensemble import RandomForestClassifier
 from ste.Forest import Forest
 from ste.ForestWithEnvelope import ForestWithEnvelope
 from ste.ForestWithStoppingStrategy import ForestWithGivenStoppingStrategy
-from ste.figure_utils import create_subplot_grid, plot_functions
-from ste.logging_utils import configure_logging, get_module_logger
-from ste.multiprocessing_utils import parallelize
+from ste.utils.figures import create_subplot_grid, plot_functions
+from ste.utils.logging import configure_logging, get_module_logger
+from ste.utils.multiprocessing import parallelize
 from ste.optimization import get_optimal_stopping_strategy
-from ste.utils import Dataset, load_datasets, get_output_path, memoize, split_dataset
+from ste.utils.caching import memoize
+from ste.utils.data import Dataset, load_datasets, split_dataset
+from ste.utils.misc import get_output_path
 
 
 _logger = get_module_logger()

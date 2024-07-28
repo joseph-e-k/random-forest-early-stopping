@@ -1,9 +1,9 @@
 import argparse
 
-from ste.logging_utils import configure_logging, get_module_logger
-from ste.multiprocessing_utils import parallelize
+from ste.utils.logging import configure_logging, get_module_logger
+from ste.utils.multiprocessing import parallelize
 from ste.optimization import get_optimal_stopping_strategy
-from ste.utils import TimerContext
+from ste.utils.misc import TimerContext
 
 
 _logger = get_module_logger()
