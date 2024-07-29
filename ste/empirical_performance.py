@@ -2,8 +2,8 @@ import argparse
 import functools
 import operator
 import random
-from typing import Callable
 import warnings
+from typing import Callable, Sequence
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -29,7 +29,7 @@ def _split_and_train_and_estimate_smopdis(i_forest, dataset, n_trees, eval_propo
     return estimate_smopdis(forest, evaluation_data)
 
 
-def plot_smopdises(n_trees, datasets, eval_proportion=0.2, n_forests=30):
+def plot_smopdises(n_trees: int, datasets: Sequence[Dataset], dataset_names: Sequence[str], eval_proportion: float = 0.2, n_forests: int = 30):
     fig, axs = create_subplot_grid(len(datasets), n_rows=2)
     try:
         n_columns = axs.shape[1]
@@ -46,7 +46,7 @@ def plot_smopdises(n_trees, datasets, eval_proportion=0.2, n_forests=30):
         ),
         argses_to_combine=[
             range(n_forests),
-            datasets.values()
+            datasets
         ]
     )
 
@@ -55,7 +55,7 @@ def plot_smopdises(n_trees, datasets, eval_proportion=0.2, n_forests=30):
 
     mean_smopdises = smopdis_estimates.mean(axis=0)
 
-    for i_dataset, (dataset_name, dataset) in enumerate(datasets.items()):
+    for i_dataset, dataset_name in enumerate(dataset_names):
         if (len(axs.shape) == 1):
             ax = axs[i_dataset]
         else:
@@ -336,7 +336,7 @@ def main():
                 }
             )
         elif args.action_name == "smopdis":
-            plot_smopdises(args.n_trees, datasets, n_forests=args.n_forests)
+            plot_smopdises(args.n_trees, datasets, dataset_names, n_forests=args.n_forests)
 
     output_path = args.output_path or get_output_path(f"{args.action_name}_{args.n_forests}_forests_of_{args.n_trees}_trees")
     plt.savefig(output_path)
