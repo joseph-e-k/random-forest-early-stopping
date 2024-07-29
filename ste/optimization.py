@@ -27,13 +27,13 @@ class PiSolution:
     pi_bar: np.ndarray
 
 
-def make_and_solve_optimal_stopping_problem(n: int, alpha: float, freqs_n_plus: np.ndarray = None, error_minimax=True, runtime_minimax=True) -> tuple[PiSolution, float]:
+def make_and_solve_optimal_stopping_problem(n: int, alpha: float, freqs_n_plus: np.ndarray = None, disagreement_minimax=True, runtime_minimax=True) -> tuple[PiSolution, float]:
     problem = Problem()
 
-    if error_minimax and runtime_minimax and freqs_n_plus is not None:
-        raise ValueError("frequencies were provided for n_plus but both error_minimax and runtime_minimax are True, so those frequencies cannot be used")
+    if disagreement_minimax and runtime_minimax and freqs_n_plus is not None:
+        raise ValueError("frequencies were provided for n_plus but both disagreement_minimax and runtime_minimax are True, so those frequencies cannot be used")
 
-    if error_minimax and runtime_minimax:
+    if disagreement_minimax and runtime_minimax:
         # In minimax mode, we need only consider the worst-case scenario, which is a balanced ensemble
         n_plus = np.array([n // 2, n // 2 + 1])
     else:
@@ -61,16 +61,16 @@ def make_and_solve_optimal_stopping_problem(n: int, alpha: float, freqs_n_plus: 
                 problem.add_constraint(decision_variable[i, j] >= 0)
                 problem.add_constraint(decision_variable[i, j] <= 1)
 
-    e = _make_error_mask(n, n_plus)
-    prob_error = np.sum(e * beta, axis=(1, 2))
+    d = _make_disagreement_mask(n, n_plus)
+    prob_disagreement = np.sum(d * beta, axis=(1, 2))
 
-    if error_minimax:
-        # In minimax mode, error probability must be controlled in each scenario separately
+    if disagreement_minimax:
+        # In minimax mode, disagreement probability must be controlled in each scenario separately
         for k in range(len(n_plus)):
-            problem.add_constraint(prob_error[k] <= alpha)
+            problem.add_constraint(prob_disagreement[k] <= alpha)
     else:
-        expected_prob_error = np.sum(prob_error * freqs_n_plus) / np.sum(freqs_n_plus)
-        problem.add_constraint(expected_prob_error <= alpha)
+        expected_prob_disagreement = np.sum(prob_disagreement * freqs_n_plus) / np.sum(freqs_n_plus)
+        problem.add_constraint(expected_prob_disagreement <= alpha)
 
 
     problem.add_constraint(p[0, 0] == 1)
@@ -134,7 +134,7 @@ def _precise_hypergeometric_probability_mass(n_total, n_good, n_draws, n_good_dr
     )
 
 
-def _make_error_mask(n, n_plus) -> np.ndarray:
+def _make_disagreement_mask(n, n_plus) -> np.ndarray:
     i_arange = np.arange(n + 1).reshape(1, -1, 1)
     j_arange = np.arange(n + 1).reshape(1, 1, -1)
     R = (j_arange > (i_arange / 2))
@@ -183,7 +183,7 @@ def main():
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-n", type=int, required=True)
-    parser.add_argument("--alpha", "--aer", "-a", type=float, default=0.05)
+    parser.add_argument("--alpha", "--adr", "-a", type=float, default=0.05)
     parser.add_argument("--graph", "-g", action="store_true")
     parser.add_argument("--output-path", "-o", type=str, default=None)
     args = parser.parse_args()
@@ -202,7 +202,7 @@ def main():
     greedy_ss = get_greedy_stopping_strategy(args.n, args.alpha)
     show_stopping_strategies([oss, greedy_ss], ["Optimal stopping strategy", "Greedy envelope"])
 
-    output_path = args.output_path or get_output_path(f"ss_visualization_{args.n}_submodels_{args.alpha}_aer")
+    output_path = args.output_path or get_output_path(f"ss_visualization_{args.n}_submodels_{args.alpha}_adr")
     plt.savefig(output_path)
 
 

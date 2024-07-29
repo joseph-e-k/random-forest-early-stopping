@@ -22,9 +22,6 @@ from ste.utils.data import Dataset, load_datasets, split_dataset
 from ste.utils.misc import get_output_path
 
 
-_logger = get_module_logger()
-
-
 def _split_and_train_and_estimate_smopdis(i_forest, dataset, n_trees, eval_proportion):
     training_data, evaluation_data = split_dataset(dataset, (1-eval_proportion, eval_proportion))
     forest = RandomForestClassifier(n_trees)
@@ -71,7 +68,7 @@ def plot_smopdises(n_trees, datasets, eval_proportion=0.2, n_forests=30):
     return fig
 
 
-def _get_stopping_strategies(n_trees, smopdis_estimate, aer, stopping_strategy_getters):
+def _get_stopping_strategies(n_trees, smopdis_estimate, adr, stopping_strategy_getters):
     stopping_strategies = np.empty(
         shape=(
             len(stopping_strategy_getters),
@@ -86,7 +83,7 @@ def _get_stopping_strategies(n_trees, smopdis_estimate, aer, stopping_strategy_g
             (functools.partial(
                 ss_getter,
                 n_trees=n_trees,
-                allowable_error=aer,
+                adr=adr,
                 smopdis_estimate=smopdis_estimate
             ),)
             for ss_getter in stopping_strategy_getters
@@ -116,7 +113,7 @@ def _analyse_stopping_strategies(stopping_strategies, smopdis_estimate):
     n_trees = n_trees_plus_one - 1
 
     runtimes = np.zeros(n_ss_kinds)
-    error_rates = np.zeros_like(runtimes)
+    disagreement_rates = np.zeros_like(runtimes)
 
     tasks = parallelize(
         functools.partial(
@@ -138,9 +135,9 @@ def _analyse_stopping_strategies(stopping_strategies, smopdis_estimate):
         i_ss_kind, n_positive_trees = task.args_or_kwargs
         prob_n_positive_trees = smopdis_estimate[n_positive_trees] / smopdis_estimate.sum()
         runtimes[i_ss_kind] += task.result.expected_runtime * prob_n_positive_trees
-        error_rates[i_ss_kind] += task.result.prob_error * prob_n_positive_trees
+        disagreement_rates[i_ss_kind] += task.result.prob_disagreement * prob_n_positive_trees
 
-    return error_rates, runtimes
+    return disagreement_rates, runtimes
 
 
 type StoppingStrategyGetter = Callable[[int, float, Dataset], np.ndarray]
@@ -159,26 +156,26 @@ def estimate_smopdis(rf_classifier: RandomForestClassifier, calibration_data: Da
     return np.bincount(np.sum(tree_predictions, axis=0), minlength=n_trees + 1)
 
 
-def get_error_rates_and_runtimes_once(_, data: Dataset, aer: float, n_trees: int, stopping_strategy_getters: list[StoppingStrategyGetter], data_partition_ratios):
+def get_disagreement_rates_and_runtimes_once(_, data: Dataset, adr: float, n_trees: int, stopping_strategy_getters: list[StoppingStrategyGetter], data_partition_ratios):
     training_data, calibration_data_for_evaluation, calibration_data_for_bayesian_ss, testing_data = split_dataset(data, data_partition_ratios)
 
     forest = train_forest(n_trees, training_data)
     smopdis_estimate_for_evaluation = estimate_smopdis(forest, calibration_data_for_evaluation)
     smopdis_estimate_for_bayesian_ss = estimate_smopdis(forest, calibration_data_for_bayesian_ss)
 
-    stopping_strategies = _get_stopping_strategies(n_trees, smopdis_estimate_for_bayesian_ss, aer, stopping_strategy_getters)
+    stopping_strategies = _get_stopping_strategies(n_trees, smopdis_estimate_for_bayesian_ss, adr, stopping_strategy_getters)
 
     return _analyse_stopping_strategies(stopping_strategies, smopdis_estimate_for_evaluation)
 
 
 @memoize()
-def get_error_rates_and_runtimes(n_forests, n_trees, datasets, aers, stopping_strategy_getters, data_partition_ratios=(0.6, 0.1, 0.1, 0.2)):
-    error_rates = np.zeros((n_forests, len(datasets), len(aers), len(stopping_strategy_getters)))
-    runtimes = np.zeros_like(error_rates)
+def get_disagreement_rates_and_runtimes(n_forests, n_trees, datasets, adrs, stopping_strategy_getters, data_partition_ratios=(0.6, 0.1, 0.1, 0.2)):
+    disagreement_rates = np.zeros((n_forests, len(datasets), len(adrs), len(stopping_strategy_getters)))
+    runtimes = np.zeros_like(disagreement_rates)
     
     tasks = parallelize(
         function=functools.partial(
-            get_error_rates_and_runtimes_once,
+            get_disagreement_rates_and_runtimes_once,
             n_trees=n_trees,
             data_partition_ratios=data_partition_ratios,
             stopping_strategy_getters=stopping_strategy_getters
@@ -186,39 +183,39 @@ def get_error_rates_and_runtimes(n_forests, n_trees, datasets, aers, stopping_st
         argses_to_combine=[
             range(n_forests),
             datasets,
-            aers
+            adrs
         ]
     )
 
     for task in tasks:
-        task_error_rates, task_runtimes = task.result
-        error_rates[task.index] = task_error_rates
+        task_disagreement_rates, task_runtimes = task.result
+        disagreement_rates[task.index] = task_disagreement_rates
         runtimes[task.index] = task_runtimes
 
-    return error_rates, runtimes
+    return disagreement_rates, runtimes
 
 
 def _getitem(sequence, index):
     return sequence[index]
 
 
-def show_error_rates_and_runtimes(n_trees, error_rates, runtimes, dataset_names, allowable_error_rates, ss_names):
-    assert error_rates.shape == runtimes.shape
+def show_disagreement_rates_and_runtimes(n_trees, disagreement_rates, runtimes, dataset_names, allowable_disagreement_rates, ss_names):
+    assert disagreement_rates.shape == runtimes.shape
 
-    n_datasets, n_aers, n_ss_kinds = error_rates.shape
+    n_datasets, n_adrs, n_ss_kinds = disagreement_rates.shape
 
     assert len(dataset_names) == n_datasets
-    assert len(allowable_error_rates) == n_aers
+    assert len(allowable_disagreement_rates) == n_adrs
     assert len(ss_names) == n_ss_kinds
 
     fig, axs = create_subplot_grid(2 * n_datasets, n_rows=n_datasets, tight_layout=False, figsize=(10, 15))
     fig.suptitle(f"Empirical performance of early-stopping random forests with {n_trees} trees", fontsize=16)
 
-    metric_names = ["Error Rate", "Expected Runtime"]
-    metric_maxima = [np.max(error_rates), np.max(runtimes)]
+    metric_names = ["Disagreement Rate", "Expected Runtime"]
+    metric_maxima = [np.max(disagreement_rates), np.max(runtimes)]
 
     for i_dataset, dataset_name in enumerate(dataset_names):
-        for i_metric, metric in enumerate([error_rates, runtimes]):
+        for i_metric, metric in enumerate([disagreement_rates, runtimes]):
             ax = axs[i_dataset, i_metric]
 
             metric_value_getters = [
@@ -231,67 +228,67 @@ def show_error_rates_and_runtimes(n_trees, error_rates, runtimes, dataset_names,
                 x_axis_arg_name="index",
                 functions=metric_value_getters,
                 function_kwargs=dict(
-                    index=range(n_aers)[::-1],
+                    index=range(n_adrs)[::-1],
                 ),
                 concurrently=False,
                 labels=ss_names,
-                x_axis_values_transform=lambda i_aers: [allowable_error_rates[i_aer] for i_aer in i_aers],
+                x_axis_values_transform=lambda i_adrs: [allowable_disagreement_rates[i_adr] for i_adr in i_adrs],
                 plot_kwargs=dict(marker="o")
             )
 
             if i_metric == 0:
-                ax.set_yscale("symlog", linthresh=min(set(allowable_error_rates) - {0}), linscale=0.5)
-                ax.plot([0, 1], [0, 1], color="black", label="AER", linestyle='dashed')
+                ax.set_yscale("symlog", linthresh=min(set(allowable_disagreement_rates) - {0}), linscale=0.5)
+                ax.plot([0, 1], [0, 1], color="black", label="ADR", linestyle='dashed')
                 ax.legend()
             else:
                 ax.set_yticks(list(range(0, int(metric_maxima[i_metric]), 5)), minor=True)
                 ax.grid(visible=True, axis='y', which='both')
 
             ax.set_ylim((0, metric_maxima[i_metric]))
-            ax.set_xscale("symlog", linthresh=min(set(allowable_error_rates) - {0}), linscale=0.5)
-            ax.set_xlim((min(allowable_error_rates), max(allowable_error_rates)))
-            ax.set_xlabel("allowable error rate")
+            ax.set_xscale("symlog", linthresh=min(set(allowable_disagreement_rates) - {0}), linscale=0.5)
+            ax.set_xlim((min(allowable_disagreement_rates), max(allowable_disagreement_rates)))
+            ax.set_xlabel("allowable disagreement rate")
             ax.set_title(f"{metric_names[i_metric]} ({dataset_names[i_dataset]})")
     
     plt.show()
 
 
-def get_and_show_error_rates_and_runtimes(n_forests, n_trees, datasets, dataset_names, allowable_error_rates, ss_getters_by_name):
+def get_and_show_disagreement_rates_and_runtimes(n_forests, n_trees, datasets, dataset_names, allowable_disagreement_rates, ss_getters_by_name):
     ss_names, ss_getters = zip(*ss_getters_by_name.items())
 
-    error_rates, runtimes = get_error_rates_and_runtimes(
-        n_forests, n_trees, datasets, allowable_error_rates, ss_getters
+    disagreement_rates, runtimes = get_disagreement_rates_and_runtimes(
+        n_forests, n_trees, datasets, allowable_disagreement_rates, ss_getters
     )
 
-    mean_error_rates = error_rates.mean(axis=0)
+    mean_disagreement_rates = disagreement_rates.mean(axis=0)
     mean_runtimes = runtimes.mean(axis=0)
 
-    show_error_rates_and_runtimes(
+    show_disagreement_rates_and_runtimes(
         n_trees,
-        mean_error_rates,
+        mean_disagreement_rates,
         mean_runtimes,
         dataset_names,
-        allowable_error_rates,
+        allowable_disagreement_rates,
         ss_names or [func.__name__ for func in ss_getters]
     )
 
 
 @memoize(args_to_ignore=["smopdis_estimate"])
-def get_greedy_ss(n_trees: int, allowable_error: float, smopdis_estimate: np.ndarray) -> np.ndarray:
-    fwe = ForestWithEnvelope.create_greedy(n_trees, n_trees, allowable_error)
+def get_greedy_ss(n_trees: int, adr: float, smopdis_estimate: np.ndarray) -> np.ndarray:
+    fwe = ForestWithEnvelope.create_greedy(n_trees, n_trees, adr)
     return fwe.get_prob_stop()
 
 
 @memoize(args_to_ignore=["smopdis_estimate"])
-def get_minimax_ss(n_trees: int, allowable_error: float, smopdis_estimate: np.ndarray) -> np.ndarray:
-    return get_optimal_stopping_strategy(n_trees, allowable_error)
+def get_minimax_ss(n_trees: int, adr: float, smopdis_estimate: np.ndarray) -> np.ndarray:
+    return get_optimal_stopping_strategy(n_trees, adr)
 
 
-def get_bayesian_ss(n_trees: int, allowable_error: float, smopdis_estimate: np.ndarray) -> np.ndarray:
-    return get_optimal_stopping_strategy(n_trees, allowable_error, smopdis_estimate, error_minimax=False, runtime_minimax=False)
+def get_bayesian_ss(n_trees: int, adr: float, smopdis_estimate: np.ndarray) -> np.ndarray:
+    return get_optimal_stopping_strategy(n_trees, adr, smopdis_estimate, disagreement_minimax=False, runtime_minimax=False)
 
 
-DEFAULT_AERS = tuple(10 ** -(i/2) for i in range(2, 13)) + (0,)
+DEFAULT_ADRS = tuple(10 ** -(i/2) for i in range(2, 13)) + (0,)
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -300,7 +297,7 @@ def parse_args():
     ss_comparison_subparser = subparsers.add_parser("ss-comparison")
     ss_comparison_subparser.set_defaults(action_name="empirical_comparison")
     ss_comparison_subparser.add_argument("--n-trees", "--number-of-trees", "-n", type=int, default=101)
-    ss_comparison_subparser.add_argument("--alphas", "--aers", "-a", type=float, nargs="+", default=DEFAULT_AERS)
+    ss_comparison_subparser.add_argument("--alphas", "--adrs", "-a", type=float, nargs="+", default=DEFAULT_ADRS)
     ss_comparison_subparser.add_argument("--output-path", "-o", type=str, default=None)
     ss_comparison_subparser.add_argument("--random-seed", "-s", type=int, default=1234)
     ss_comparison_subparser.add_argument("--n-forests", "--number-of-forests", "-f", type=int, default=30)
@@ -326,7 +323,7 @@ def main():
 
     with warnings.catch_warnings(category=UserWarning, action="ignore"):
         if args.action_name == "empirical_comparison":
-            get_and_show_error_rates_and_runtimes(
+            get_and_show_disagreement_rates_and_runtimes(
                 args.n_forests,
                 args.n_trees,
                 datasets,

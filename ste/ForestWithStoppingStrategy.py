@@ -117,13 +117,13 @@ class ForestWithStoppingStrategy:
 
         log_prob_reach_state_and_stop = self._log_state_probabilities + self._log_prob_stop
 
-        is_state_error = (self._n_seen_good > self._n_seen / 2) != self.result
+        is_state_disagreement = (self._n_seen_good > self._n_seen / 2) != self.result
 
-        log_prob_error = logsumexp(log_prob_reach_state_and_stop, b=is_state_error)
+        log_prob_disagreement = logsumexp(log_prob_reach_state_and_stop, b=is_state_disagreement)
         log_expected_runtime = logsumexp(log_prob_reach_state_and_stop, b=self._n_seen)
 
         return ForestAnalysis(
-            prob_error=np.exp(log_prob_error),
+            prob_disagreement=np.exp(log_prob_disagreement),
             expected_runtime=np.exp(log_expected_runtime)
         )
 
@@ -183,5 +183,5 @@ class ForestWithGivenStoppingStrategy(ForestWithStoppingStrategy):
 
 @dataclasses.dataclass(frozen=True)
 class ForestAnalysis:
-    prob_error: float
+    prob_disagreement: float
     expected_runtime: float
