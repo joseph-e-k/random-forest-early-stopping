@@ -5,16 +5,18 @@ import multiprocessing
 import multiprocessing.dummy
 import operator
 import os
+import random
 import time
 import traceback
 from collections.abc import Mapping
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable
 
+import numpy as np
 import tblib
 
 from ste.utils.logging import get_breadcrumbs, get_module_logger, logged, breadcrumbs
-from ste.utils.misc import TimerContext, enumerate_product, get_name
+from ste.utils.misc import TimerContext, enumerate_product, get_name, repeat_enumerated
 
 
 _logger = get_module_logger()
@@ -50,10 +52,15 @@ class _Job:
     n_total_tasks: int = None
     start_time_ns: int = dataclasses.field(default_factory=time.monotonic_ns)
     n_completed_tasks: int = 0
+    random_nonce: float = dataclasses.field(default_factory=random.random)
+    np_random_nonce: float = dataclasses.field(default_factory=np.random.random)
 
     def run_single_task(self, index_and_args_or_kwargs):
         index, args_or_kwargs = index_and_args_or_kwargs
         task_name = self.get_single_task_name(index)
+
+        random.seed(hash((self.random_nonce, index)) % (2 ** 32 - 1))
+        np.random.seed(hash((self.np_random_nonce, index)) % (2 ** 32 - 1))
         
         try:
             with breadcrumbs(self.breadcrumbs_at_creation + (task_name,)), TimerContext(verbose=False) as timer:
@@ -103,12 +110,14 @@ class _Job:
         _logger.info(log_message)
 
 
-def _infer_n_tasks(argses_to_iter, argses_to_combine):
+def _infer_n_tasks(reps, argses_to_iter, argses_to_combine):
+    if reps is None:
+        reps = 1
     try:
-        return len(argses_to_iter)
+        return reps * len(argses_to_iter)
     except TypeError:
         try:
-            return functools.reduce(
+            return reps * functools.reduce(
                 operator.mul,
                 (len(values) for values in argses_to_combine)
             )
@@ -138,22 +147,24 @@ def _process_raw_task_outcome(raw_outcome: _RawTaskOutcome, reraise_exceptions: 
 
 
 @logged()
-def parallelize(function, argses_to_iter=None, argses_to_combine=None, n_workers=N_WORKER_PROCESSES, n_tasks=None, reraise_exceptions=True, job_name=None, dummy=False):
+def parallelize(function, reps=None, argses_to_iter=None, argses_to_combine=None, n_workers=N_WORKER_PROCESSES, reraise_exceptions=True, job_name=None, dummy=False):
     if not ((argses_to_iter is None) ^ (argses_to_combine is None)):
-        raise TypeError("argses_to_iter or argses_to_multiply must be specified (but not both)")
+        raise TypeError("argses_to_iter or argses_to_combine must be specified (but not both)")
     
     if job_name is None:
         job_name = get_name(function)
     
     _logger.info(f"Preparing task pool for {job_name}")
 
-    if n_tasks is None:
-        n_tasks = _infer_n_tasks(argses_to_iter, argses_to_combine)
+    n_tasks = _infer_n_tasks(reps, argses_to_iter, argses_to_combine)
     
     if argses_to_iter is None:
         indices_and_argses = enumerate_product(*argses_to_combine)
     else:
         indices_and_argses = enumerate(argses_to_iter)
+
+    if reps is not None:
+        indices_and_argses = repeat_enumerated(reps, indices_and_argses)
 
     job = _Job(function, job_name, get_breadcrumbs(), n_tasks)
 

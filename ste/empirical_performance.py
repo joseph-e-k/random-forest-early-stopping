@@ -22,7 +22,7 @@ from ste.utils.data import Dataset, load_datasets, split_dataset
 from ste.utils.misc import get_output_path
 
 
-def _split_and_train_and_estimate_smopdis(i_forest, dataset, n_trees, eval_proportion):
+def _split_and_train_and_estimate_smopdis(dataset, n_trees, eval_proportion):
     training_data, evaluation_data = split_dataset(dataset, (1-eval_proportion, eval_proportion))
     forest = RandomForestClassifier(n_trees)
     forest.fit(*training_data)
@@ -44,8 +44,8 @@ def plot_smopdises(n_trees: int, datasets: Sequence[Dataset], dataset_names: Seq
             n_trees=n_trees,
             eval_proportion=eval_proportion
         ),
+        reps=n_forests,
         argses_to_combine=[
-            range(n_forests),
             datasets
         ]
     )
@@ -156,7 +156,7 @@ def estimate_smopdis(rf_classifier: RandomForestClassifier, calibration_data: Da
     return np.bincount(np.sum(tree_predictions, axis=0), minlength=n_trees + 1)
 
 
-def get_disagreement_rates_and_runtimes_once(_, data: Dataset, adr: float, n_trees: int, stopping_strategy_getters: list[StoppingStrategyGetter], data_partition_ratios):
+def get_disagreement_rates_and_runtimes_once(data: Dataset, adr: float, n_trees: int, stopping_strategy_getters: list[StoppingStrategyGetter], data_partition_ratios):
     training_data, calibration_data_for_evaluation, calibration_data_for_bayesian_ss, testing_data = split_dataset(data, data_partition_ratios)
 
     forest = train_forest(n_trees, training_data)
@@ -180,8 +180,8 @@ def get_disagreement_rates_and_runtimes(n_forests, n_trees, datasets, adrs, stop
             data_partition_ratios=data_partition_ratios,
             stopping_strategy_getters=stopping_strategy_getters
         ),
+        reps=n_forests,
         argses_to_combine=[
-            range(n_forests),
             datasets,
             adrs
         ]

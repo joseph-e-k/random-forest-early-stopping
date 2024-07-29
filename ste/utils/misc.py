@@ -136,6 +136,14 @@ def enumerate_product(*iterables):
     )
 
 
+def repeat_enumerated(n_repetitions, enumerated_iterable):
+    for i_rep, (index, item) in itertools.product(range(n_repetitions), enumerated_iterable):
+        if isinstance(index, tuple):
+            yield (i_rep,) + index, item
+        else:
+            yield (i_rep, index), item
+
+
 def get_name(callable):
     if isinstance(callable, functools.partial):
         return callable.func.__name__
