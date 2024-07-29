@@ -16,7 +16,7 @@ import numpy as np
 import tblib
 
 from ste.utils.logging import get_breadcrumbs, get_module_logger, logged, breadcrumbs
-from ste.utils.misc import TimerContext, enumerate_product, get_name, repeat_enumerated
+from ste.utils.misc import TimerContext, enumerate_product, forwards_to, get_name, repeat_enumerated
 
 
 _logger = get_module_logger()
@@ -184,3 +184,31 @@ def parallelize(function, reps=None, argses_to_iter=None, argses_to_combine=None
             outcome = _process_raw_task_outcome(raw_outcome, reraise_exceptions)
             job.single_task_completed(raw_outcome.index)
             yield outcome
+
+
+def parallelize_to_array(function, reps=None, argses_to_iter=None, argses_to_combine=None, n_workers=N_WORKER_PROCESSES, reraise_exceptions=True, job_name=None, dummy=False):
+    results_array = None
+
+    if argses_to_iter:
+        results_shape = (len(argses_to_iter),)
+    else:
+        results_shape = tuple(len(args) for args in argses_to_combine)
+    
+    if reps is not None:
+        results_shape = (reps,) + results_shape
+
+    for task in parallelize(function, reps, argses_to_iter, argses_to_combine, n_workers, reraise_exceptions, job_name, dummy):
+        result = task.result
+
+        if results_array is None:
+            if isinstance(result, np.ndarray):
+                results_shape += result.shape
+                result_type = result.dtype
+            else:
+                result_type = type(result)
+
+            results_array = np.empty(shape=results_shape, dtype=result_type)
+        
+        results_array[task.index] = result
+
+    return results_array
