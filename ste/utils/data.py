@@ -2,6 +2,7 @@ import logging
 import os
 from typing import Callable, Iterable, Sequence
 
+from diskcache import Cache
 import pandas as pd
 import numpy as np
 
@@ -13,6 +14,8 @@ from ste.utils.misc import unzip
 
 
 DATA_DIRECTORY = os.path.join(os.path.dirname(__file__), "../../data")
+
+dataset_cache = Cache(os.path.join(DATA_DIRECTORY, ".cache"))
 
 type Dataset = tuple[pd.DataFrame, np.ndarray]
 
@@ -60,8 +63,8 @@ def enforce_nice_dataset(dataset: Dataset, coercion_seed=0) -> Dataset:
     y = to_binary_classifications(y, coercion_seed)
     return X, y
 
-@logged(message_level=logging.INFO)
-@memoize()
+@logged(message_level=logging.DEBUG)
+@memoize(cache=dataset_cache)
 def load_datasets(coercion_seed=0):
     named_raw_datasets = {
         "Salaries": load_local_dataset("adult.data"),

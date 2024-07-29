@@ -15,7 +15,6 @@ from ste.utils.figures import create_subplot_grid, plot_stopping_strategy
 from ste.utils.linear_programming import Problem, OptimizationResult, ArithmeticExpression, OptimizationFailure
 from ste.utils.logging import configure_logging, get_module_logger
 from ste.utils.misc import forwards_to, get_output_path
-from ste.utils.caching import memoize
 
 
 _logger = get_module_logger()
@@ -28,7 +27,6 @@ class PiSolution:
     pi_bar: np.ndarray
 
 
-@memoize("make_and_solve_optimal_stopping_problem")
 def make_and_solve_optimal_stopping_problem(n: int, alpha: float, freqs_n_plus: np.ndarray = None, error_minimax=True, runtime_minimax=True) -> tuple[PiSolution, float]:
     problem = Problem()
 
@@ -173,7 +171,6 @@ def show_stopping_strategies(stopping_strategies, titles, n_rows=None, n_columns
     plt.show()
 
 
-@memoize("get_optimal_stopping_strategy")
 @forwards_to(make_and_solve_optimal_stopping_problem)
 def get_optimal_stopping_strategy(*args, **kwargs):
     pi_solution, objective_value = make_and_solve_optimal_stopping_problem(*args, **kwargs)
@@ -182,8 +179,6 @@ def get_optimal_stopping_strategy(*args, **kwargs):
 
 
 def main():
-    from ste.utils.caching import cache
-
     configure_logging()
 
     parser = argparse.ArgumentParser()
@@ -192,13 +187,6 @@ def main():
     parser.add_argument("--graph", "-g", action="store_true")
     parser.add_argument("--output-path", "-o", type=str, default=None)
     args = parser.parse_args()
-
-    _logger.debug(f"{cache.directory=}")
-    cache_key = get_optimal_stopping_strategy.__cache_key__(args.n, args.alpha)
-    if cache_key in cache:
-        _logger.debug(f"{cache_key=} found in cache")
-    else:
-        _logger.debug(f"{cache_key=} not found in cache")
 
     try:
         oss = get_optimal_stopping_strategy(args.n, args.alpha)

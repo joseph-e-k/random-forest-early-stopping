@@ -287,7 +287,6 @@ def get_minimax_ss(n_trees: int, allowable_error: float, smopdis_estimate: np.nd
     return get_optimal_stopping_strategy(n_trees, allowable_error)
 
 
-@memoize()
 def get_bayesian_ss(n_trees: int, allowable_error: float, smopdis_estimate: np.ndarray) -> np.ndarray:
     return get_optimal_stopping_strategy(n_trees, allowable_error, smopdis_estimate, error_minimax=False, runtime_minimax=False)
 
