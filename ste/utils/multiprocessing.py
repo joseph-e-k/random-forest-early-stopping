@@ -147,7 +147,7 @@ def _process_raw_task_outcome(raw_outcome: _RawTaskOutcome, reraise_exceptions: 
 
 
 @logged()
-def parallelize(function, reps=None, argses_to_iter=None, argses_to_combine=None, n_workers=N_WORKER_PROCESSES, reraise_exceptions=True, job_name=None, dummy=False):
+def parallelize(function, reps=None, argses_to_iter=None, argses_to_combine=None, n_workers=N_WORKER_PROCESSES, reraise_exceptions=True, job_name=None, dummy=True):
     if not ((argses_to_iter is None) ^ (argses_to_combine is None)):
         raise TypeError("argses_to_iter or argses_to_combine must be specified (but not both)")
     

@@ -15,11 +15,14 @@ from ste.ForestWithEnvelope import ForestWithEnvelope
 from ste.ForestWithStoppingStrategy import ForestWithGivenStoppingStrategy
 from ste.utils.figures import create_subplot_grid, plot_functions
 from ste.utils.logging import configure_logging, get_module_logger
-from ste.utils.multiprocessing import parallelize, parallelize_to_array
+from ste.utils.multiprocessing import parallelize_to_array
 from ste.optimization import get_optimal_stopping_strategy
 from ste.utils.caching import memoize
 from ste.utils.data import Dataset, load_datasets, split_dataset
 from ste.utils.misc import get_output_path
+
+
+_logger = get_module_logger()
 
 
 def _split_and_train_and_estimate_smopdis(dataset, n_trees, eval_proportion):
@@ -63,57 +66,75 @@ def plot_smopdises(n_trees: int, datasets: Sequence[Dataset], dataset_names: Seq
     return fig
 
 
-def _get_stopping_strategies(n_trees, smopdis_estimate, adr, stopping_strategy_getters):
+def _get_stopping_strategies(n_trees, smopdis_estimate, adrs, stopping_strategy_getters):
     return parallelize_to_array(
         operator.call,
-        argses_to_iter=[
-            (functools.partial(
-                ss_getter,
-                n_trees=n_trees,
-                adr=adr,
-                smopdis_estimate=smopdis_estimate
-            ),)
-            for ss_getter in stopping_strategy_getters
+        argses_to_combine=[
+            [
+                functools.partial(
+                    ss_getter,
+                    n_trees=n_trees,
+                    smopdis_estimate=smopdis_estimate
+                ) for ss_getter in stopping_strategy_getters
+            ],
+            adrs
         ],
         job_name="get_ss"
     )
 
 
-def _analyse_stopping_strategy_if_relevant(i_ss_kind, n_positive_trees, n_trees, smopdis_estimate, stopping_strategies):
-    if smopdis_estimate[n_positive_trees] == 0:
-        return np.empty(shape=2)
+def _analyse_stopping_strategy_if_relevant(i_ss_kind, i_adr, true_class, n_positive_trees, n_trees, smopdis_estimates, stopping_strategies):
+    base_ensemble_result = (n_positive_trees > (n_trees // 2))
+    is_base_ensemble_correct = (base_ensemble_result == true_class)
+    
+    out = np.zeros(shape=4, dtype=float)
+    out[-1] = 1 - is_base_ensemble_correct
 
-    ss = stopping_strategies[i_ss_kind]
+    if smopdis_estimates[true_class, n_positive_trees] == 0:
+        return out
+
+    ss = stopping_strategies[i_ss_kind, i_adr]
     forest = Forest(n_trees, n_positive_trees)
     fwss = ForestWithGivenStoppingStrategy(forest, ss)
     analysis = fwss.analyse()
-    return np.array([analysis.prob_disagreement, analysis.expected_runtime])
+
+    if is_base_ensemble_correct:
+        prob_error = analysis.prob_disagreement
+    else:
+        prob_error = 1 - analysis.prob_disagreement
+
+    out[:-1] = [analysis.prob_disagreement, analysis.expected_runtime, prob_error]
+    return out
 
 
-def _analyse_stopping_strategies(stopping_strategies, smopdis_estimate):
-    n_ss_kinds, n_trees_plus_one, _ = stopping_strategies.shape
+def _analyse_stopping_strategies(stopping_strategies, smopdis_estimates):
+    n_ss_kinds, n_adrs, n_trees_plus_one, _ = stopping_strategies.shape
     n_trees = n_trees_plus_one - 1
 
     metrics = parallelize_to_array(
         functools.partial(
             _analyse_stopping_strategy_if_relevant,
             n_trees=n_trees,
-            smopdis_estimate=smopdis_estimate,
+            smopdis_estimates=smopdis_estimates,
             stopping_strategies=stopping_strategies
         ),
         argses_to_combine=(
             range(n_ss_kinds),
+            range(n_adrs),
+            [0, 1],
             range(n_trees + 1),
         ),
         job_name="analyse"
     )
 
-    weighted_metrics = metrics * smopdis_estimate[:, np.newaxis] / smopdis_estimate.sum()
-    averaged_metrics = weighted_metrics.sum(axis=1)
+    weighted_metrics = metrics * smopdis_estimates[:, :, np.newaxis]
+    weighted_metrics /= smopdis_estimates.sum()
+    averaged_metrics = weighted_metrics.sum(axis=(2, 3))
+
     return averaged_metrics
 
 
-type StoppingStrategyGetter = Callable[[int, float, Dataset], np.ndarray]
+type StoppingStrategyGetter = Callable[[float, np.ndarray, int], np.ndarray]
 
 
 def train_forest(n_trees, training_data) -> RandomForestClassifier:
@@ -122,69 +143,86 @@ def train_forest(n_trees, training_data) -> RandomForestClassifier:
     return rf_classifier
 
 
-def estimate_smopdis(rf_classifier: RandomForestClassifier, calibration_data: Dataset):
-    X, y = calibration_data
+def estimate_smopdis(rf_classifier: RandomForestClassifier, dataset: Dataset):
+    X, y = dataset
     n_trees = len(rf_classifier.estimators_)
     tree_predictions = np.array(np.vstack([tree.predict(X) for tree in rf_classifier.estimators_]), dtype=int)
     return np.bincount(np.sum(tree_predictions, axis=0), minlength=n_trees + 1)
 
 
-def get_disagreement_rates_and_runtimes_once(data: Dataset, adr: float, n_trees: int, stopping_strategy_getters: list[StoppingStrategyGetter], data_partition_ratios):
-    training_data, calibration_data_for_evaluation, calibration_data_for_bayesian_ss, testing_data = split_dataset(data, data_partition_ratios)
+def estimate_conditional_smopdises(rf_classifier: RandomForestClassifier, dataset: Dataset):
+    X, y = dataset
+
+    return np.stack([
+        estimate_smopdis(rf_classifier, (X[y == 0], y[y == 0])),
+        estimate_smopdis(rf_classifier, (X[y == 1], y[y == 1])),
+    ])
+
+
+def get_metrics_once(data: Dataset, adrs: Sequence[float], n_trees: int, stopping_strategy_getters: list[StoppingStrategyGetter], data_partition_ratios):
+    training_data, calibration_data, evaluation_data = split_dataset(data, data_partition_ratios)
 
     forest = train_forest(n_trees, training_data)
-    smopdis_estimate_for_evaluation = estimate_smopdis(forest, calibration_data_for_evaluation)
-    smopdis_estimate_for_bayesian_ss = estimate_smopdis(forest, calibration_data_for_bayesian_ss)
+    smopdis_estimates_for_evaluation = estimate_conditional_smopdises(forest, evaluation_data)
+    smopdis_estimate_for_bayesian_ss = estimate_smopdis(forest, calibration_data)
 
-    stopping_strategies = _get_stopping_strategies(n_trees, smopdis_estimate_for_bayesian_ss, adr, stopping_strategy_getters)
+    stopping_strategies = _get_stopping_strategies(n_trees, smopdis_estimate_for_bayesian_ss, adrs, stopping_strategy_getters)
 
-    return _analyse_stopping_strategies(stopping_strategies, smopdis_estimate_for_evaluation)
+    return _analyse_stopping_strategies(stopping_strategies, smopdis_estimates_for_evaluation)
 
 
 @memoize()
-def get_disagreement_rates_and_runtimes(n_forests, n_trees, datasets, adrs, stopping_strategy_getters, data_partition_ratios=(0.6, 0.1, 0.1, 0.2)):
-    disagreement_rates_and_runtimes = parallelize_to_array(
+def get_metrics(n_forests, n_trees, datasets, adrs, stopping_strategy_getters, data_partition_ratios=(0.7, 0.1, 0.2)):
+    metrics = parallelize_to_array(
         function=functools.partial(
-            get_disagreement_rates_and_runtimes_once,
+            get_metrics_once,
             n_trees=n_trees,
             data_partition_ratios=data_partition_ratios,
-            stopping_strategy_getters=stopping_strategy_getters
+            stopping_strategy_getters=stopping_strategy_getters,
+            adrs=adrs
         ),
         reps=n_forests,
         argses_to_combine=[
-            datasets,
-            adrs
+            datasets
         ]
     )
 
-    return disagreement_rates_and_runtimes
+    return metrics
 
 
 def _getitem(sequence, index):
     return sequence[index]
 
 
-def show_disagreement_rates_and_runtimes(n_trees, disagreement_rates_and_runtimes, dataset_names, allowable_disagreement_rates, ss_names):
-    n_datasets, n_adrs, n_ss_kinds, n_metrics = disagreement_rates_and_runtimes.shape
+def show_metrics(n_trees, metrics, dataset_names, allowable_disagreement_rates, ss_names):
+    base_error_rates = metrics[..., -1]
+
+    metrics = metrics[..., :-1]
+    n_datasets, n_ss_kinds, n_adrs,  n_metrics = metrics.shape
 
     assert len(dataset_names) == n_datasets
-    assert len(allowable_disagreement_rates) == n_adrs
     assert len(ss_names) == n_ss_kinds
-    assert n_metrics == 2
+    assert len(allowable_disagreement_rates) == n_adrs
+    assert n_metrics == 3
 
-    fig, axs = create_subplot_grid(2 * n_datasets, n_rows=n_datasets, tight_layout=False, figsize=(10, 15))
+    for i_dataset in range(n_datasets):
+        assert np.all(np.isclose(base_error_rates[i_dataset, :, :], base_error_rates[i_dataset, 0, 0]))
+    
+    base_error_rates = base_error_rates[:, 0, 0]
+
+    fig, axs = create_subplot_grid(n_metrics * n_datasets, n_rows=n_datasets, tight_layout=False, figsize=(10, 15))
     fig.suptitle(f"Empirical performance of early-stopping random forests with {n_trees} trees", fontsize=16)
 
-    metric_names = ["Disagreement Rate", "Expected Runtime"]
-    metric_maxima = np.max(disagreement_rates_and_runtimes, axis=(0, 1, 2))
+    metric_names = ["Disagreement Rate", "Expected Runtime", "Error Rate"]
+    metric_maxima = np.max(metrics, axis=(0, 1, 2))
 
     for i_dataset, dataset_name in enumerate(dataset_names):
         for i_metric in range(n_metrics):
-            metric = disagreement_rates_and_runtimes[:, :, :, i_metric]
+            metric = metrics[:, :, :, i_metric]
             ax = axs[i_dataset, i_metric]
 
             metric_value_getters = [
-                functools.partial(_getitem, metric[i_dataset, :, i_ss])
+                functools.partial(_getitem, metric[i_dataset, i_ss])
                 for i_ss in range(n_ss_kinds)
             ]
             
@@ -205,9 +243,14 @@ def show_disagreement_rates_and_runtimes(n_trees, disagreement_rates_and_runtime
                 ax.set_yscale("symlog", linthresh=min(set(allowable_disagreement_rates) - {0}), linscale=0.5)
                 ax.plot([0, 1], [0, 1], color="black", label="ADR", linestyle='dashed')
                 ax.legend()
-            else:
+            elif i_metric == 1:
                 ax.set_yticks(list(range(0, int(metric_maxima[i_metric]), 5)), minor=True)
                 ax.grid(visible=True, axis='y', which='both')
+            else:
+                ax.set_yscale("symlog", linthresh=min(set(allowable_disagreement_rates) - {0}), linscale=0.5)
+                ax.axhline(y=base_error_rates[i_dataset], color="black", label="Base", linestyle='dashed')
+                _logger.info(f"Base error rate for {dataset_names[i_dataset]}: {base_error_rates[i_dataset]}")
+                ax.legend()
 
             ax.set_ylim((0, metric_maxima[i_metric]))
             ax.set_xscale("symlog", linthresh=min(set(allowable_disagreement_rates) - {0}), linscale=0.5)
@@ -221,13 +264,13 @@ def show_disagreement_rates_and_runtimes(n_trees, disagreement_rates_and_runtime
 def get_and_show_disagreement_rates_and_runtimes(n_forests, n_trees, datasets, dataset_names, allowable_disagreement_rates, ss_getters_by_name):
     ss_names, ss_getters = zip(*ss_getters_by_name.items())
 
-    metrics = get_disagreement_rates_and_runtimes(
+    metrics = get_metrics(
         n_forests, n_trees, datasets, allowable_disagreement_rates, ss_getters
     )
 
     mean_metrics = metrics.mean(axis=0)
 
-    show_disagreement_rates_and_runtimes(
+    show_metrics(
         n_trees,
         mean_metrics,
         dataset_names,
@@ -237,17 +280,17 @@ def get_and_show_disagreement_rates_and_runtimes(n_forests, n_trees, datasets, d
 
 
 @memoize(args_to_ignore=["smopdis_estimate"])
-def get_greedy_ss(n_trees: int, adr: float, smopdis_estimate: np.ndarray) -> np.ndarray:
+def get_greedy_ss(adr: float, smopdis_estimate: np.ndarray, n_trees: int) -> np.ndarray:
     fwe = ForestWithEnvelope.create_greedy(n_trees, n_trees, adr)
     return fwe.get_prob_stop()
 
 
 @memoize(args_to_ignore=["smopdis_estimate"])
-def get_minimax_ss(n_trees: int, adr: float, smopdis_estimate: np.ndarray) -> np.ndarray:
+def get_minimax_ss(adr: float, smopdis_estimate: np.ndarray, n_trees: int) -> np.ndarray:
     return get_optimal_stopping_strategy(n_trees, adr)
 
 
-def get_bayesian_ss(n_trees: int, adr: float, smopdis_estimate: np.ndarray) -> np.ndarray:
+def get_bayesian_ss(adr: float, smopdis_estimate: np.ndarray, n_trees: int) -> np.ndarray:
     return get_optimal_stopping_strategy(n_trees, adr, smopdis_estimate, disagreement_minimax=False, runtime_minimax=False)
 
 
