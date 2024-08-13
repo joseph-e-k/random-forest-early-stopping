@@ -148,3 +148,10 @@ def get_name(callable):
     if isinstance(callable, functools.partial):
         return callable.func.__name__
     return getattr(callable, "__name__", "<unnamed>")
+
+
+def swap_indices_of_axis(array, i, j, axis):
+    array_swap = np.swapaxes(array, axis, 0)
+    array_swap[[i, j], ...] = array_swap[[j, i], ...]
+    array = np.swapaxes(array_swap, 0, axis)
+    return array

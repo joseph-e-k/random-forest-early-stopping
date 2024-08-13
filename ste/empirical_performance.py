@@ -19,7 +19,7 @@ from ste.utils.multiprocessing import parallelize_to_array
 from ste.optimization import get_optimal_stopping_strategy
 from ste.utils.caching import memoize
 from ste.utils.data import Dataset, load_datasets, split_dataset
-from ste.utils.misc import get_output_path
+from ste.utils.misc import get_output_path, swap_indices_of_axis
 
 
 _logger = get_module_logger()
@@ -213,13 +213,35 @@ def show_metrics(n_trees, metrics, dataset_names, allowable_disagreement_rates, 
     fig, axs = create_subplot_grid(n_metrics * n_datasets, n_rows=n_datasets, tight_layout=False, figsize=(10, 15))
     fig.suptitle(f"Empirical performance of early-stopping random forests with {n_trees} trees", fontsize=16)
 
-    metric_names = ["Disagreement Rate", "Expected Runtime", "Error Rate"]
+    metrics = swap_indices_of_axis(metrics, 1, 2, axis=3)
+
+    metric_names = ["Disagreement Rate", "Error Rate",  "Expected Runtime"]
     metric_maxima = np.max(metrics, axis=(0, 1, 2))
 
     for i_dataset, dataset_name in enumerate(dataset_names):
         for i_metric in range(n_metrics):
             metric = metrics[:, :, :, i_metric]
+            metric_name = metric_names[i_metric]
             ax = axs[i_dataset, i_metric]
+
+            if metric_name == "Disagreement Rate":
+                ax.set_yscale("symlog", linthresh=min(set(allowable_disagreement_rates) - {0}), linscale=0.5)
+                ax.set_ylim((0, 1))
+                ax.plot([0, 1], [0, 1], color="black", label="ADR", linestyle='dashed')
+                ax.legend()
+            elif metric_name == "Error Rate":
+                ax.set_ylim((0, metric_maxima[i_metric]))
+                ax.axhline(y=base_error_rates[i_dataset], color="black", label="Base", linestyle='dashed')
+                ax.legend()
+            elif metric_name == "Expected Runtime":
+                ax.set_yticks(list(range(0, int(metric_maxima[i_metric]), 5)), minor=True)
+                ax.set_ylim((0, metric_maxima[i_metric]))
+            else:
+                raise ValueError(f"Unrecognized metric name: {metric_name!r}")
+            
+            ax.grid(visible=True, axis='y', which='both')
+            ax.set_xscale("symlog", linthresh=min(set(allowable_disagreement_rates) - {0}), linscale=0.5)
+            ax.set_xlim((min(allowable_disagreement_rates), max(allowable_disagreement_rates)))
 
             metric_value_getters = [
                 functools.partial(_getitem, metric[i_dataset, i_ss])
@@ -239,24 +261,8 @@ def show_metrics(n_trees, metrics, dataset_names, allowable_disagreement_rates, 
                 plot_kwargs=dict(marker="o")
             )
 
-            if i_metric == 0:
-                ax.set_yscale("symlog", linthresh=min(set(allowable_disagreement_rates) - {0}), linscale=0.5)
-                ax.plot([0, 1], [0, 1], color="black", label="ADR", linestyle='dashed')
-                ax.legend()
-            elif i_metric == 1:
-                ax.set_yticks(list(range(0, int(metric_maxima[i_metric]), 5)), minor=True)
-                ax.grid(visible=True, axis='y', which='both')
-            else:
-                ax.set_yscale("symlog", linthresh=min(set(allowable_disagreement_rates) - {0}), linscale=0.5)
-                ax.axhline(y=base_error_rates[i_dataset], color="black", label="Base", linestyle='dashed')
-                _logger.info(f"Base error rate for {dataset_names[i_dataset]}: {base_error_rates[i_dataset]}")
-                ax.legend()
-
-            ax.set_ylim((0, metric_maxima[i_metric]))
-            ax.set_xscale("symlog", linthresh=min(set(allowable_disagreement_rates) - {0}), linscale=0.5)
-            ax.set_xlim((min(allowable_disagreement_rates), max(allowable_disagreement_rates)))
-            ax.set_xlabel("allowable disagreement rate")
             ax.set_title(f"{metric_names[i_metric]} ({dataset_names[i_dataset]})")
+            ax.set_xlabel("Allowable disagreement rate")
     
     plt.show()
 

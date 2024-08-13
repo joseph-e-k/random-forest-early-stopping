@@ -72,7 +72,7 @@ def load_datasets(coercion_seed=0):
         "Phishing": load_uci_dataset(id=327),
         "Diabetes": load_uci_dataset(id=891),
         "IoT": load_uci_dataset(id=942),
-        "Android Permissions": load_uci_dataset(id=722)
+        "Android": load_uci_dataset(id=722)
     }
 
     return unzip([
