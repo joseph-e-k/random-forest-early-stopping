@@ -15,6 +15,7 @@ import os
 import matplotlib
 import numpy as np
 from matplotlib import pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 from ste.utils.logging import get_module_logger
 from ste.utils.multiprocessing import parallelize
@@ -185,7 +186,10 @@ def plot_stopping_strategy(ss, ax, ytick_gap=None):
 
     cmap = matplotlib.colormaps.get_cmap('viridis')
     cmap.set_bad(color="lightgray")
-    im = ax.matshow(out, cmap=cmap)
+    cax = ax.matshow(out, cmap=cmap)
+
+    divider = make_axes_locatable(ax)
+    cbar_ax = divider.append_axes("right", size="5%", pad=0.05)
 
     if ytick_gap is None:
         ytick_gap = out.shape[0] // min(11, out.shape[0])
@@ -200,5 +204,5 @@ def plot_stopping_strategy(ss, ax, ytick_gap=None):
 
     ax.set_yticks(yticks)
     ax.set_yticklabels(ytick_labels)
-    plt.colorbar(ax=ax, mappable=im)
+    plt.colorbar(cax, cax=cbar_ax)
     return ax
