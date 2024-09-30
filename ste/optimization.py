@@ -202,7 +202,7 @@ def main():
     greedy_ss = get_greedy_stopping_strategy(args.n, args.alpha)
     show_stopping_strategies([oss, greedy_ss], ["Optimal stopping strategy", "Greedy envelope"])
 
-    output_path = args.output_path or get_output_path(f"ss_visualization_{args.n}_submodels_{args.alpha}_adr", ".png")
+    output_path = args.output_path or get_output_path(f"ss_visualization_{args.n}_submodels_{args.alpha}_adr")
     plt.savefig(output_path)
 
 

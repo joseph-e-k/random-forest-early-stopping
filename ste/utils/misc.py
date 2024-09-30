@@ -120,7 +120,7 @@ def forwards_to[RInner, ROuter, **P](inner_function: Callable[P, RInner]) -> Cal
     return decorator
 
 
-def get_output_path(partial_file_name: str, file_name_suffix=""):
+def get_output_path(partial_file_name: str, file_name_suffix=".pdf"):
     timestamp = datetime.now().astimezone(timezone.utc).strftime("%Y%m%d%H%M%S")
     return os.path.join(RESULTS_DIRECTORY, f"{partial_file_name}_{timestamp}{file_name_suffix}")
 
