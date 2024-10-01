@@ -39,6 +39,11 @@ def plot_smopdises(n_trees: int, datasets: Sequence[Dataset], dataset_names: Seq
     except IndexError:
         n_columns = 1
 
+    n_eval_obs = [
+        int(np.round(eval_proportion * len(dataset[1])))
+        for dataset in datasets
+    ]
+
     smopdis_estimates = parallelize_to_array(
         functools.partial(
             _split_and_train_and_estimate_smopdis,
@@ -58,10 +63,11 @@ def plot_smopdises(n_trees: int, datasets: Sequence[Dataset], dataset_names: Seq
             ax = axs[i_dataset]
         else:
             ax = axs[i_dataset // n_columns, i_dataset % n_columns]
-        ax.bar(np.arange(n_trees + 1), mean_smopdises[i_dataset], width=1)
+        smopdis = mean_smopdises[i_dataset] / n_eval_obs[i_dataset]
+        ax.bar(np.arange(n_trees + 1), smopdis, width=1)
         ax.title.set_text(f"{dataset_name}")
-        ax.set_xlim((0, n_trees))
-        ax.set_yticks([])
+        ax.set_xlim((-0.5, n_trees + 0.5))
+        ax.set_ylim((0, max(smopdis) * 1.05))
 
     return fig
 
