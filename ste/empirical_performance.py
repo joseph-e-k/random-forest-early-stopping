@@ -58,16 +58,14 @@ def plot_smopdises(n_trees: int, datasets: Sequence[Dataset], dataset_names: Seq
 
     mean_smopdises = smopdis_estimates.mean(axis=0)
 
-    for i_dataset, dataset_name in enumerate(dataset_names):
-        if (len(axs.shape) == 1):
-            ax = axs[i_dataset]
-        else:
-            ax = axs[i_dataset // n_columns, i_dataset % n_columns]
+    for i_dataset, (dataset_name, ax) in enumerate(zip(dataset_names, axs.flat)):
         smopdis = mean_smopdises[i_dataset] / n_eval_obs[i_dataset]
         ax.bar(np.arange(n_trees + 1), smopdis, width=1)
         ax.title.set_text(f"{dataset_name}")
         ax.set_xlim((-0.5, n_trees + 0.5))
         ax.set_ylim((0, max(smopdis) * 1.05))
+        for side in ["top", "left", "right"]:
+            ax.spines[side].set_visible(False)
 
     return fig
 
