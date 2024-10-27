@@ -67,12 +67,10 @@ def enforce_nice_dataset(dataset: Dataset, coercion_seed=0) -> Dataset:
 @memoize(cache=dataset_cache)
 def load_datasets(coercion_seed=0):
     named_raw_datasets = {
-        "Salaries": load_local_dataset("adult.data"),
-        "Dry Beans": load_local_dataset("dry_beans.xlsx", reader=pd.read_excel),
-        "Phishing": load_uci_dataset(id=327),
+        "Ground Cover": load_uci_dataset(id=31),
+        "Income": load_uci_dataset(id=117),
         "Diabetes": load_uci_dataset(id=891),
-        "IoT": load_uci_dataset(id=942),
-        "Android": load_uci_dataset(id=722)
+        "Skin": load_uci_dataset(id=229)
     }
 
     return unzip([
