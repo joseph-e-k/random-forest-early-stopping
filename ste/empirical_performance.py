@@ -215,6 +215,7 @@ def show_metrics(n_trees, metrics, dataset_names, allowable_disagreement_rates, 
     base_error_rates = base_error_rates[:, 0, 0]
 
     fig, axs = create_subplot_grid(n_metrics * n_datasets, n_rows=n_datasets, tight_layout=False, figsize=(10, 15))
+    fig.subplots_adjust(hspace=10)
 
     metrics = swap_indices_of_axis(metrics, 1, 2, axis=3)
 
