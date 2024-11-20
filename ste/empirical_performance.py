@@ -25,28 +25,25 @@ from ste.utils.misc import get_output_path, swap_indices_of_axis
 _logger = get_module_logger()
 
 
-def _split_and_train_and_estimate_smopdis(dataset, n_trees, eval_proportion):
+@memoize()
+def _split_and_train_and_estimate_smopdises(dataset, n_trees, eval_proportion):
     training_data, evaluation_data = split_dataset(dataset, (1-eval_proportion, eval_proportion))
     forest = RandomForestClassifier(n_trees)
     forest.fit(*training_data)
-    return estimate_smopdis(forest, evaluation_data)
+    return estimate_conditional_smopdises(forest, evaluation_data)
 
 
 def plot_smopdises(n_trees: int, datasets: Sequence[Dataset], dataset_names: Sequence[str], eval_proportion: float = 0.2, n_forests: int = 30):
     fig, axs = create_subplot_grid(len(datasets), n_rows=2)
-    try:
-        n_columns = axs.shape[1]
-    except IndexError:
-        n_columns = 1
 
-    n_eval_obs = [
-        int(np.round(eval_proportion * len(dataset[1])))
-        for dataset in datasets
-    ]
+    n_actual_positive = [int(np.sum(y)) for (X, y) in datasets]
+    n_actual_negative = [int(np.sum(1 - y)) for (X, y) in datasets]
+    n_obs = np.array([n_actual_negative, n_actual_positive]).T
+    n_eval_obs = np.asarray(n_obs * eval_proportion, dtype=int)
 
     smopdis_estimates = parallelize_to_array(
         functools.partial(
-            _split_and_train_and_estimate_smopdis,
+            _split_and_train_and_estimate_smopdises,
             n_trees=n_trees,
             eval_proportion=eval_proportion
         ),
@@ -56,14 +53,15 @@ def plot_smopdises(n_trees: int, datasets: Sequence[Dataset], dataset_names: Seq
         ]
     )
 
-    mean_smopdises = smopdis_estimates.mean(axis=0)
+    mean_smopdises = smopdis_estimates.mean(axis=0) / n_eval_obs[:, :, np.newaxis]
 
     for i_dataset, (dataset_name, ax) in enumerate(zip(dataset_names, axs.flat)):
-        smopdis = mean_smopdises[i_dataset] / n_eval_obs[i_dataset]
-        ax.bar(np.arange(n_trees + 1), smopdis, width=1)
+        for (actual_class, color, label) in zip((0, 1), ["orange", "blue"], ["False", "True"]):
+            ax.bar(np.arange(n_trees + 1), mean_smopdises[i_dataset, actual_class], width=1, color=color, alpha=0.5, label=label)
+
         ax.title.set_text(f"{dataset_name}")
         ax.set_xlim((-0.5, n_trees + 0.5))
-        ax.set_ylim((0, max(smopdis) * 1.05))
+        ax.set_ylim((0, np.max(mean_smopdises[i_dataset]) * 1.05))
         for side in ["top", "left", "right"]:
             ax.spines[side].set_visible(False)
 
