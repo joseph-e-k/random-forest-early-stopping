@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Callable, Iterable, Sequence
+from typing import Iterable, Sequence
 
 from diskcache import Cache
 import pandas as pd
@@ -17,7 +17,35 @@ DATA_DIRECTORY = os.path.join(os.path.dirname(__file__), "../../data")
 
 dataset_cache = Cache(os.path.join(DATA_DIRECTORY, ".cache"))
 
-type Dataset = tuple[pd.DataFrame, np.ndarray]
+class LazyDataset:
+    def __init__(self):
+        self._loaded = False
+        self._features = None
+        self._target = None
+    
+    def _load(self):
+        raise NotImplementedError()
+    
+
+    def __iter__(self):
+        if not self._loaded:
+            self._load()
+        self._loaded = True
+        yield from [self._features, self._target]
+
+
+class UCIDataset(LazyDataset):
+    def __init__(self, id):
+        super().__init__()
+        self._id = id
+    
+    def _load(self):
+        uci_dataset = fetch_ucirepo(id=self._id)
+        self._features = uci_dataset.data.features
+        self._target = uci_dataset.data.targets.iloc[:, 0]
+
+
+type Dataset = tuple[pd.DataFrame, np.ndarray] | LazyDataset
 
 
 def covariates_response_split(dataframe: pd.DataFrame, response_column=-1) -> Dataset:
@@ -25,15 +53,6 @@ def covariates_response_split(dataframe: pd.DataFrame, response_column=-1) -> Da
         response_column = dataframe.columns[response_column]
     
     return dataframe.drop([response_column], axis=1), dataframe[response_column]
-
-
-def load_local_dataset(file_name: str, reader: Callable[[str], pd.DataFrame] = pd.read_csv, response_column: str | int = -1) -> Dataset:
-    return covariates_response_split(reader(os.path.join(DATA_DIRECTORY, file_name)), response_column)
-
-
-def load_uci_dataset(id: int) -> Dataset:
-    uci_dataset = fetch_ucirepo(id=id)
-    return uci_dataset.data.features, uci_dataset.data.targets.iloc[:, 0]
 
 
 def to_binary_classifications(classifications, seed=0):
@@ -64,13 +83,12 @@ def enforce_nice_dataset(dataset: Dataset, coercion_seed=0) -> Dataset:
     return X, y
 
 @logged(message_level=logging.DEBUG)
-@memoize(cache=dataset_cache)
 def load_datasets(coercion_seed=0):
     named_raw_datasets = {
-        "Ground Cover": load_uci_dataset(id=31),
-        "Income": load_uci_dataset(id=117),
-        "Diabetes": load_uci_dataset(id=891),
-        "Skin": load_uci_dataset(id=229)
+        "Ground Cover": UCIDataset(id=31),
+        "Income": UCIDataset(id=117),
+        "Diabetes": UCIDataset(id=891),
+        "Skin": UCIDataset(id=229)
     }
 
     return unzip([
