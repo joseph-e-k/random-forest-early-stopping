@@ -12,10 +12,15 @@
 # Amit Moscovich, Tel Aviv University, 2023.
 import functools
 import os
+
 import matplotlib
-import numpy as np
 from matplotlib import pyplot as plt
+from matplotlib.axes import Axes
+from matplotlib.colors import to_rgb
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+import numpy as np
+import scipy
+import networkx as nx
 
 from ste.utils.logging import get_module_logger
 from ste.utils.multiprocessing import parallelize
@@ -206,3 +211,85 @@ def plot_stopping_strategy(ss, ax, ytick_gap=None):
     ax.set_yticklabels(ytick_labels)
     plt.colorbar(cax, cax=cbar_ax)
     return ax
+
+
+def draw_smooth_curve(points, **kwargs):
+    # Separate the points into x and y
+    points = np.array(points)
+    x = points[:, 0]
+    y = points[:, 1]
+    
+    # Generate more points along the curve
+    x_smooth = np.linspace(x.min(), x.max(), 500)  # Dense x for smooth curve
+    # Interpolate with spline
+    spline = scipy.interpolate.make_interp_spline(x, y, k=3)  # k=3 gives cubic spline
+    y_smooth = spline(x_smooth)
+    
+    # Plot the original points and the smooth curve
+    plt.plot(x_smooth, y_smooth, **kwargs)
+
+
+def compute_node_size_in_square_points(ax: Axes, r, axis="x"):
+    bbox = ax.get_window_extent().transformed(ax.figure.dpi_scale_trans.inverted())
+
+    match axis:
+        case "x" | 0:
+            ax_extent = bbox.width
+            data_limits = ax.get_xlim()
+        case "y" | 1:
+            ax_extent = bbox.height
+            data_limits = ax.get_ylim()
+        case _:
+            raise ValueError(f"'axis' must be 'x', 0, 'y', or 1; got {axis!r}")
+
+    data_per_inch = (data_limits[1] - data_limits[0]) / ax_extent
+    r_inches = r / data_per_inch
+    r_points = r_inches * 72
+    return np.pi * (r_points ** 2)
+
+
+def plot_stopping_strategy_fancy(ss, ax: Axes, node_radius=0.2, cmap="viridis_r"):
+    ss = np.asarray(ss, dtype=float)
+    n_base_models = ss.shape[0] - 1
+    G = nx.DiGraph()
+
+    # Add nodes and positions
+    positions = {}
+    for i in range(n_base_models + 1):
+        for j in range(i + 1):
+            G.add_node((i, j))
+            positions[(i, j)] = (i, 2 * j - i)
+
+    # Add edges
+    for i in range(n_base_models):
+        for j in range(i + 1):
+            G.add_edge((i, j), (i + 1, j))
+            G.add_edge((i, j), (i + 1, j + 1))
+
+    # Draw the graph
+    x_positions, y_positions = zip(*positions.values())
+    ax.set_xlim(min(x_positions) - 1, max(x_positions) + 1)
+    ax.set_ylim(min(y_positions) - 1, max(y_positions) + 1)
+
+    # Draw edges
+    node_size = compute_node_size_in_square_points(ax, node_radius)
+    nx.draw_networkx_edges(G, positions, ax=ax, arrowsize=np.sqrt(node_size) / 4, edge_color="black", node_size=node_size)
+
+    # Draw nodes
+    if isinstance(cmap, str):
+        cmap = plt.get_cmap(cmap)
+    node_colors = [cmap(ss[i, j]) for (i, j) in G.nodes]
+    nx.draw_networkx_nodes(G, positions, ax=ax, node_color=node_colors, edgecolors="black", alpha=0.5, node_size=node_size)
+
+    # Add labels
+    nx.draw_networkx_labels(G, positions, {(i, j): j for (i, j) in G.nodes}, ax=ax, font_size=10)
+
+    # Add vertical dashed lines for columns
+    for i in range(1, n_base_models + 1):
+        ax.axvline(x=i-0.5, color="gray", linestyle="dashed", linewidth=1)
+
+    # Add column headers
+    for i in range(n_base_models + 1):
+        ax.text(i, n_base_models + 1, f"i = {i}", fontsize=12, ha="center")
+
+    ax.axis("off")
