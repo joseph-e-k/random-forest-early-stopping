@@ -168,7 +168,13 @@ def create_subplot_grid(n_subplots, n_rows=None, n_columns=None, tight_layout=Tr
     if n_columns * n_rows != n_subplots:
         raise ValueError("Number of subplots does not fit evenly into given number of rows and columns")
 
-    return plt.subplots(nrows=n_rows, ncols=n_columns, tight_layout=tight_layout, figsize=figsize)
+    fig, axs = plt.subplots(nrows=n_rows, ncols=n_columns, tight_layout=tight_layout, figsize=figsize)
+
+    if not isinstance(axs, np.ndarray):
+        axs = np.array([axs])
+    
+    return fig, axs
+
 
 
 def plot_stopping_strategy(ss, ax, ytick_gap=None):
