@@ -27,6 +27,9 @@ class ForestWithStoppingStrategy:
     # TODO: Consistent naming style: log_prob_thing vs thing_log_prob vs log_thing_prob
     def _get_log_prob_stop(self):
         raise NotImplementedError()
+    
+    def get_prob_stop(self):
+        return np.exp(self._get_log_prob_stop())
 
     def __post_init__(self):
         self._n_steps = self.n_total + 1
@@ -179,6 +182,9 @@ class ForestWithGivenStoppingStrategy(ForestWithStoppingStrategy):
     def _get_log_prob_stop(self):
         with warnings.catch_warnings(category=RuntimeWarning, action="ignore"):
             return np.log(np.asarray(self.stopping_strategy, dtype=float))
+        
+    def get_prob_stop(self):
+        return self.stopping_strategy
 
 
 @dataclasses.dataclass(frozen=True)
