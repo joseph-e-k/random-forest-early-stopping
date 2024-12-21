@@ -254,8 +254,8 @@ def compute_node_size_in_square_points(ax: Axes, r, axis="x"):
     return np.pi * (r_points ** 2)
 
 
-def plot_stopping_strategy_fancy(ss, ax: Axes, node_radius=0.2, cmap="viridis_r"):
-    ss = np.asarray(ss, dtype=float)
+def plot_fwss(fwss, ax: Axes, node_radius=0.2, cmap="viridis_r"):
+    ss = np.asarray(fwss.get_prob_stop(), dtype=float)
     n_base_models = ss.shape[0] - 1
     G = nx.DiGraph()
 
@@ -272,20 +272,34 @@ def plot_stopping_strategy_fancy(ss, ax: Axes, node_radius=0.2, cmap="viridis_r"
             G.add_edge((i, j), (i + 1, j))
             G.add_edge((i, j), (i + 1, j + 1))
 
+    node_probs = np.exp([fwss.get_log_state_probability(*node) for node in G.nodes])
+
     # Draw the graph
     x_positions, y_positions = zip(*positions.values())
     ax.set_xlim(min(x_positions) - 1, max(x_positions) + 1)
     ax.set_ylim(min(y_positions) - 1, max(y_positions) + 1)
 
     # Draw edges
+    transition_probs = []
+
+    for ((i_src, j_src), (_, j_dest)) in G.edges:
+        prob_reach = np.exp(fwss.get_log_state_probability(i_src, j_src))
+        prob_continue_if_reached = 1 - ss[i_src, j_src]
+        prob_transition_if_continue = fwss.prob_see_bad[i_src, j_src] if j_dest == j_src else fwss.prob_see_good[i_src, j_src]
+        transition_probs.append(prob_reach * prob_continue_if_reached * prob_transition_if_continue)
+
     node_size = compute_node_size_in_square_points(ax, node_radius)
-    nx.draw_networkx_edges(G, positions, ax=ax, arrowsize=np.sqrt(node_size) / 4, edge_color="black", node_size=node_size)
+    base_arrow_size = np.sqrt(node_size) / 4
+    arrow_sizes = list(base_arrow_size * np.array(transition_probs))
+    nx.draw_networkx_edges(G, positions, width=transition_probs, ax=ax, arrowsize=arrow_sizes, edge_color="black", node_size=node_size)
 
     # Draw nodes
     if isinstance(cmap, str):
         cmap = plt.get_cmap(cmap)
-    node_colors = [cmap(ss[i, j]) for (i, j) in G.nodes]
-    nx.draw_networkx_nodes(G, positions, ax=ax, node_color=node_colors, edgecolors="black", alpha=0.5, node_size=node_size)
+    node_body_color = "skyblue"
+    node_border_weights = 2 * np.array([ss[i, j] if fwss.get_log_state_probability(i, j) > -np.inf else 1 for (i, j) in G.nodes])
+    node_border_colors = [node_body_color if w == 0 else "black" for w in node_border_weights]
+    nx.draw_networkx_nodes(G, positions, ax=ax, node_color=node_body_color, edgecolors=node_border_colors, alpha=node_probs, node_size=node_size, linewidths=node_border_weights)
 
     # Add labels
     nx.draw_networkx_labels(G, positions, {(i, j): j for (i, j) in G.nodes}, ax=ax, font_size=10)

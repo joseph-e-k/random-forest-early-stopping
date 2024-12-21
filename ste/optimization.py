@@ -10,8 +10,8 @@ from matplotlib import pyplot as plt
 from scipy import stats
 from scipy.special import comb
 
-from ste.ForestWithEnvelope import get_greedy_stopping_strategy
-from ste.utils.figures import create_subplot_grid, plot_stopping_strategy, plot_stopping_strategy_fancy
+from ste.ForestWithStoppingStrategy import Forest, ForestWithGivenStoppingStrategy
+from ste.utils.figures import create_subplot_grid, plot_stopping_strategy, plot_fwss
 from ste.utils.linear_programming import Problem, OptimizationResult, ArithmeticExpression, OptimizationFailure
 from ste.utils.logging import configure_logging, get_module_logger
 from ste.utils.misc import forwards_to, get_output_path
@@ -166,7 +166,9 @@ def show_stopping_strategies(stopping_strategies, titles, n_rows=None, n_columns
     axs = axs.reshape(-1)
     for i, (ss, title) in enumerate(zip(stopping_strategies, titles)):
         if fancy:
-            plot_stopping_strategy_fancy(ss, ax=axs[i])
+            n_base_models = ss.shape[0] - 1
+            fwss = ForestWithGivenStoppingStrategy(Forest(n_base_models, n_base_models), ss)
+            plot_fwss(fwss, ax=axs[i])
         else:
             plot_stopping_strategy(ss, ax=axs[i])
         axs[i].title.set_text(title)
@@ -203,8 +205,7 @@ def main():
     if not args.graph:
         return
 
-    greedy_ss = get_greedy_stopping_strategy(args.n, args.alpha)
-    show_stopping_strategies([oss, greedy_ss], ["Optimal stopping strategy", "Greedy envelope"], fancy=args.fancy)
+    show_stopping_strategies([oss], [""], fancy=args.fancy)
 
     output_path = args.output_path or get_output_path(f"ss_visualization_{args.n}_submodels_{args.alpha}_adr")
     plt.savefig(output_path)

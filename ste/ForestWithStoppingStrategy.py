@@ -23,6 +23,8 @@ class ForestWithStoppingStrategy:
     n_total_positive = property(lambda self: self.forest.n_total_positive)
     result = property(lambda self: self.forest.result)
     n_steps = property(lambda self: self.forest.n_steps)
+    prob_see_good = property(lambda self: np.exp(self._log_prob_see_good))
+    prob_see_bad = property(lambda self: np.exp(self._log_prob_see_bad))
 
     # TODO: Consistent naming style: log_prob_thing vs thing_log_prob vs log_thing_prob
     def _get_log_prob_stop(self):
