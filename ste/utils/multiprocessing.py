@@ -23,6 +23,7 @@ _logger = get_module_logger()
 
 
 N_WORKER_PROCESSES = int(os.getenv("STE_N_WORKER_PROCESSES", 32))
+SHOULD_DUMMY_MULTIPROCESSING = bool(os.getenv("STE_DUMMY_MULTIPROCESS", False))
 
 
 @dataclasses.dataclass
@@ -168,7 +169,11 @@ def parallelize(function, reps=None, argses_to_iter=None, argses_to_combine=None
 
     job = _Job(function, job_name, get_breadcrumbs(), n_tasks)
 
-    if multiprocessing.current_process().daemon:
+    if SHOULD_DUMMY_MULTIPROCESSING:
+        _logger.info("Falling back to dummy multiprocessing, per environment variable flag")
+        dummy = True
+
+    elif multiprocessing.current_process().daemon:
         _logger.warning("Daemon process; falling back to dummy behaviour")
         dummy = True
 
