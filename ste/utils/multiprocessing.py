@@ -14,9 +14,11 @@ from typing import Any, Callable
 
 import numpy as np
 import tblib
+import sysv_ipc
+from diskcache.core import full_name
 
 from ste.utils.logging import get_breadcrumbs, get_module_logger, logged, breadcrumbs
-from ste.utils.misc import TimerContext, enumerate_product, forwards_to, get_name, repeat_enumerated
+from ste.utils.misc import TimerContext, enumerate_product, forwards_to, function_call_to_tuple, get_name, repeat_enumerated, deterministic_hash
 
 
 _logger = get_module_logger()
@@ -24,6 +26,10 @@ _logger = get_module_logger()
 
 N_WORKER_PROCESSES = int(os.getenv("STE_N_WORKER_PROCESSES", 32))
 SHOULD_DUMMY_MULTIPROCESSING = bool(os.getenv("STE_DUMMY_MULTIPROCESS", False))
+
+
+class SynchronizationError(Exception):
+    pass
 
 
 @dataclasses.dataclass
@@ -217,3 +223,53 @@ def parallelize_to_array(function, reps=None, argses_to_iter=None, argses_to_com
         results_array[task.index] = result
 
     return results_array
+
+
+class Lock:
+    def __init__(self, key):
+        ipc_key = deterministic_hash(key) % (sysv_ipc.KEY_MAX - sysv_ipc.KEY_MIN) + sysv_ipc.KEY_MIN
+        try:
+            self.semaphore = sysv_ipc.Semaphore(key=ipc_key, flags=sysv_ipc.IPC_CREX, initial_value=1)
+            _logger.info(f"Semaphore created for key {key!r} => {ipc_key}")
+        except sysv_ipc.ExistentialError:
+            self.semaphore = sysv_ipc.Semaphore(key=ipc_key)
+        self.locked = False
+
+    def __enter__(self):
+        if self.locked:
+            raise SynchronizationError("This kind of lock is not reentrant")
+
+        self.semaphore.acquire()
+        self.locked = True
+        return self
+    
+    def __exit__(self, *args):
+        self.semaphore.release()
+        self.locked = False
+
+
+def locked(per_argset=False):
+    if per_argset:
+        return _locked_per_argset
+    return _locked_globally
+
+
+def _locked_per_argset(wrapped):
+    try:
+        key_getter = wrapped.__cache_key__
+    except AttributeError:
+        key_getter = functools.partial(function_call_to_tuple, wrapped, None, (), {})
+    @functools.wraps(wrapped)
+    def wrapper(*args, **kwargs):
+        key = key_getter(*args, **kwargs)
+        with Lock(key):
+            return wrapped(*args, **kwargs)
+    return wrapper
+
+
+def _locked_globally(wrapped):
+    @functools.wraps(wrapped)
+    def wrapper(*args, **kwargs):
+        with Lock(full_name(wrapped)):
+            return wrapped(*args, **kwargs)
+    return wrapper

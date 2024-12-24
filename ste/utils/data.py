@@ -6,16 +6,25 @@ from diskcache import Cache
 import pandas as pd
 import numpy as np
 
-from ucimlrepo import fetch_ucirepo
+from ucimlrepo import fetch_ucirepo as _fetch_uci_repo
 
 from ste.utils.caching  import memoize
 from ste.utils.logging import logged
 from ste.utils.misc import unzip
+from ste.utils.multiprocessing import locked
 
 
 DATA_DIRECTORY = os.path.join(os.path.dirname(__file__), "../../data")
 
 dataset_cache = Cache(os.path.join(DATA_DIRECTORY, ".cache"))
+
+
+@locked(per_argset=True)
+@memoize(cache=dataset_cache)
+@logged(message_level=logging.INFO)
+def fetch_uci_repo(repo_id):
+    return _fetch_uci_repo(id=repo_id)
+
 
 class LazyDataset:
     def __init__(self):
@@ -40,7 +49,7 @@ class UCIDataset(LazyDataset):
         self._id = id
     
     def _load(self):
-        uci_dataset = fetch_ucirepo(id=self._id)
+        uci_dataset = fetch_uci_repo(self._id)
         self._features = uci_dataset.data.features
         self._target = uci_dataset.data.targets.iloc[:, 0]
 

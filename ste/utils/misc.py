@@ -1,6 +1,7 @@
 import dataclasses
 from datetime import datetime, timezone
 import functools
+import hashlib
 import inspect
 import itertools
 import os
@@ -9,6 +10,7 @@ from typing import Callable
 
 import numpy as np
 from scipy import stats
+from diskcache.core import full_name
 
 from ste.utils.logging import get_module_logger
 
@@ -155,3 +157,29 @@ def swap_indices_of_axis(array, i, j, axis):
     array_swap[[i, j], ...] = array_swap[[j, i], ...]
     array = np.swapaxes(array_swap, 0, axis)
     return array
+
+
+def deterministic_hash(thing):
+    h = hashlib.sha256(repr(thing).encode("utf8"), usedforsecurity=False)
+    return int(h.hexdigest(), base=16)
+
+
+def function_call_to_tuple(function, name, args_to_ignore, arg_transformations, /, *args, **kwargs):
+    if name is None:
+        name = full_name(function)
+
+    signature = inspect.signature(function)
+    bound_arguments = signature.bind(*args, **kwargs)
+    bound_arguments.apply_defaults()
+
+    key = [name]
+
+    for arg_name, arg_value in bound_arguments.arguments.items():
+        if arg_name in args_to_ignore:
+            continue
+        if arg_name in arg_transformations:
+            transformation = arg_transformations[arg_name]
+            arg_value = transformation(arg_value)
+        key.append((arg_name, arg_value))
+
+    return tuple(key)
