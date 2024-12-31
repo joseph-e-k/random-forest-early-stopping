@@ -212,7 +212,7 @@ def show_metrics(n_trees, metrics, dataset_names, allowable_disagreement_rates, 
     
     base_error_rates = base_error_rates[:, 0, 0]
 
-    fig, axs = create_subplot_grid(n_metrics * n_datasets, n_rows=n_datasets, tight_layout=False, figsize=(10, 15))
+    fig, axs = create_subplot_grid(n_metrics * n_datasets, n_rows=n_datasets, tight_layout=False, figsize=(10, 4 * n_datasets))
     fig.subplots_adjust(hspace=10)
 
     metrics = swap_indices_of_axis(metrics, 1, 2, axis=3)
@@ -315,6 +315,7 @@ def parse_args():
     ss_comparison_subparser.add_argument("--output-path", "-o", type=str, default=None)
     ss_comparison_subparser.add_argument("--random-seed", "-s", type=int, default=1234)
     ss_comparison_subparser.add_argument("--n-forests", "--number-of-forests", "-f", type=int, default=30)
+    ss_comparison_subparser.add_argument("--benchmark", "-b", action="store_true")
 
     tree_distribution_subparser = subparsers.add_parser("tree-distribution")
     tree_distribution_subparser.set_defaults(action_name="smopdis")
@@ -322,6 +323,7 @@ def parse_args():
     tree_distribution_subparser.add_argument("--output-path", "-o", type=str, default=None)
     tree_distribution_subparser.add_argument("--random-seed", "-s", type=int, default=1234)
     tree_distribution_subparser.add_argument("--n-forests", "--number-of-forests", "-f", type=int, default=30)
+    tree_distribution_subparser.add_argument("--benchmark", "-b", action="store_true")
 
     return parser.parse_args()
 
@@ -333,7 +335,7 @@ def main():
     random.seed(args.random_seed)
     pd.options.mode.chained_assignment = None
 
-    dataset_names, datasets = load_datasets()
+    dataset_names, datasets = load_datasets(full_benchmark=args.benchmark)
 
     with warnings.catch_warnings(category=UserWarning, action="ignore"):
         if args.action_name == "empirical_comparison":

@@ -3,6 +3,7 @@ import os
 from typing import Iterable, Sequence
 
 from diskcache import Cache
+import openml
 import pandas as pd
 import numpy as np
 
@@ -11,15 +12,15 @@ from ucimlrepo import fetch_ucirepo as _fetch_uci_repo
 from ste.utils.caching  import memoize
 from ste.utils.logging import logged
 from ste.utils.misc import unzip
-from ste.utils.multiprocessing import locked
 
 
+BENCHMARK_SUITE_IDS = [298, 300]
 DATA_DIRECTORY = os.path.join(os.path.dirname(__file__), "../../data")
+
 
 dataset_cache = Cache(os.path.join(DATA_DIRECTORY, ".cache"))
 
 
-@locked(per_argset=True)
 @memoize(cache=dataset_cache)
 @logged(message_level=logging.INFO)
 def fetch_uci_repo(repo_id):
@@ -52,6 +53,17 @@ class UCIDataset(LazyDataset):
         uci_dataset = fetch_uci_repo(self._id)
         self._features = uci_dataset.data.features
         self._target = uci_dataset.data.targets.iloc[:, 0]
+
+
+class OpenMLDataset(LazyDataset):
+    def __init__(self, id):
+            super().__init__()
+            self._id = id
+    
+    def _load(self):
+        openml_dataset = openml.datasets.get_dataset(self._id)
+        data = openml_dataset.get_data(target=openml_dataset.default_target_attribute)
+        self._features, self._target, _, _ = data
 
 
 type Dataset = tuple[pd.DataFrame, np.ndarray] | LazyDataset
@@ -91,14 +103,31 @@ def enforce_nice_dataset(dataset: Dataset, coercion_seed=0) -> Dataset:
     y = to_binary_classifications(y, coercion_seed)
     return X, y
 
+
+def get_benchmark_datasets():
+    suite = openml.study.get_suite(298)
+    datasets_by_name = {}
+    for suite_id in BENCHMARK_SUITE_IDS:
+        suite = openml.study.get_suite(suite_id)
+        for task_id in suite.tasks:
+            task = openml.tasks.get_task(task_id)
+            dataset = openml.datasets.get_dataset(task.dataset_id)
+            datasets_by_name[dataset.name] = OpenMLDataset(task.dataset_id)
+
+    return datasets_by_name
+
+
 @logged(message_level=logging.DEBUG)
-def load_datasets(coercion_seed=0):
-    named_raw_datasets = {
-        "Ground Cover": UCIDataset(id=31),
-        "Income": UCIDataset(id=117),
-        "Diabetes": UCIDataset(id=891),
-        "Skin": UCIDataset(id=229)
-    }
+def load_datasets(coercion_seed=0, full_benchmark=False):
+    if full_benchmark:
+        named_raw_datasets = get_benchmark_datasets()
+    else:
+        named_raw_datasets = {
+            "Ground Cover": UCIDataset(id=31),
+            "Income": UCIDataset(id=117),
+            "Diabetes": UCIDataset(id=891),
+            "Skin": UCIDataset(id=229)
+        }
 
     return unzip([
         (name, enforce_nice_dataset(dataset, coercion_seed))
