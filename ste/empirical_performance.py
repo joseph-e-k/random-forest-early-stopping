@@ -18,7 +18,7 @@ from ste.utils.logging import configure_logging, get_module_logger
 from ste.utils.multiprocessing import parallelize_to_array
 from ste.optimization import get_optimal_stopping_strategy
 from ste.utils.caching import memoize
-from ste.utils.data import Dataset, load_datasets, split_dataset
+from ste.utils.data import Dataset, get_names_and_datasets, split_dataset
 from ste.utils.misc import get_output_path, swap_indices_of_axis
 
 
@@ -335,7 +335,7 @@ def main():
     random.seed(args.random_seed)
     pd.options.mode.chained_assignment = None
 
-    dataset_names, datasets = load_datasets(full_benchmark=args.benchmark)
+    dataset_names, datasets = get_names_and_datasets(full_benchmark=args.benchmark)
 
     with warnings.catch_warnings(category=UserWarning, action="ignore"):
         if args.action_name == "empirical_comparison":

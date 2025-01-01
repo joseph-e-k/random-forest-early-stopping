@@ -1,6 +1,8 @@
+from dataclasses import dataclass
 import logging
 import os
 from typing import Iterable, Sequence
+from weakref import WeakKeyDictionary
 
 from diskcache import Cache
 import openml
@@ -14,8 +16,9 @@ from ste.utils.logging import logged
 from ste.utils.misc import unzip
 
 
-BENCHMARK_SUITE_IDS = [298, 300]
+BENCHMARK_DATASET_IDS = [44089, 44090, 44091, 44120, 44121, 44122, 44123, 44124, 44125, 44126, 44127, 44128, 44129, 44130, 44131, 44156, 44157, 44158, 44159, 44160, 44161, 44162]
 DATA_DIRECTORY = os.path.join(os.path.dirname(__file__), "../../data")
+DICHOTOMIZATION_SEED = 0
 
 
 dataset_cache = Cache(os.path.join(DATA_DIRECTORY, ".cache"))
@@ -28,42 +31,44 @@ def fetch_uci_repo(repo_id):
 
 
 class LazyDataset:
-    def __init__(self):
-        self._loaded = False
-        self._features = None
-        self._target = None
+    _wkd = WeakKeyDictionary()
     
     def _load(self):
         raise NotImplementedError()
-    
 
     def __iter__(self):
-        if not self._loaded:
-            self._load()
-        self._loaded = True
-        yield from [self._features, self._target]
+        try:
+            data = self._wkd[self]
+        except KeyError:
+            data = self._clean_data(*self._load())
+            self._wkd[self] = data
+        yield from data
+
+    @staticmethod
+    def _clean_data(features, target):
+        features = coerce_nonnumeric_columns_to_numeric(features)
+        target = to_binary_classifications(target, DICHOTOMIZATION_SEED)
+        return features, target
 
 
+@dataclass(frozen=True)
 class UCIDataset(LazyDataset):
-    def __init__(self, id):
-        super().__init__()
-        self._id = id
+    id: int
     
     def _load(self):
-        uci_dataset = fetch_uci_repo(self._id)
-        self._features = uci_dataset.data.features
-        self._target = uci_dataset.data.targets.iloc[:, 0]
+        uci_dataset = fetch_uci_repo(self.id)
+        return uci_dataset.data.features, uci_dataset.data.targets.iloc[:, 0]
 
 
+@dataclass(frozen=True)
 class OpenMLDataset(LazyDataset):
-    def __init__(self, id):
-            super().__init__()
-            self._id = id
+    id: int
     
     def _load(self):
-        openml_dataset = openml.datasets.get_dataset(self._id)
+        openml_dataset = openml.datasets.get_dataset(self.id)
         data = openml_dataset.get_data(target=openml_dataset.default_target_attribute)
-        self._features, self._target, _, _ = data
+        features, target, _, _ = data
+        return features, target
 
 
 type Dataset = tuple[pd.DataFrame, np.ndarray] | LazyDataset
@@ -76,7 +81,7 @@ def covariates_response_split(dataframe: pd.DataFrame, response_column=-1) -> Da
     return dataframe.drop([response_column], axis=1), dataframe[response_column]
 
 
-def to_binary_classifications(classifications, seed=0):
+def to_binary_classifications(classifications, seed):
     classes = set(classifications)
     n_classes = len(classes)
 
@@ -97,42 +102,28 @@ def coerce_nonnumeric_columns_to_numeric(df: pd.DataFrame):
     return df
 
 
-def enforce_nice_dataset(dataset: Dataset, coercion_seed=0) -> Dataset:
-    X, y = dataset
-    X = coerce_nonnumeric_columns_to_numeric(X)
-    y = to_binary_classifications(y, coercion_seed)
-    return X, y
-
-
 def get_benchmark_datasets():
-    suite = openml.study.get_suite(298)
     datasets_by_name = {}
-    for suite_id in BENCHMARK_SUITE_IDS:
-        suite = openml.study.get_suite(suite_id)
-        for task_id in suite.tasks:
-            task = openml.tasks.get_task(task_id)
-            dataset = openml.datasets.get_dataset(task.dataset_id)
-            datasets_by_name[dataset.name] = OpenMLDataset(task.dataset_id)
+    for dataset_id in BENCHMARK_DATASET_IDS:
+        dataset = openml.datasets.get_dataset(dataset_id)
+        datasets_by_name[dataset.name] = OpenMLDataset(dataset_id)
 
     return datasets_by_name
 
 
 @logged(message_level=logging.DEBUG)
-def load_datasets(coercion_seed=0, full_benchmark=False):
+def get_names_and_datasets(full_benchmark=False):
     if full_benchmark:
-        named_raw_datasets = get_benchmark_datasets()
+        named_datasets = get_benchmark_datasets()
     else:
-        named_raw_datasets = {
+        named_datasets = {
             "Ground Cover": UCIDataset(id=31),
             "Income": UCIDataset(id=117),
             "Diabetes": UCIDataset(id=891),
             "Skin": UCIDataset(id=229)
         }
 
-    return unzip([
-        (name, enforce_nice_dataset(dataset, coercion_seed))
-        for name, dataset in named_raw_datasets.items()
-    ])
+    return unzip(named_datasets.items())
 
 
 def split_dataset(dataset: Dataset, relative_proportions: Sequence[float | int]) -> Iterable[Dataset]:
