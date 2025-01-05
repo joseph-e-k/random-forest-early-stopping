@@ -11,7 +11,6 @@ import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 
 from ste.Forest import Forest
-from ste.ForestWithEnvelope import ForestWithEnvelope
 from ste.ForestWithStoppingStrategy import ForestWithGivenStoppingStrategy
 from ste.utils.figures import create_subplot_grid, plot_functions
 from ste.utils.logging import configure_logging, get_module_logger
@@ -75,7 +74,7 @@ def plot_smopdises(n_trees: int, datasets: Sequence[Dataset], dataset_names: Seq
     return fig
 
 
-def _get_stopping_strategies(n_trees, smopdis_estimate, adrs, stopping_strategy_getters):
+def _get_stopping_strategies(n_trees, smopdis_estimated, smopdis_oracular, adrs, stopping_strategy_getters):
     return parallelize_to_array(
         operator.call,
         argses_to_combine=[
@@ -83,7 +82,8 @@ def _get_stopping_strategies(n_trees, smopdis_estimate, adrs, stopping_strategy_
                 functools.partial(
                     ss_getter,
                     n_trees=n_trees,
-                    smopdis_estimate=smopdis_estimate
+                    smopdis_estimated=smopdis_estimated,
+                    smopdis_oracular=smopdis_oracular
                 ) for ss_getter in stopping_strategy_getters
             ],
             adrs
@@ -168,14 +168,20 @@ def estimate_conditional_smopdises(rf_classifier: RandomForestClassifier, datase
     ])
 
 
+def combine_conditional_smopdises(smopdises, data):
+    X, y = data
+    weights = np.array([(y == 0).sum(), (y == 1).sum()]) / len(y)
+
+
 def get_metrics_once(data: Dataset, adrs: Sequence[float], n_trees: int, stopping_strategy_getters: list[StoppingStrategyGetter], data_partition_ratios):
     training_data, calibration_data, evaluation_data = split_dataset(data, data_partition_ratios)
 
     forest = train_forest(n_trees, training_data)
     smopdis_estimates_for_evaluation = estimate_conditional_smopdises(forest, evaluation_data)
     smopdis_estimate_for_bayesian_ss = estimate_smopdis(forest, calibration_data)
+    smopdis_estimate_for_oracular_ss = estimate_smopdis(forest, evaluation_data)
 
-    stopping_strategies = _get_stopping_strategies(n_trees, smopdis_estimate_for_bayesian_ss, adrs, stopping_strategy_getters)
+    stopping_strategies = _get_stopping_strategies(n_trees, smopdis_estimate_for_bayesian_ss, smopdis_estimate_for_oracular_ss, adrs, stopping_strategy_getters)
 
     return _analyse_stopping_strategies(stopping_strategies, smopdis_estimates_for_evaluation)
 
@@ -294,19 +300,17 @@ def get_and_show_disagreement_rates_and_runtimes(n_forests, n_trees, datasets, d
     )
 
 
-@memoize(args_to_ignore=["smopdis_estimate"])
-def get_greedy_ss(adr: float, smopdis_estimate: np.ndarray, n_trees: int) -> np.ndarray:
-    fwe = ForestWithEnvelope.create_greedy(n_trees, n_trees, adr)
-    return fwe.get_prob_stop()
-
-
-@memoize(args_to_ignore=["smopdis_estimate"])
-def get_minimax_ss(adr: float, smopdis_estimate: np.ndarray, n_trees: int) -> np.ndarray:
+@memoize(args_to_ignore=["smopdis_estimated", "smopdis_oracular"])
+def get_minimax_ss(adr: float, smopdis_estimated: np.ndarray, smopdis_oracular: np.ndarray, n_trees: int) -> np.ndarray:
     return get_optimal_stopping_strategy(n_trees, adr)
 
 
-def get_bayesian_ss(adr: float, smopdis_estimate: np.ndarray, n_trees: int) -> np.ndarray:
-    return get_optimal_stopping_strategy(n_trees, adr, smopdis_estimate, disagreement_minimax=False, runtime_minimax=False)
+def get_bayesian_ss(adr: float, smopdis_estimated: np.ndarray, smopdis_oracular: np.ndarray, n_trees: int) -> np.ndarray:
+    return get_optimal_stopping_strategy(n_trees, adr, smopdis_estimated, disagreement_minimax=False, runtime_minimax=False)
+
+
+def get_bayesian_oracle_ss(adr: float, smopdis_estimated: np.ndarray, smopdis_oracular: np.ndarray, n_trees: int) -> np.ndarray:
+    return get_optimal_stopping_strategy(n_trees, adr, smopdis_oracular, disagreement_minimax=False, runtime_minimax=False)
 
 
 DEFAULT_ADRS = tuple(10 ** -(i/2) for i in range(2, 13)) + (0,)
@@ -353,9 +357,9 @@ def main():
                 dataset_names,
                 args.alphas,
                 {
-                    "Greedy": get_greedy_ss,
                     "Minimax": get_minimax_ss,
-                    "Bayesian": get_bayesian_ss
+                    "Bayesian": get_bayesian_ss,
+                    "Oracular": get_bayesian_oracle_ss
                 }
             )
         elif args.action_name == "smopdis":
