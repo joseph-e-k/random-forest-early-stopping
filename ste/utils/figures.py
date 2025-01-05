@@ -163,8 +163,10 @@ def plot_function_many_curves(ax, x_axis_arg_name, distinct_curves_arg_name, fun
 
 
 def create_subplot_grid(n_subplots, n_rows=None, n_columns=None, tight_layout=True, figsize=None):
+    if n_rows is None and n_columns is not None:
+        n_rows = n_subplots // n_columns
     n_rows = n_rows or 1
-    n_columns = n_columns or n_subplots // n_rows
+    n_columns = n_columns or (n_subplots // n_rows)
     if n_columns * n_rows != n_subplots:
         raise ValueError("Number of subplots does not fit evenly into given number of rows and columns")
 
@@ -174,7 +176,6 @@ def create_subplot_grid(n_subplots, n_rows=None, n_columns=None, tight_layout=Tr
         axs = np.array([axs])
     
     return fig, axs
-
 
 
 def plot_stopping_strategy(ss, ax, ytick_gap=None):

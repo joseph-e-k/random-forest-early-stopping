@@ -34,7 +34,14 @@ def _split_and_train_and_estimate_smopdises(dataset, n_trees, eval_proportion):
 
 
 def plot_smopdises(n_trees: int, datasets: Sequence[Dataset], dataset_names: Sequence[str], eval_proportion: float = 0.2, n_forests: int = 30):
-    fig, axs = create_subplot_grid(len(datasets), n_rows=2)
+    n_datasets = len(datasets)
+    if n_datasets % 2 == 0:
+        n_columns = 2
+    elif n_datasets % 3 == 0:
+        n_columns = 3
+    else:
+        n_columns = 1
+    fig, axs = create_subplot_grid(n_datasets, n_columns=n_columns, figsize=(10, 4 * n_datasets))
 
     n_actual_positive = [int(np.sum(y)) for (X, y) in datasets]
     n_actual_negative = [int(np.sum(1 - y)) for (X, y) in datasets]
