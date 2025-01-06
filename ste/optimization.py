@@ -165,12 +165,14 @@ def show_stopping_strategy(ss):
     n = ss.shape[0] - 1
     values_of_n_plus = [n, n // 2]
     n_fwsses = len(values_of_n_plus)
-    fig, axs = create_subplot_grid(n_fwsses,  figsize=(24 * n_fwsses, 8))
+    fig_width = 2 * n + 2
+    fig_height = (n + 1) * n_fwsses
+    fig, axs = create_subplot_grid(n_fwsses, n_rows=n_fwsses, n_columns=1, figsize=(fig_width, fig_height))
     axs = axs.reshape(-1)
-    for i_fwss, n_plus in enumerate(values_of_n_plus):
+    for n_plus, ax in zip(values_of_n_plus, axs):
         fwss = ForestWithGivenStoppingStrategy(Forest(n, n_plus), ss)
-        plot_fwss(fwss, ax=axs[i_fwss])
-        axs[i_fwss].title.set_text(f"{n_plus} / {n} positive base models")
+        plot_fwss(fwss, ax=ax)
+        ax.set_title(f"{n_plus} / {n} positive base models", pad=20)
 
     plt.show()
 

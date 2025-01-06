@@ -15,16 +15,15 @@ import os
 
 import matplotlib
 from matplotlib import pyplot as plt
+from matplotlib import colors
 from matplotlib.axes import Axes
-from matplotlib.colors import to_rgb
-from mpl_toolkits.axes_grid1 import make_axes_locatable
 import numpy as np
 import scipy
 import networkx as nx
 
 from ste.utils.logging import get_module_logger
 from ste.utils.multiprocessing import parallelize
-from ste.utils.misc import get_name, stringify_kwargs
+from ste.utils.misc import extend_array, get_name, stringify_kwargs
 
 
 _logger = get_module_logger()
@@ -78,6 +77,12 @@ def save_figure(fig, name):
     filename = os.path.join(FIGURES_PATH, name).replace('.', '_') + '.pdf'
     _logger.info(f'Saving figure to "{os.path.realpath(filename)}"')
     fig.savefig(filename, dpi=DPI, bbox_inches='tight')
+
+
+def interpolate_color(color1, color2, t):
+    rgba1 = colors.to_rgba(color1)
+    rgba2 = colors.to_rgba(color2)
+    return tuple((1 - t) * c1 + t * c2 for c1, c2 in zip(rgba1, rgba2))
 
 
 def plot_function(ax, x_axis_arg_name, function, function_kwargs=None, plot_kwargs=None, results_transform=lambda y: y,
@@ -213,9 +218,10 @@ def compute_node_size_in_square_points(ax: Axes, r, axis="x"):
     return np.pi * (r_points ** 2)
 
 
-def plot_fwss(fwss, ax: Axes, node_radius=0.2, cmap="viridis_r"):
+def plot_fwss(fwss, ax: Axes, node_radius=0.2):
     ss = np.asarray(fwss.get_prob_stop(), dtype=float)
     n_base_models = ss.shape[0] - 1
+    ss = extend_array(ss, new_shape=(n_base_models + 1, n_base_models + 1), fill_value=1)
     G = nx.DiGraph()
 
     # Add nodes and positions
@@ -251,17 +257,13 @@ def plot_fwss(fwss, ax: Axes, node_radius=0.2, cmap="viridis_r"):
             transition_probs.append(prob_reach * prob_continue_if_reached * prob_transition_if_continue)
 
     node_size = compute_node_size_in_square_points(ax, node_radius)
-    base_arrow_size = np.sqrt(node_size) / 4
-    arrow_sizes = list(base_arrow_size * np.array(transition_probs))
-    nx.draw_networkx_edges(G, positions, width=transition_probs, ax=ax, arrowsize=arrow_sizes, edge_color="black", node_size=node_size)
+    arrow_size = np.sqrt(node_size) / 4
+    nx.draw_networkx_edges(G, positions, ax=ax, arrowsize=arrow_size, edge_color="black", node_size=node_size, alpha=transition_probs)
 
     # Draw nodes
-    if isinstance(cmap, str):
-        cmap = plt.get_cmap(cmap)
     node_body_color = "skyblue"
-    node_border_weights = 2 * np.array([ss[i, j] if fwss.get_log_state_probability(i, j) > -np.inf else 1 for (i, j) in G.nodes])
-    node_border_colors = [node_body_color if w == 0 else "black" for w in node_border_weights]
-    nx.draw_networkx_nodes(G, positions, ax=ax, node_color=node_body_color, edgecolors=node_border_colors, alpha=node_probs, node_size=node_size, linewidths=node_border_weights)
+    node_border_colors = [interpolate_color("black", "red", ss[i, j]) for (i, j) in G.nodes]
+    nx.draw_networkx_nodes(G, positions, ax=ax, node_color=node_body_color, alpha=node_probs, node_size=node_size, edgecolors=node_border_colors, linewidths=2)
 
     # Add labels
     nx.draw_networkx_labels(G, positions, {(i, j): j for (i, j) in G.nodes}, ax=ax, font_size=10)

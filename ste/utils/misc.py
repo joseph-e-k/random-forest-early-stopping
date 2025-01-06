@@ -25,6 +25,21 @@ def unzip(sequence_of_tuples):
     return list(zip(*sequence_of_tuples))
 
 
+def extend_array(old_array, new_shape, fill_value=0):
+    old_shape = old_array.shape
+    if len(new_shape) != len(old_shape):
+        raise ValueError(f"extend_array cannot change number of dimensions ({len(old_shape)} -> {len(new_shape)})")
+    
+    for i_dimension, (old_dimension, new_dimension) in enumerate(zip(old_shape, new_shape)):
+        if new_dimension < old_dimension:
+            raise ValueError(f"extend_array cannot shrink dimensions (dimension {i_dimension}: {old_dimension} -> {new_dimension})")
+
+    new_array = np.full(new_shape, fill_value, dtype=old_array.dtype)
+    slices = tuple(slice(0, old_dimension) for old_dimension in old_shape)
+    new_array[slices] = old_array
+    return new_array
+
+
 def shift_array(arr, num, fill_value=np.nan):
     result = np.empty_like(arr)
     if num > 0:
