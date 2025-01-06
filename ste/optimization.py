@@ -11,7 +11,7 @@ from scipy import stats
 from scipy.special import comb
 
 from ste.ForestWithStoppingStrategy import Forest, ForestWithGivenStoppingStrategy
-from ste.utils.figures import create_subplot_grid, plot_stopping_strategy, plot_fwss
+from ste.utils.figures import create_subplot_grid, plot_fwss
 from ste.utils.linear_programming import Problem, OptimizationResult, ArithmeticExpression, OptimizationFailure
 from ste.utils.logging import configure_logging, get_module_logger
 from ste.utils.misc import forwards_to, get_output_path
@@ -161,17 +161,16 @@ def make_theta_from_pi(pi_solution):
     return theta
 
 
-def show_stopping_strategies(stopping_strategies, titles, n_rows=None, n_columns=None, fancy=False):
-    fig, axs = create_subplot_grid(len(stopping_strategies), n_rows, n_columns, figsize=(24, 8) if fancy else None)
+def show_stopping_strategy(ss):
+    n = ss.shape[0] - 1
+    values_of_n_plus = [n, n // 2]
+    n_fwsses = len(values_of_n_plus)
+    fig, axs = create_subplot_grid(n_fwsses,  figsize=(24 * n_fwsses, 8))
     axs = axs.reshape(-1)
-    for i, (ss, title) in enumerate(zip(stopping_strategies, titles)):
-        if fancy:
-            n_base_models = ss.shape[0] - 1
-            fwss = ForestWithGivenStoppingStrategy(Forest(n_base_models, n_base_models), ss)
-            plot_fwss(fwss, ax=axs[i])
-        else:
-            plot_stopping_strategy(ss, ax=axs[i])
-        axs[i].title.set_text(title)
+    for i_fwss, n_plus in enumerate(values_of_n_plus):
+        fwss = ForestWithGivenStoppingStrategy(Forest(n, n_plus), ss)
+        plot_fwss(fwss, ax=axs[i_fwss])
+        axs[i_fwss].title.set_text(f"{n_plus} / {n} positive base models")
 
     plt.show()
 
@@ -190,7 +189,6 @@ def main():
     parser.add_argument("-n", type=int, required=True)
     parser.add_argument("--alpha", "--adr", "-a", type=float, default=0.05)
     parser.add_argument("--graph", "-g", action="store_true")
-    parser.add_argument("--fancy", "-f", action="store_true")
     parser.add_argument("--output-path", "-o", type=str, default=None)
     args = parser.parse_args()
 
@@ -205,7 +203,7 @@ def main():
     if not args.graph:
         return
 
-    show_stopping_strategies([oss], [""], fancy=args.fancy)
+    show_stopping_strategy(oss)
 
     output_path = args.output_path or get_output_path(f"ss_visualization_{args.n}_submodels_{args.alpha}_adr")
     plt.savefig(output_path)

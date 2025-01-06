@@ -178,48 +178,6 @@ def create_subplot_grid(n_subplots, n_rows=None, n_columns=None, tight_layout=Tr
     return fig, axs
 
 
-def plot_stopping_strategy(ss, ax, ytick_gap=None):
-    n_submodels = ss.shape[0] - 1
-    triviality_boundary = n_submodels // 2 + 1
-    n_difference_values = 2 * triviality_boundary + 1
-    i_center_row = triviality_boundary
-    out = np.empty((n_difference_values, n_submodels + 1), dtype=float)
-    out[:, :] = np.nan
-
-    for n_seen in range(n_submodels + 1):
-        for n_seen_good in range(n_seen + 1):
-            n_seen_bad = n_seen - n_seen_good
-
-            if n_seen_good > triviality_boundary or n_seen_bad > triviality_boundary:
-                continue
-
-            difference = n_seen_bad - n_seen_good
-            out[difference + i_center_row, n_seen] = ss[n_seen, n_seen_good]
-
-    cmap = matplotlib.colormaps.get_cmap('viridis')
-    cmap.set_bad(color="lightgray")
-    cax = ax.matshow(out, cmap=cmap)
-
-    divider = make_axes_locatable(ax)
-    cbar_ax = divider.append_axes("right", size="5%", pad=0.05)
-
-    if ytick_gap is None:
-        ytick_gap = out.shape[0] // min(11, out.shape[0])
-    n_yticks = out.shape[0] // ytick_gap
-
-    yticks = [i_center_row]
-    for i_ytick in range(1, n_yticks // 2 + 1):
-        yticks.append(i_center_row + i_ytick * ytick_gap)
-        yticks.append(i_center_row - i_ytick * ytick_gap)
-
-    ytick_labels = [tick_row - i_center_row for tick_row in yticks]
-
-    ax.set_yticks(yticks)
-    ax.set_yticklabels(ytick_labels)
-    plt.colorbar(cax, cax=cbar_ax)
-    return ax
-
-
 def draw_smooth_curve(points, **kwargs):
     # Separate the points into x and y
     points = np.array(points)
@@ -284,10 +242,13 @@ def plot_fwss(fwss, ax: Axes, node_radius=0.2, cmap="viridis_r"):
     transition_probs = []
 
     for ((i_src, j_src), (_, j_dest)) in G.edges:
-        prob_reach = np.exp(fwss.get_log_state_probability(i_src, j_src))
-        prob_continue_if_reached = 1 - ss[i_src, j_src]
-        prob_transition_if_continue = fwss.prob_see_bad[i_src, j_src] if j_dest == j_src else fwss.prob_see_good[i_src, j_src]
-        transition_probs.append(prob_reach * prob_continue_if_reached * prob_transition_if_continue)
+        if i_src > fwss.n_total or j_src > fwss.n_total_positive:
+            transition_probs.append(0)
+        else:
+            prob_reach = np.exp(fwss.get_log_state_probability(i_src, j_src))
+            prob_continue_if_reached = 1 - ss[i_src, j_src]
+            prob_transition_if_continue = fwss.prob_see_bad[i_src, j_src] if j_dest == j_src else fwss.prob_see_good[i_src, j_src]
+            transition_probs.append(prob_reach * prob_continue_if_reached * prob_transition_if_continue)
 
     node_size = compute_node_size_in_square_points(ax, node_radius)
     base_arrow_size = np.sqrt(node_size) / 4
