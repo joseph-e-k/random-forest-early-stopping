@@ -179,6 +179,7 @@ def create_subplot_grid(n_subplots, n_rows=None, n_columns=None, tight_layout=Tr
 
     if not isinstance(axs, np.ndarray):
         axs = np.array([axs])
+    axs = axs.reshape((n_rows, n_columns))
     
     return fig, axs
 
