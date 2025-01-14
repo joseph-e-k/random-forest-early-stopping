@@ -9,6 +9,7 @@ from .misc import function_call_to_tuple
 
 
 default_cache = Cache(os.path.join(os.path.dirname(__file__), "../.cache"))
+SHOULD_DUMMY_CACHING = bool(os.getenv("STE_DUMMY_CACHE", False))
 
 
 def memoize(name=None, *, args_to_ignore=(), arg_transformations=None, cache=default_cache):
@@ -20,3 +21,7 @@ def memoize(name=None, *, args_to_ignore=(), arg_transformations=None, cache=def
         memoized.__cache_key__ = functools.partial(function_call_to_tuple, memoized, name, args_to_ignore, arg_transformations)
         return memoized
     return decorator
+
+
+if SHOULD_DUMMY_CACHING:
+    memoize = lambda *args, **kwargs: (lambda function: function)
