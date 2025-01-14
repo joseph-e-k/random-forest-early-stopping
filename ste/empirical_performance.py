@@ -168,11 +168,6 @@ def estimate_conditional_smopdises(rf_classifier: RandomForestClassifier, datase
     ])
 
 
-def combine_conditional_smopdises(smopdises, data):
-    X, y = data
-    weights = np.array([(y == 0).sum(), (y == 1).sum()]) / len(y)
-
-
 def get_metrics_once(data: Dataset, adrs: Sequence[float], n_trees: int, stopping_strategy_getters: list[StoppingStrategyGetter], data_partition_ratios):
     training_data, calibration_data, evaluation_data = split_dataset(data, data_partition_ratios)
 
