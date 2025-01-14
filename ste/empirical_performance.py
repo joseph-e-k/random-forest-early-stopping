@@ -313,7 +313,7 @@ def get_bayesian_oracle_ss(adr: float, smopdis_estimated: np.ndarray, smopdis_or
     return get_optimal_stopping_strategy(n_trees, adr, smopdis_oracular, disagreement_minimax=False, runtime_minimax=False)
 
 
-DEFAULT_ADRS = tuple(10 ** -(i/2) for i in range(2, 13)) + (0,)
+DEFAULT_ADRS = tuple(10 ** -(i/2) for i in range(1, 11)) + (0,)
 
 def parse_args():
     parser = argparse.ArgumentParser()
