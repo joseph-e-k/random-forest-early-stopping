@@ -18,7 +18,7 @@ import sysv_ipc
 from diskcache.core import full_name
 
 from ste.utils.logging import get_breadcrumbs, get_module_logger, logged, breadcrumbs
-from ste.utils.misc import TimerContext, enumerate_product, forwards_to, function_call_to_tuple, get_name, repeat_enumerated, deterministic_hash
+from ste.utils.misc import TimerContext, enumerate_product, function_call_to_tuple, get_name, repeat_enumerated, deterministic_hash
 
 
 _logger = get_module_logger()
@@ -66,8 +66,8 @@ class _Job:
         index, args_or_kwargs = index_and_args_or_kwargs
         task_name = self.get_single_task_name(index)
 
-        random.seed(hash((self.random_nonce, index)) % (2 ** 32 - 1))
-        np.random.seed(hash((self.np_random_nonce, index)) % (2 ** 32 - 1))
+        random.seed(deterministic_hash((self.random_nonce, index)) % (2 ** 32 - 1))
+        np.random.seed(deterministic_hash((self.np_random_nonce, index)) % (2 ** 32 - 1))
         
         try:
             with breadcrumbs(self.breadcrumbs_at_creation + (task_name,)), TimerContext(verbose=False) as timer:
