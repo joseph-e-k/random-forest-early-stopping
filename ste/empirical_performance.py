@@ -258,7 +258,7 @@ def show_metrics(n_trees, metrics, dataset_names, allowable_disagreement_rates, 
                 for i_ss in range(n_ss_kinds)
             ]
             
-            plot_functions(
+            lines = plot_functions(
                 ax=ax,
                 x_axis_arg_name="index",
                 functions=metric_value_getters,
@@ -271,6 +271,10 @@ def show_metrics(n_trees, metrics, dataset_names, allowable_disagreement_rates, 
                 plot_kwargs=dict(marker="o")
             )
 
+            for (line, dash_pattern) in zip(lines, [(1, 1), (2, 1), (3, 1)]):
+                line.set_dashes(dash_pattern)
+
+            ax.legend()
             ax.set_title(f"{metric_names[i_metric]} ({dataset_names[i_dataset]})")
             ax.set_xlabel("Allowable disagreement rate")
     

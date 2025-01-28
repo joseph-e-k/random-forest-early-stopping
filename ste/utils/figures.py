@@ -115,7 +115,7 @@ def plot_function(ax, x_axis_arg_name, function, function_kwargs=None, plot_kwar
     y_axis_values = results_transform(y_axis_values)
     x_axis_values = x_axis_values_transform(x_axis_values)
 
-    ax.plot(x_axis_values, y_axis_values, **plot_kwargs)
+    return ax.plot(x_axis_values, y_axis_values, **plot_kwargs)
 
 
 def plot_functions(ax, x_axis_arg_name, functions, function_kwargs=None, plot_kwargs=None, results_transform=lambda y: y,
@@ -126,10 +126,12 @@ def plot_functions(ax, x_axis_arg_name, functions, function_kwargs=None, plot_kw
     if labels is None:
         labels = [get_name(function) for function in functions]
 
+    lines = []
+
     for label, function in zip(labels, functions):
         _logger.info(f"Plotting {get_name(function)}")
-        plot_function(ax, x_axis_arg_name, function, dict(function_kwargs), plot_kwargs | dict(label=label),
-                      results_transform, x_axis_values_transform, concurrently)
+        lines += plot_function(ax, x_axis_arg_name, function, dict(function_kwargs), plot_kwargs | dict(label=label),
+                               results_transform, x_axis_values_transform, concurrently)
 
     title = ", ".join(get_name(function) for function in functions)
     if function_kwargs:
@@ -138,6 +140,8 @@ def plot_functions(ax, x_axis_arg_name, functions, function_kwargs=None, plot_kw
     ax.set_title(title)
 
     ax.legend()
+
+    return lines
 
 
 def plot_function_many_curves(ax, x_axis_arg_name, distinct_curves_arg_name, function,
