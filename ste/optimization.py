@@ -7,11 +7,10 @@ from fractions import Fraction
 
 import numpy as np
 from matplotlib import pyplot as plt
-from scipy import stats
 from scipy.special import comb
 
 from ste.ForestWithStoppingStrategy import Forest, ForestWithGivenStoppingStrategy
-from ste.utils.figures import create_subplot_grid, plot_fwss
+from ste.utils.figures import plot_fwss
 from ste.utils.linear_programming import Problem, OptimizationResult, ArithmeticExpression, OptimizationFailure
 from ste.utils.logging import configure_logging, get_module_logger
 from ste.utils.misc import forwards_to, get_output_path
@@ -161,18 +160,21 @@ def make_theta_from_pi(pi_solution):
     return theta
 
 
-def show_stopping_strategy(ss):
+def show_stopping_strategy(ss, save_to_folder=None):
     n = ss.shape[0] - 1
     values_of_n_plus = [n, n // 2]
-    n_fwsses = len(values_of_n_plus)
     fig_width = 2 * n + 2
-    fig_height = (n + 1) * n_fwsses
-    fig, axs = create_subplot_grid(n_fwsses, n_rows=n_fwsses, n_columns=1, figsize=(fig_width, fig_height))
-    axs = axs.reshape(-1)
-    for n_plus, ax in zip(values_of_n_plus, axs):
+    fig_height = n + 1
+    for n_plus in values_of_n_plus:
+        fig, ax = plt.subplots(figsize=(fig_width, fig_height))
         fwss = ForestWithGivenStoppingStrategy(Forest(n, n_plus), ss)
         plot_fwss(fwss, ax=ax)
-        ax.set_title(f"{n_plus} / {n} positive base models", pad=20)
+
+        if save_to_folder is not None:
+            if not os.path.exists(save_to_folder):
+                os.mkdir(save_to_folder)
+            path = os.path.join(save_to_folder, f"n_plus_{n_plus}.pdf")
+            fig.savefig(path)
 
     plt.show()
 
@@ -181,7 +183,6 @@ def show_stopping_strategy(ss):
 def get_optimal_stopping_strategy(*args, **kwargs):
     pi_solution, objective_value = make_and_solve_optimal_stopping_problem(*args, **kwargs)
     return make_theta_from_pi(pi_solution)
-
 
 
 def main():
@@ -205,10 +206,8 @@ def main():
     if not args.graph:
         return
 
-    show_stopping_strategy(oss)
-
-    output_path = args.output_path or get_output_path(f"ss_visualization_{args.n}_submodels_{args.alpha}_adr")
-    plt.savefig(output_path)
+    output_path = args.output_path or get_output_path(f"ss_visualization_{args.n}_submodels_{args.alpha}_adr", file_name_suffix="")
+    show_stopping_strategy(oss, save_to_folder=output_path)
 
 
 if __name__ == "__main__":
