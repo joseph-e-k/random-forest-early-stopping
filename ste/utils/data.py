@@ -120,7 +120,11 @@ def get_names_and_datasets(full_benchmark=False):
             "Ground Cover": UCIDataset(id=31),
             "Income": UCIDataset(id=117),
             "Diabetes": UCIDataset(id=891),
-            "Skin": UCIDataset(id=229)
+            "Skin": UCIDataset(id=229),
+            "Sepsis": UCIDataset(id=827),
+            "Dota2": UCIDataset(id=367),
+            "Hospitalization": UCIDataset(id=296),
+            "Shuttle": UCIDataset(id=148)
         }
 
     return unzip(named_datasets.items())
