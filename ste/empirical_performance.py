@@ -363,8 +363,8 @@ def main():
             )
         elif args.action_name == "smopdis":
             plot_smopdises(args.n_trees, datasets, dataset_names, n_forests=args.n_forests)
-
-    output_path = args.output_path or get_output_path(f"{args.action_name}_{args.n_forests}_forests_of_{args.n_trees}_trees")
+            
+    output_path = args.output_path or get_output_path(f"{args.action_name}{'_b' if args.benchmark else ''}_{args.n_forests}_forests_of_{args.n_trees}_trees")
     plt.savefig(output_path)
 
 
