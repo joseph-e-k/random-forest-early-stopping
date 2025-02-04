@@ -224,7 +224,7 @@ def draw_metrics(n_trees, metrics, dataset_names, allowable_disagreement_rates, 
         fig, axs = create_subplot_grid(n_metrics * n_datasets, n_rows=n_datasets, tight_layout=False, figsize=(10, 4 * n_datasets))
         fig.subplots_adjust(hspace=10)
     else:
-        fig, axs = create_independent_plots_grid(n_metrics * n_datasets, n_rows=n_datasets, figsize=(10 / 3, 4))
+        fig, axs = create_independent_plots_grid(n_metrics * n_datasets, n_rows=n_datasets, figsize=(4, 4))
 
     metrics = swap_indices_of_axis(metrics, 1, 2, axis=3)
 
