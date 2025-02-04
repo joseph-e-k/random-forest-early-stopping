@@ -12,7 +12,7 @@ from sklearn.ensemble import RandomForestClassifier
 
 from ste.Forest import Forest
 from ste.ForestWithStoppingStrategy import ForestWithGivenStoppingStrategy
-from ste.utils.figures import create_subplot_grid, plot_functions
+from ste.utils.figures import create_independent_plots_grid, create_subplot_grid, plot_functions, save_drawing
 from ste.utils.logging import configure_logging, get_module_logger
 from ste.utils.multiprocessing import parallelize_to_array
 from ste.optimization import get_optimal_stopping_strategy
@@ -32,7 +32,7 @@ def _split_and_train_and_estimate_smopdises(dataset, n_trees, eval_proportion):
     return estimate_conditional_smopdises(forest, evaluation_data)
 
 
-def plot_smopdises(n_trees: int, datasets: Sequence[Dataset], dataset_names: Sequence[str], eval_proportion: float = 0.2, n_forests: int = 30):
+def draw_smopdises(n_trees: int, datasets: Sequence[Dataset], dataset_names: Sequence[str], eval_proportion: float = 0.2, n_forests: int = 30):
     n_datasets = len(datasets)
     if n_datasets % 2 == 0:
         n_columns = 2
@@ -204,7 +204,7 @@ def _getitem(sequence, index):
     return sequence[index]
 
 
-def show_metrics(n_trees, metrics, dataset_names, allowable_disagreement_rates, ss_names):
+def draw_metrics(n_trees, metrics, dataset_names, allowable_disagreement_rates, ss_names, combine_plots=False):
     base_error_rates = metrics[..., -1]
 
     metrics = metrics[..., :-1]
@@ -220,8 +220,11 @@ def show_metrics(n_trees, metrics, dataset_names, allowable_disagreement_rates, 
     
     base_error_rates = base_error_rates[:, 0, 0]
 
-    fig, axs = create_subplot_grid(n_metrics * n_datasets, n_rows=n_datasets, tight_layout=False, figsize=(10, 4 * n_datasets))
-    fig.subplots_adjust(hspace=10)
+    if combine_plots:
+        fig, axs = create_subplot_grid(n_metrics * n_datasets, n_rows=n_datasets, tight_layout=False, figsize=(10, 4 * n_datasets))
+        fig.subplots_adjust(hspace=10)
+    else:
+        fig, axs = create_independent_plots_grid(n_metrics * n_datasets, n_rows=n_datasets, figsize=(10 / 3, 4))
 
     metrics = swap_indices_of_axis(metrics, 1, 2, axis=3)
 
@@ -278,10 +281,10 @@ def show_metrics(n_trees, metrics, dataset_names, allowable_disagreement_rates, 
             ax.set_title(f"{metric_names[i_metric]} ({dataset_names[i_dataset]})")
             ax.set_xlabel("Allowable disagreement rate")
     
-    plt.show()
+    return fig
 
 
-def get_and_show_disagreement_rates_and_runtimes(n_forests, n_trees, datasets, dataset_names, allowable_disagreement_rates, ss_getters_by_name):
+def get_and_draw_disagreement_rates_and_runtimes(n_forests, n_trees, datasets, dataset_names, allowable_disagreement_rates, ss_getters_by_name, combine_plots=False):
     ss_names, ss_getters = zip(*ss_getters_by_name.items())
 
     metrics = get_metrics(
@@ -290,12 +293,13 @@ def get_and_show_disagreement_rates_and_runtimes(n_forests, n_trees, datasets, d
 
     mean_metrics = metrics.mean(axis=0)
 
-    show_metrics(
+    return draw_metrics(
         n_trees,
         mean_metrics,
         dataset_names,
         allowable_disagreement_rates,
-        ss_names or [func.__name__ for func in ss_getters]
+        ss_names or [func.__name__ for func in ss_getters],
+        combine_plots
     )
 
 
@@ -325,6 +329,7 @@ def parse_args():
     ss_comparison_subparser.add_argument("--output-path", "-o", type=str, default=None)
     ss_comparison_subparser.add_argument("--random-seed", "-s", type=int, default=1234)
     ss_comparison_subparser.add_argument("--n-forests", "--number-of-forests", "-f", type=int, default=30)
+    ss_comparison_subparser.add_argument("--combine-plots", "-c", action="store_true")
     ss_comparison_subparser.add_argument("--benchmark", "-b", action="store_true")
 
     tree_distribution_subparser = subparsers.add_parser("tree-distribution")
@@ -349,7 +354,7 @@ def main():
 
     with warnings.catch_warnings(category=UserWarning, action="ignore"):
         if args.action_name == "empirical_comparison":
-            get_and_show_disagreement_rates_and_runtimes(
+            drawing = get_and_draw_disagreement_rates_and_runtimes(
                 args.n_forests,
                 args.n_trees,
                 datasets,
@@ -359,13 +364,14 @@ def main():
                     "Minimax": get_minimax_ss,
                     "Bayesian": get_bayesian_ss,
                     "Oracular": get_bayesian_oracle_ss
-                }
+                },
+                args.combine_plots
             )
         elif args.action_name == "smopdis":
-            plot_smopdises(args.n_trees, datasets, dataset_names, n_forests=args.n_forests)
+            drawing = draw_smopdises(args.n_trees, datasets, dataset_names, n_forests=args.n_forests)
             
     output_path = args.output_path or get_output_path(f"{args.action_name}{'_b' if args.benchmark else ''}_{args.n_forests}_forests_of_{args.n_trees}_trees")
-    plt.savefig(output_path)
+    save_drawing(drawing, output_path)
 
 
 if __name__ == "__main__":

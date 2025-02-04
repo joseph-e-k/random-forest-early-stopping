@@ -198,3 +198,20 @@ def function_call_to_tuple(function, name, args_to_ignore, arg_transformations, 
         key.append((arg_name, arg_value))
 
     return tuple(key)
+
+
+class Dummy:
+    def __init__(self, rep):
+        self.__rep = rep
+
+    def __call__(self, *args, **kwargs):
+        args_rep = ", ".join(repr(arg) for arg in args)
+        kwargs_rep = ", ".join(f"{key!r}={value!r}" for key, value in kwargs.items())
+        args_and_kwargs_rep = ", ".join(args_rep, kwargs_rep)
+        return f"{self!r}({args_and_kwargs_rep})"
+    
+    def __getattr__(self, attribute):
+        return Dummy(f"{self!r}.{attribute}")
+
+    def __repr__(self):
+        return self.__rep

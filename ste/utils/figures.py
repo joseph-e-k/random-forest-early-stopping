@@ -17,13 +17,14 @@ import matplotlib
 from matplotlib import pyplot as plt
 from matplotlib import colors
 from matplotlib.axes import Axes
+from matplotlib.figure import Figure
 import numpy as np
 import scipy
 import networkx as nx
 
 from ste.utils.logging import get_module_logger
 from ste.utils.multiprocessing import parallelize
-from ste.utils.misc import extend_array, get_name, stringify_kwargs
+from ste.utils.misc import Dummy, extend_array, get_name, stringify_kwargs
 
 
 _logger = get_module_logger()
@@ -72,7 +73,7 @@ RCPARAMS_LATEX_SINGLE_COLUMN_LARGE_SHORT = {**_RCPARAMS_LATEX_SINGLE_COLUMN, 'fi
 RCPARAMS_LATEX_SINGLE_COLUMN_LARGE_TALL = {**_RCPARAMS_LATEX_SINGLE_COLUMN, 'figure.figsize': (_WIDTH, 1.2 * _WIDTH)}
 RCPARAMS_ONE_TIME_THING = {**_RCPARAMS_LATEX_SINGLE_COLUMN, 'figure.figsize': (_WIDTH / 2, _WIDTH * 540 / 960)}
 
-def save_figure(fig, name):
+def save_drawing(fig, name):
     os.makedirs(FIGURES_PATH, exist_ok=True)
     filename = os.path.join(FIGURES_PATH, name).replace('.', '_') + '.pdf'
     _logger.info(f'Saving figure to "{os.path.realpath(filename)}"')
@@ -171,13 +172,25 @@ def plot_function_many_curves(ax, x_axis_arg_name, distinct_curves_arg_name, fun
     ax.legend()
 
 
-def create_subplot_grid(n_subplots, n_rows=None, n_columns=None, tight_layout=True, figsize=None):
-    if n_rows is None and n_columns is not None:
-        n_rows = n_subplots // n_columns
-    n_rows = n_rows or 1
-    n_columns = n_columns or (n_subplots // n_rows)
-    if n_columns * n_rows != n_subplots:
-        raise ValueError("Number of subplots does not fit evenly into given number of rows and columns")
+def resolve_grid_shape(n_total=None, n_rows=None, n_columns=None):
+    if sum(arg is not None for arg in (n_total, n_rows, n_columns)) < 2:
+        raise ValueError("At least 2 of n_total, n_rows and n_columns must be specified")
+    if n_total is None:
+        return n_rows, n_columns
+    
+    if n_rows is None:
+        n_rows = n_total // n_columns
+    
+    n_rows = n_rows or (n_total // n_columns)
+    n_columns = n_columns or (n_total // n_rows)
+    if n_columns * n_rows != n_total:
+        raise ValueError("Number of items does not fit evenly into given number of rows and columns")
+    
+    return n_rows, n_columns
+
+
+def create_subplot_grid(n_subplots=None, n_rows=None, n_columns=None, tight_layout=True, figsize=None):
+    n_rows, n_columns = resolve_grid_shape(n_subplots, n_rows, n_columns)
 
     fig, axs = plt.subplots(nrows=n_rows, ncols=n_columns, tight_layout=tight_layout, figsize=figsize)
 
@@ -186,6 +199,26 @@ def create_subplot_grid(n_subplots, n_rows=None, n_columns=None, tight_layout=Tr
     axs = axs.reshape((n_rows, n_columns))
     
     return fig, axs
+
+
+class MultiFigure(Dummy):
+    def __init__(self, axs):
+        super().__init__("<dummy figure>")
+        self.axs = axs
+
+
+def create_independent_plots_grid(n_plots=None, n_rows=None, n_columns=None, axs_kw=None, **fig_kw):
+    axs_kw = axs_kw or {}
+
+    grid_shape = resolve_grid_shape(n_plots, n_rows, n_columns)
+
+    axs = np.empty(shape=grid_shape, dtype=object)
+    
+    for (i, j) in np.ndindex(grid_shape):
+        fig = plt.figure(**fig_kw)
+        axs[i, j] = fig.add_subplot(**axs_kw)
+    
+    return MultiFigure(axs), axs
 
 
 def draw_smooth_curve(points, **kwargs):
@@ -282,3 +315,27 @@ def plot_fwss(fwss, ax: Axes, node_radius=0.2):
         ax.text(i, n_base_models + 1, f"i = {i}", fontsize=12, ha="center")
 
     ax.axis("off")
+
+
+def save_drawing(drawing, path, file_name_suffix=".pdf"):
+    if isinstance(drawing, Axes):
+        drawing = drawing.figure
+
+    if isinstance(drawing, Figure):
+        drawing.savefig(path + file_name_suffix)
+        return
+
+    if isinstance(drawing, MultiFigure):
+        path = os.path.splitext(path)[0]
+        if not os.path.exists(path):
+            os.mkdir(path)
+        
+        for index in np.ndindex(drawing.axs.shape):
+            ax = drawing.axs[index]
+            name = "_".join(str(i) for i in index)
+            
+            save_drawing(ax, os.path.join(path, name), file_name_suffix)
+        
+        return
+
+    raise TypeError("First argument to save_drawing must be an Axes, Figure, or MultiFigure")
