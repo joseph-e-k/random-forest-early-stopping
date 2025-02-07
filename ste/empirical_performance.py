@@ -74,7 +74,7 @@ def draw_smopdises(n_trees: int, datasets: Sequence[Dataset], dataset_names: Seq
     return fig
 
 
-def _get_stopping_strategies(n_trees, smopdis_estimated, smopdis_oracular, adrs, stopping_strategy_getters):
+def _get_stopping_strategies(n_trees, smopdis_estimated_normally, smopdis_estimated_badly, smopdis_estimated_perfectly, adrs, stopping_strategy_getters):
     return parallelize_to_array(
         operator.call,
         argses_to_combine=[
@@ -82,8 +82,9 @@ def _get_stopping_strategies(n_trees, smopdis_estimated, smopdis_oracular, adrs,
                 functools.partial(
                     ss_getter,
                     n_trees=n_trees,
-                    smopdis_estimated=smopdis_estimated,
-                    smopdis_oracular=smopdis_oracular
+                    smopdis_estimated_normally=smopdis_estimated_normally,
+                    smopdis_estimated_badly=smopdis_estimated_badly,
+                    smopdis_estimated_perfectly=smopdis_estimated_perfectly
                 ) for ss_getter in stopping_strategy_getters
             ],
             adrs
@@ -173,10 +174,11 @@ def get_metrics_once(data: Dataset, adrs: Sequence[float], n_trees: int, stoppin
 
     forest = train_forest(n_trees, training_data)
     smopdis_estimates_for_evaluation = estimate_conditional_smopdises(forest, evaluation_data)
-    smopdis_estimate_for_bayesian_ss = estimate_smopdis(forest, calibration_data)
-    smopdis_estimate_for_oracular_ss = estimate_smopdis(forest, evaluation_data)
+    smopdis_estimated_normally = estimate_smopdis(forest, calibration_data)
+    smopdis_estimated_perfectly = estimate_smopdis(forest, evaluation_data)
+    smopdis_estimated_badly = estimate_smopdis(forest, training_data)
 
-    stopping_strategies = _get_stopping_strategies(n_trees, smopdis_estimate_for_bayesian_ss, smopdis_estimate_for_oracular_ss, adrs, stopping_strategy_getters)
+    stopping_strategies = _get_stopping_strategies(n_trees, smopdis_estimated_normally, smopdis_estimated_badly, smopdis_estimated_perfectly, adrs, stopping_strategy_getters)
 
     return _analyse_stopping_strategies(stopping_strategies, smopdis_estimates_for_evaluation)
 
@@ -274,7 +276,7 @@ def draw_metrics(n_trees, metrics, dataset_names, allowable_disagreement_rates, 
                 plot_kwargs=dict(marker="o")
             )
 
-            for (line, dash_pattern) in zip(lines, [(1, 1), (2, 1), (3, 1)]):
+            for (line, dash_pattern) in zip(lines, [(1, 1), (2, 1), (3, 1), (3, 2)]):
                 line.set_dashes(dash_pattern)
 
             ax.legend()
@@ -303,17 +305,21 @@ def get_and_draw_disagreement_rates_and_runtimes(n_forests, n_trees, datasets, d
     )
 
 
-@memoize(args_to_ignore=["smopdis_estimated", "smopdis_oracular"])
-def get_minimax_ss(adr: float, smopdis_estimated: np.ndarray, smopdis_oracular: np.ndarray, n_trees: int) -> np.ndarray:
+@memoize(args_to_ignore=["smopdis_estimated_normally", "smopdis_estimated_badly", "smopdis_estimated_perfectly"])
+def get_minimax_ss(adr: float, smopdis_estimated_normally: np.ndarray, smopdis_estimated_badly: np.ndarray, smopdis_estimated_perfectly: np.ndarray, n_trees: int) -> np.ndarray:
     return get_optimal_stopping_strategy(n_trees, adr)
 
 
-def get_bayesian_ss(adr: float, smopdis_estimated: np.ndarray, smopdis_oracular: np.ndarray, n_trees: int) -> np.ndarray:
-    return get_optimal_stopping_strategy(n_trees, adr, smopdis_estimated, disagreement_minimax=False, runtime_minimax=False)
+def get_bayesian_ss(adr: float, smopdis_estimated_normally: np.ndarray, smopdis_estimated_badly: np.ndarray, smopdis_estimated_perfectly: np.ndarray, n_trees: int) -> np.ndarray:
+    return get_optimal_stopping_strategy(n_trees, adr, smopdis_estimated_normally, disagreement_minimax=False, runtime_minimax=False)
 
 
-def get_bayesian_oracle_ss(adr: float, smopdis_estimated: np.ndarray, smopdis_oracular: np.ndarray, n_trees: int) -> np.ndarray:
-    return get_optimal_stopping_strategy(n_trees, adr, smopdis_oracular, disagreement_minimax=False, runtime_minimax=False)
+def get_bayesian_bad_ss(adr: float, smopdis_estimated_normally: np.ndarray, smopdis_estimated_badly: np.ndarray, smopdis_estimated_perfectly: np.ndarray, n_trees: int) -> np.ndarray:
+    return get_optimal_stopping_strategy(n_trees, adr, smopdis_estimated_badly, disagreement_minimax=False, runtime_minimax=False)
+
+
+def get_bayesian_perfect_ss(adr: float, smopdis_estimated_normally: np.ndarray, smopdis_estimated_badly: np.ndarray, smopdis_estimated_perfectly: np.ndarray, n_trees: int) -> np.ndarray:
+    return get_optimal_stopping_strategy(n_trees, adr, smopdis_estimated_perfectly, disagreement_minimax=False, runtime_minimax=False)
 
 
 DEFAULT_ADRS = tuple(10 ** -(i/2) for i in range(1, 11)) + (0,)
@@ -362,8 +368,9 @@ def main():
                 args.alphas,
                 {
                     "Minimax": get_minimax_ss,
-                    "Bayesian": get_bayesian_ss,
-                    "Oracular": get_bayesian_oracle_ss
+                    "Bayesian (Cal)": get_bayesian_ss,
+                    "Bayesian (Test)": get_bayesian_perfect_ss,
+                    "Bayesian (Train)": get_bayesian_bad_ss
                 },
                 args.combine_plots
             )
