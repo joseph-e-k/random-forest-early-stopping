@@ -245,7 +245,6 @@ def draw_metrics(n_trees, metrics, dataset_names, allowable_disagreement_rates, 
                 ax.plot([0, 1], [0, 1], color="black", label="ADR", linestyle='dashed')
                 ax.legend()
             elif metric_name == "Error Rate":
-                ax.set_ylim((0, metric_maxima[i_metric]))
                 ax.axhline(y=base_error_rates[i_dataset], color="black", label="Base", linestyle='dashed')
                 ax.legend()
             elif metric_name == "Expected Runtime":
