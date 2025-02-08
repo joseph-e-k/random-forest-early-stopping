@@ -27,6 +27,20 @@ class PiSolution:
 
 
 def make_and_solve_optimal_stopping_problem(n: int, alpha: float, freqs_n_plus: np.ndarray = None, disagreement_minimax=True, runtime_minimax=True) -> tuple[PiSolution, float]:
+    problem, p, pi, pi_bar = make_optimal_stopping_problem(n, alpha, freqs_n_plus, disagreement_minimax, runtime_minimax)
+
+    solution = problem.solve_with_soplex()
+
+    pi_solution = PiSolution(
+        _get_decision_variable_values(solution, p),
+        _get_decision_variable_values(solution, pi),
+        _get_decision_variable_values(solution, pi_bar)
+    )
+
+    return pi_solution, solution.objective_value
+
+
+def make_optimal_stopping_problem(n: int, alpha: float, freqs_n_plus: np.ndarray = None, disagreement_minimax=True, runtime_minimax=True) -> tuple[Problem, np.ndarray, np.ndarray, np.ndarray]:
     problem = Problem()
 
     if disagreement_minimax and runtime_minimax and freqs_n_plus is not None:
@@ -89,15 +103,7 @@ def make_and_solve_optimal_stopping_problem(n: int, alpha: float, freqs_n_plus: 
     for j in range(n + 1):
         problem.add_constraint(pi[n, j] == p[n, j])
 
-    solution = problem.solve_with_soplex()
-
-    pi_solution = PiSolution(
-        _get_decision_variable_values(solution, p),
-        _get_decision_variable_values(solution, pi),
-        _get_decision_variable_values(solution, pi_bar)
-    )
-
-    return pi_solution, solution.objective_value
+    return problem, p, pi, pi_bar
 
 
 def _make_decision_variables(n, problem) -> tuple[np.ndarray, np.ndarray, np.ndarray]:

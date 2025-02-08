@@ -255,6 +255,7 @@ class Problem:
 class OptimizationResult:
     variable_values: Mapping[str, Constant]
     objective_value: Constant
+    seconds_to_solve: float
 
     def __getitem__(self, item):
         return self.variable_values[item]
@@ -263,8 +264,11 @@ class OptimizationResult:
     def from_soplex_output(cls, stdout, stderr, solution_file):
         success = False
         objective_value = None
+        seconds_to_solve = None
 
         for line in stdout:
+            if m := re.match(r"Solving time \(sec\)\s*: ([\d.]+)$", line):
+                seconds_to_solve = float(m.group(1))
             if re.match(r"SoPlex status\s*:\s*problem is solved \[optimal\]\s*$", line):
                 success = True
             if m := re.match(r"Objective value\s*: (\S+)$", line):
@@ -295,7 +299,8 @@ class OptimizationResult:
 
         return OptimizationResult(
             objective_value=objective_value,
-            variable_values=variable_values
+            variable_values=variable_values,
+            seconds_to_solve=seconds_to_solve
         )
 
 
