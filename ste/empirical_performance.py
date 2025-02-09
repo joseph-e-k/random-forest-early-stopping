@@ -5,7 +5,6 @@ import random
 import warnings
 from typing import Callable, Sequence
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
@@ -321,7 +320,7 @@ def get_bayesian_perfect_ss(adr: float, smopdis_estimated_normally: np.ndarray, 
     return get_optimal_stopping_strategy(n_trees, adr, smopdis_estimated_perfectly, disagreement_minimax=False, runtime_minimax=False)
 
 
-DEFAULT_ADRS = tuple(10 ** -(i/2) for i in range(1, 11)) + (0,)
+DEFAULT_ADRS = (0, 10**-4, 10**-3.5, 10**-3, 10**-2.5, 10**-2, 10**-1.5, 5*10**-2, 10**-1)
 
 def parse_args():
     parser = argparse.ArgumentParser()
