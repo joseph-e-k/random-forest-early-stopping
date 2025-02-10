@@ -4,6 +4,7 @@ import time
 import numpy as np
 
 from ste.optimization import make_optimal_stopping_problem
+from ste.qcp import make_and_time_qcp
 from ste.utils.figures import create_independent_plots_grid, save_drawing
 from ste.utils.logging import configure_logging, get_module_logger
 from ste.utils.misc import get_output_path
@@ -21,11 +22,12 @@ def time_os_solution(n, alpha):
 
 
 @memoize()
-def get_os_solution_times(ensemble_sizes, adrs, n_reps, nonce):
+def get_os_solution_times(ensemble_sizes, adrs, n_reps, nonce, use_qcp=False):
     return parallelize_to_array(
-        time_os_solution,
+        make_and_time_qcp if use_qcp else time_os_solution,
         reps=n_reps,
-        argses_to_combine=(ensemble_sizes, adrs)
+        argses_to_combine=(ensemble_sizes, adrs),
+        dummy=use_qcp
     )
 
 
@@ -37,6 +39,7 @@ def parse_args():
     parser.add_argument("--adrs", "--alphas", "-a", type=float, nargs="+", default=(0.0001, 0.001, 0.01, 0.05))
     parser.add_argument("--reps", "-r", type=int, default=3)
     parser.add_argument("--nonce", type=int, default=None)
+    parser.add_argument("--qcp", "-q", action="store_true")
     return parser.parse_args()
 
 
@@ -47,13 +50,14 @@ def main():
     ensemble_sizes = list(range(args.n_lower, args.n_upper + 1, args.n_step))
     nonce = args.nonce or time.time_ns()
 
-    _logger.info(f"{ensemble_sizes=}, adrs={args.adrs}, n_reps={args.reps}, {nonce=}")
+    _logger.info(f"{ensemble_sizes=}, adrs={args.adrs}, n_reps={args.reps}, {nonce=}, use_qcp={args.qcp}")
 
     times = get_os_solution_times(
         ensemble_sizes=ensemble_sizes,
         adrs=args.adrs,
         n_reps=args.reps,
-        nonce=nonce
+        nonce=nonce,
+        use_qcp=args.qcp
     )
 
     _logger.info(f"{times=}")
@@ -65,7 +69,10 @@ def main():
     for i_adr, adr in enumerate(args.adrs):
         ax = axs[i_adr, 0]
         ax.plot(ensemble_sizes, min_times[:, i_adr])
-        ax.set_title(f"ADR = {adr}")
+        title = f"ADR = {adr}"
+        if args.qcp:
+            title += " (QCP)"
+        ax.set_title(title)
         ax.set_xlabel("n")
         ax.set_ylabel("Time (sec)")
     
