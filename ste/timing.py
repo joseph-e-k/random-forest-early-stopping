@@ -64,7 +64,7 @@ def main():
 
     min_times = times.min(axis=0)
 
-    fig, axs = create_independent_plots_grid(len(args.adrs), n_rows=len(args.adrs), figsize=(4, 4))
+    fig, axs = create_independent_plots_grid(len(args.adrs), n_rows=len(args.adrs), figsize=(5, 4))
 
     for i_adr, adr in enumerate(args.adrs):
         ax = axs[i_adr, 0]
@@ -76,7 +76,7 @@ def main():
         ax.set_xlabel("n")
         ax.set_ylabel("Time (sec)")
     
-    output_path = get_output_path(f"timing")
+    output_path = get_output_path(f"timing_{'q_' if args.qcp else ''}nonce_{nonce}")
     save_drawing(fig, output_path)
 
 
