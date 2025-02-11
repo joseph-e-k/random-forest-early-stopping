@@ -14,6 +14,7 @@ import functools
 import os
 
 import matplotlib
+import matplotlib.style as mplstyle
 from matplotlib import pyplot as plt
 from matplotlib import colors
 from matplotlib.axes import Axes
@@ -72,6 +73,11 @@ RCPARAMS_LATEX_SINGLE_COLUMN_LARGE = {**_RCPARAMS_LATEX_SINGLE_COLUMN, 'figure.f
 RCPARAMS_LATEX_SINGLE_COLUMN_LARGE_SHORT = {**_RCPARAMS_LATEX_SINGLE_COLUMN, 'figure.figsize': (_WIDTH, _HEIGHT * 0.75)}
 RCPARAMS_LATEX_SINGLE_COLUMN_LARGE_TALL = {**_RCPARAMS_LATEX_SINGLE_COLUMN, 'figure.figsize': (_WIDTH, 1.2 * _WIDTH)}
 RCPARAMS_ONE_TIME_THING = {**_RCPARAMS_LATEX_SINGLE_COLUMN, 'figure.figsize': (_WIDTH / 2, _WIDTH * 540 / 960)}
+
+
+STYLE_PATH = os.path.join(os.path.dirname(__file__), "latex-paper.mplstyle")
+mplstyle.use(STYLE_PATH)
+
 
 def save_drawing(fig, name):
     os.makedirs(FIGURES_PATH, exist_ok=True)
