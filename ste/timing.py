@@ -74,7 +74,7 @@ def main():
             title += " (QCP)"
             ax.set_yscale("log")
 
-        ax.plot(ensemble_sizes, min_times[:, i_adr], marker="o")
+        ax.scatter(ensemble_sizes, min_times[:, i_adr], marker="o")
         ax.set_title(title)
         ax.set_xlabel("n")
         ax.set_ylabel("Time (sec)")
