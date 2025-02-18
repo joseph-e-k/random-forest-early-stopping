@@ -39,7 +39,7 @@ def draw_smopdises(n_trees: int, datasets: Sequence[Dataset], dataset_names: Seq
         n_columns = 3
     else:
         n_columns = 1
-    fig, axs = create_subplot_grid(n_datasets, n_columns=n_columns, figsize=(10, 4 * n_datasets))
+    fig, axs = create_independent_plots_grid(n_datasets, n_columns=n_columns, figsize=(5, 3))
 
     n_actual_positive = [int(np.sum(y)) for (X, y) in datasets]
     n_actual_negative = [int(np.sum(1 - y)) for (X, y) in datasets]
