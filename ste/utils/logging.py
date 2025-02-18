@@ -5,6 +5,7 @@ import inspect
 import logging
 import os
 import threading
+import sys
 from datetime import datetime, timezone
 from types import GeneratorType
 from typing import Callable
@@ -237,6 +238,16 @@ def configure_logging(console_level=logging.INFO):
         root_logger.addHandler(handler)
 
     _TLS.breadcrumbs = ()
+
+    sys.excepthook = log_uncaught_exception
+
+
+def log_uncaught_exception(exc_type, exc_value, exc_traceback):
+    if issubclass(exc_type, KeyboardInterrupt):
+        sys.__excepthook__(exc_type, exc_value, exc_traceback)
+        return
+
+    logging.getLogger().critical("Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback))
 
 
 def get_module_logger(up_frames=0):

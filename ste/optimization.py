@@ -11,7 +11,7 @@ from scipy.special import comb
 
 from ste.ForestWithStoppingStrategy import Forest, ForestWithGivenStoppingStrategy
 from ste.utils.figures import plot_fwss
-from ste.utils.linear_programming import Problem, OptimizationResult, ArithmeticExpression, OptimizationFailure
+from ste.utils.linear_programming import Problem, OptimizationResult, ArithmeticExpression
 from ste.utils.logging import configure_logging, get_module_logger
 from ste.utils.misc import forwards_to, get_output_path
 
@@ -201,13 +201,8 @@ def main():
     parser.add_argument("--output-path", "-o", type=str, default=None)
     args = parser.parse_args()
 
-    try:
-        oss = get_optimal_stopping_strategy(args.n, args.alpha)
-    except OptimizationFailure as e:
-        _logger.exception()
-        return
-    else:
-        _logger.info(f"{np.asarray(oss, dtype=float)=}")
+    oss = get_optimal_stopping_strategy(args.n, args.alpha)
+    _logger.info(f"{np.asarray(oss, dtype=float)=}")
 
     if not args.graph:
         return
