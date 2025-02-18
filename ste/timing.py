@@ -64,14 +64,17 @@ def main():
 
     min_times = times.min(axis=0)
 
-    fig, axs = create_independent_plots_grid(len(args.adrs), n_rows=len(args.adrs), figsize=(5, 4))
+    fig, axs = create_independent_plots_grid(len(args.adrs), n_rows=len(args.adrs), figsize=(7, 4))
 
     for i_adr, adr in enumerate(args.adrs):
         ax = axs[i_adr, 0]
-        ax.plot(ensemble_sizes, min_times[:, i_adr])
+
         title = f"ADR = {adr}"
         if args.qcp:
             title += " (QCP)"
+            ax.set_yscale("log")
+
+        ax.plot(ensemble_sizes, min_times[:, i_adr], marker="o")
         ax.set_title(title)
         ax.set_xlabel("n")
         ax.set_ylabel("Time (sec)")
