@@ -41,6 +41,7 @@ def make_and_solve_optimal_stopping_problem(n: int, alpha: float, freqs_n_plus: 
 
 
 def make_optimal_stopping_problem(n: int, alpha: float, freqs_n_plus: np.ndarray = None, disagreement_minimax=True, runtime_minimax=True) -> tuple[Problem, np.ndarray, np.ndarray, np.ndarray]:
+    _logger.info(f"Constructing optimal-stopping problem for {n=}, {alpha=}...")
     problem = Problem()
 
     if disagreement_minimax and runtime_minimax and freqs_n_plus is not None:
@@ -102,6 +103,8 @@ def make_optimal_stopping_problem(n: int, alpha: float, freqs_n_plus: np.ndarray
 
     for j in range(n + 1):
         problem.add_constraint(pi[n, j] == p[n, j])
+
+    _logger.info(f"Finished constructing optimal-stopping problem for {n=}, {alpha=}")
 
     return problem, p, pi, pi_bar
 

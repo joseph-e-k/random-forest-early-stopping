@@ -10,6 +10,8 @@ from enum import Enum
 from fractions import Fraction
 from io import StringIO
 
+from ste.utils.logging import get_module_logger
+
 
 CONSTANT_COEFF_KEY = None
 
@@ -17,6 +19,8 @@ GUROBI_CL_PATH = "/home/josephkalman/gurobi1100/linux64/bin/gurobi_cl"
 GUROBI_LIB_PATH = "/home/josephkalman/gurobi1100/linux64/lib"
 SOPLEX_CL_FORMAT = "soplex {} --real:feastol=0 --real:opttol=0 --int:solvemode=2 --int:syncmode=1 --int:readmode=1 --int:checkmode=2 --int:multiprecision_limit=2147483647 -X={}"
 
+
+_logger = get_module_logger()
 
 class OptimizationFailure(Exception):
     pass
@@ -191,8 +195,10 @@ class Problem:
         solution_file = tempfile.NamedTemporaryFile("rt")
 
         with lp_file:
+            _logger.info("Serializing problem to disk...")
             self.save_as_lp_format(lp_file)
             lp_file.flush()
+            _logger.info("Running SoPlex to solve problem...")
             process = subprocess.run(
                 SOPLEX_CL_FORMAT.format(lp_file.name, solution_file.name),
                 shell=True,
@@ -200,6 +206,7 @@ class Problem:
                 text=True
             )
 
+        _logger.info("Parsing SoPlex output...")
         return OptimizationResult.from_soplex_output(
             StringIO(process.stdout),
             StringIO(process.stderr),
