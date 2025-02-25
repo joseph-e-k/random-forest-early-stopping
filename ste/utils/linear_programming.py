@@ -4,6 +4,7 @@ from collections import defaultdict
 from collections.abc import Mapping
 import dataclasses
 import re
+import shutil
 import subprocess
 import tempfile
 from enum import Enum
@@ -23,6 +24,10 @@ SOPLEX_CL_FORMAT = "soplex {} --real:feastol=0 --real:opttol=0 --int:solvemode=2
 _logger = get_module_logger()
 
 class OptimizationFailure(Exception):
+    pass
+
+
+class FinalizedProblemError(Exception):
     pass
 
 
@@ -163,16 +168,16 @@ class LogicalExpression:
         return f"{self.lhs!r} {self.operator.value} {self.rhs!r}"
 
 
-@dataclasses.dataclass
 class Problem:
-    constraints: list[LogicalExpression] = dataclasses.field(default_factory=list)
-    objective: ArithmeticExpression = None
-    variable_names: set[str] = dataclasses.field(default_factory=set)
-    # TODO: Allow maximization problems as well
+    def __init__(self):
+        self._objective_file = tempfile.NamedTemporaryFile("wt", delete_on_close=False)
+        self._constraints_file = tempfile.NamedTemporaryFile("wt", delete_on_close=False)
+        self._n_constraints = 0
+        self._variables_file = tempfile.NamedTemporaryFile("wt", delete_on_close=False)
 
     def add_variable(self, variable_name: str, lower_bound: Constant = None, upper_bound: Constant = None) -> ArithmeticExpression:
         variable = ArithmeticExpression.from_coeffs([(variable_name, 1)])
-        self.variable_names.add(variable_name)
+        self._variables_file.write(f" {variable_name}\n")
 
         if lower_bound is not None:
             self.add_constraint(variable >= lower_bound)
@@ -182,13 +187,14 @@ class Problem:
         return variable
 
     def add_constraint(self, constraint: LogicalExpression):
-        self.constraints.append(constraint)
+        if constraint.is_tautology():
+            return
+        self._n_constraints += 1
+        constraint_str = self._logical_expression_to_lp_format(constraint)
+        self._constraints_file.write(f" c{self._n_constraints}: {constraint_str}\n")
 
-    def set_objective(self, objective: ArithmeticExpression, override: bool = False):
-        if self.objective is not None and not override:
-            raise ValueError(f"Objective is already set to ({self.objective}); use override=True to override")
-
-        self.objective = objective
+    def set_objective(self, objective: ArithmeticExpression):
+        self._objective_file.write(f" {self._arithmetic_expression_to_lp_format(objective)}\n")
 
     def solve_with_soplex(self) -> OptimizationResult:
         lp_file = tempfile.NamedTemporaryFile("wt")
@@ -212,21 +218,24 @@ class Problem:
             StringIO(process.stderr),
             solution_file
         )
+    
+    @staticmethod
+    def close_and_copy_file(source_file, dest_file, mode="t"):
+        source_file.close()
+        with open(source_file.name, "r" + mode) as source_file:
+            shutil.copyfileobj(source_file, dest_file)
 
-    def save_as_lp_format(self, file):
-        file.write("Minimize\n")
-        file.write(f" {self._arithmetic_expression_to_lp_format(self.objective)}\n")
-        file.write("Subject To\n")
-        for i_constraint, constraint in enumerate(self.constraints):
-            if constraint.is_tautology():
-                continue
-            constraint_str = self._logical_expression_to_lp_format(constraint)
-            file.write(f" c{i_constraint}: {constraint_str}\n")
-        file.write("Generals\n")
-        for var_name in self.variable_names:
-            file.write(f" {var_name}")
-        file.write("\n")
-        file.write("End\n")
+    def save_as_lp_format(self, lp_file):
+        lp_file.write("Minimize\n")
+        self.close_and_copy_file(self._objective_file, lp_file)
+        
+        lp_file.write("Subject To\n")
+        self.close_and_copy_file(self._constraints_file, lp_file)
+
+        lp_file.write("Generals\n")
+        self.close_and_copy_file(self._variables_file, lp_file)
+
+        lp_file.write("End\n")
 
     @staticmethod
     def _arithmetic_expression_to_lp_format(expression: ArithmeticExpression):
