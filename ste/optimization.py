@@ -47,12 +47,7 @@ def make_optimal_stopping_problem(n: int, alpha: float, freqs_n_plus: np.ndarray
     if disagreement_minimax and runtime_minimax and freqs_n_plus is not None:
         raise ValueError("frequencies were provided for n_plus but both disagreement_minimax and runtime_minimax are True, so those frequencies cannot be used")
 
-    if disagreement_minimax and runtime_minimax:
-        # In minimax mode, we need only consider the worst-case scenario, which is a balanced ensemble
-        n_plus = np.array([n // 2, n // 2 + 1])
-    else:
-        n_plus = np.arange(0, n + 1)
-
+    n_plus = np.arange(0, n + 1)
     p, pi, pi_bar = _make_decision_variables(n, problem)
     a = make_abstract_probability_matrix(n, n_plus)
     beta = a * pi
