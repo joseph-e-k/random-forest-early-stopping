@@ -40,6 +40,12 @@ def parse_args():
     parser.add_argument("--reps", "-r", type=int, default=3)
     parser.add_argument("--nonce", type=int, default=None)
     parser.add_argument("--qcp", "-q", action="store_true")
+
+    parser.add_argument("--min", action="store_const", const=np.min, dest="aggregator")
+    parser.add_argument("--max", action="store_const", const=np.max, dest="aggregator")
+    parser.add_argument("--mean", action="store_const", const=np.mean, dest="aggregator")
+    parser.add_argument("--med", "--median", action="store_const", const=np.median, dest="aggregator")
+
     return parser.parse_args()
 
 
@@ -62,7 +68,9 @@ def main():
 
     _logger.info(f"{times=}")
 
-    min_times = times.min(axis=0)
+    aggregator = args.aggregator or np.min
+
+    agg_times = aggregator(times, axis=0)
 
     fig, axs = create_independent_plots_grid(len(args.adrs), n_rows=len(args.adrs), figsize=(7, 4))
 
@@ -74,7 +82,7 @@ def main():
             title += " (QCP)"
             ax.set_yscale("log")
 
-        ax.scatter(ensemble_sizes, min_times[:, i_adr], marker="o")
+        ax.scatter(ensemble_sizes, agg_times[:, i_adr], marker="o")
         ax.set_title(title)
         ax.set_xlabel("n")
         ax.set_ylabel("Time (sec)")
