@@ -84,7 +84,7 @@ def main():
 
         ax.scatter(ensemble_sizes, agg_times[:, i_adr], marker="o")
         ax.set_title(title)
-        ax.set_xlabel("n")
+        ax.set_xlabel("N")
         ax.set_ylabel("Time (sec)")
     
     output_path = get_output_path(f"timing_{'q_' if args.qcp else ''}nonce_{nonce}")
