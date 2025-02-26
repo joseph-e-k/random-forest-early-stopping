@@ -164,6 +164,42 @@ def make_theta_from_pi(pi_solution):
     return theta
 
 
+def make_pi_from_theta(theta):
+    p = np.empty_like(theta)
+    pi = np.empty_like(theta)
+    pi_bar = np.empty_like(theta)
+
+    n = theta.shape[0] - 1
+
+    for i in range(n + 1):
+        for j in range(i + 1, n + 1):
+            p[i, j] = 0
+            pi[i, j] = 0
+            pi_bar[i, j] = 0
+
+    p[0, 0] = 1
+    pi[0, 0] = theta[0, 0]
+    pi_bar[0, 0] = 1 - theta[0, 0]
+
+    for i in range(n):
+        for j in range(i + 1):
+            pi[i, j] = p[i, j] * theta[i, j]
+            pi_bar[i, j] = p[i, j] - pi[i, j]
+
+        p[i + 1, 0] = pi_bar[i, 0]
+        for j in range(i + 1):
+            p[i + 1, j + 1] = (
+                Fraction(i - j, i + 1) * pi_bar[i, j + 1]
+                + Fraction(j + 1, i + 1) * pi_bar[i, j]
+            )
+
+    for j in range(n + 1):
+        pi[n, j] = p[n, j]
+        pi_bar[n, j] = 0
+
+    return PiSolution(p, pi, pi_bar)
+
+
 def show_stopping_strategy(ss, save_to_folder=None):
     n = ss.shape[0] - 1
     values_of_n_plus = [n, n // 2]
