@@ -30,9 +30,8 @@ from ste.utils.misc import Dummy, extend_array, get_name, stringify_kwargs
 
 _logger = get_module_logger()
 
-
-FIGURES_PATH = r"C:\Users\Josep\Dropbox\Joseph's Dropbox\School\Thesis\Graphs"
 DPI = 600
+DISTINCT_DASH_STYLES = [(1, 1), (2, 1), (3, 1), (3, 2), (4, 1)]
 
 _RCPARAMS_LATEX_SINGLE_COLUMN = {
     'font.family': 'serif',
@@ -79,9 +78,7 @@ STYLE_PATH = os.path.join(os.path.dirname(__file__), "latex-paper.mplstyle")
 mplstyle.use(STYLE_PATH)
 
 
-def save_drawing(fig, name):
-    os.makedirs(FIGURES_PATH, exist_ok=True)
-    filename = os.path.join(FIGURES_PATH, name).replace('.', '_') + '.pdf'
+def save_drawing(fig, filename):
     _logger.info(f'Saving figure to "{os.path.realpath(filename)}"')
     fig.savefig(filename, dpi=DPI, bbox_inches='tight')
 

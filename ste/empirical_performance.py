@@ -11,7 +11,7 @@ from sklearn.ensemble import RandomForestClassifier
 
 from ste.Forest import Forest
 from ste.ForestWithStoppingStrategy import ForestWithGivenStoppingStrategy
-from ste.utils.figures import create_independent_plots_grid, create_subplot_grid, plot_functions, save_drawing
+from ste.utils.figures import DISTINCT_DASH_STYLES, create_independent_plots_grid, create_subplot_grid, plot_functions, save_drawing
 from ste.utils.logging import configure_logging, get_module_logger
 from ste.utils.multiprocessing import parallelize_to_array
 from ste.optimization import get_optimal_stopping_strategy
@@ -274,7 +274,7 @@ def draw_metrics(n_trees, metrics, dataset_names, allowable_disagreement_rates, 
                 plot_kwargs=dict(marker="o")
             )
 
-            for (line, dash_pattern) in zip(lines, [(1, 1), (2, 1), (3, 1), (3, 2)]):
+            for (line, dash_pattern) in zip(lines, DISTINCT_DASH_STYLES):
                 line.set_dashes(dash_pattern)
 
             ax.legend()
@@ -318,6 +318,11 @@ def get_bayesian_bad_ss(adr: float, smopdis_estimated_normally: np.ndarray, smop
 
 def get_bayesian_perfect_ss(adr: float, smopdis_estimated_normally: np.ndarray, smopdis_estimated_badly: np.ndarray, smopdis_estimated_perfectly: np.ndarray, n_trees: int) -> np.ndarray:
     return get_optimal_stopping_strategy(n_trees, adr, smopdis_estimated_perfectly, disagreement_minimax=False, runtime_minimax=False)
+
+
+@memoize(args_to_ignore=["smopdis_estimated_normally", "smopdis_estimated_badly", "smopdis_estimated_perfectly"])
+def get_bayesian_flat_ss(adr: float, smopdis_estimated_normally: np.ndarray, smopdis_estimated_badly: np.ndarray, smopdis_estimated_perfectly: np.ndarray, n_trees: int) -> np.ndarray:
+    return get_optimal_stopping_strategy(n_trees, adr, np.ones(shape=(n_trees + 1)), disagreement_minimax=False, runtime_minimax=False)
 
 
 DEFAULT_ADRS = (0, 10**-4, 10**-3.5, 10**-3, 10**-2.5, 10**-2, 10**-1.5, 5*10**-2, 10**-1)
@@ -366,9 +371,10 @@ def main():
                 args.alphas,
                 {
                     "Minimax": get_minimax_ss,
-                    "Bayesian (Cal)": get_bayesian_ss,
-                    "Bayesian (Test)": get_bayesian_perfect_ss,
-                    "Bayesian (Train)": get_bayesian_bad_ss
+                    "Expectation (Cal)": get_bayesian_ss,
+                    "Expectation (Test)": get_bayesian_perfect_ss,
+                    "Expectation (Train)": get_bayesian_bad_ss,
+                    "Expectation (Flat)": get_bayesian_flat_ss
                 },
                 args.combine_plots
             )
