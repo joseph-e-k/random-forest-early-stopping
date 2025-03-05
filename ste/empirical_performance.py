@@ -371,10 +371,10 @@ def main():
                 args.alphas,
                 {
                     "Minimax": get_minimax_ss,
-                    "Expectation (Cal)": get_bayesian_ss,
-                    "Expectation (Test)": get_bayesian_perfect_ss,
-                    "Expectation (Train)": get_bayesian_bad_ss,
-                    "Expectation (Flat)": get_bayesian_flat_ss
+                    "Minimean (Cal)": get_bayesian_ss,
+                    "Minimean (Test)": get_bayesian_perfect_ss,
+                    "Minimean (Train)": get_bayesian_bad_ss,
+                    "Minimean (Flat)": get_bayesian_flat_ss
                 },
                 args.combine_plots
             )
