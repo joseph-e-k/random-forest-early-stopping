@@ -11,7 +11,7 @@ from sklearn.ensemble import RandomForestClassifier
 
 from ste.Forest import Forest
 from ste.ForestWithStoppingStrategy import ForestWithGivenStoppingStrategy
-from ste.utils.figures import DISTINCT_DASH_STYLES, create_independent_plots_grid, create_subplot_grid, plot_functions, save_drawing
+from ste.utils.figures import DISTINCT_DASH_STYLES, MARKERS, create_independent_plots_grid, create_subplot_grid, plot_functions, save_drawing
 from ste.utils.logging import configure_logging, get_module_logger
 from ste.utils.multiprocessing import parallelize_to_array
 from ste.optimization import get_optimal_stopping_strategy
@@ -271,7 +271,7 @@ def draw_metrics(n_trees, metrics, dataset_names, allowable_disagreement_rates, 
                 concurrently=False,
                 labels=ss_names,
                 x_axis_values_transform=lambda i_adrs: [allowable_disagreement_rates[i_adr] for i_adr in i_adrs],
-                plot_kwargs=dict(marker="o")
+                plot_kwargses=[dict(marker=marker) for marker in MARKERS]
             )
 
             for (line, dash_pattern) in zip(lines, DISTINCT_DASH_STYLES):

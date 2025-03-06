@@ -11,9 +11,9 @@
 #
 # Amit Moscovich, Tel Aviv University, 2023.
 import functools
+import itertools
 import os
 
-import matplotlib
 import matplotlib.style as mplstyle
 from matplotlib import pyplot as plt
 from matplotlib import colors
@@ -32,6 +32,7 @@ _logger = get_module_logger()
 
 DPI = 600
 DISTINCT_DASH_STYLES = [(1, 1), (2, 1), (3, 1), (3, 2), (4, 1)]
+MARKERS = ['o', 's', '^', 'D', 'x', '*', 'P', 'v', 'H', '+']
 
 STYLE_PATH = os.path.join(os.path.dirname(__file__), "latex-paper.mplstyle")
 mplstyle.use(STYLE_PATH)
@@ -81,17 +82,17 @@ def plot_function(ax, x_axis_arg_name, function, function_kwargs=None, plot_kwar
     return ax.plot(x_axis_values, y_axis_values, **plot_kwargs)
 
 
-def plot_functions(ax, x_axis_arg_name, functions, function_kwargs=None, plot_kwargs=None, results_transform=lambda y: y,
+def plot_functions(ax, x_axis_arg_name, functions, function_kwargs=None, plot_kwargses=None, results_transform=lambda y: y,
                    x_axis_values_transform=lambda x: x, concurrently=True, labels=None):
-    if plot_kwargs is None:
-        plot_kwargs = {}
+    if plot_kwargses is None:
+        plot_kwargses = itertools.repeat({})
 
     if labels is None:
         labels = [get_name(function) for function in functions]
 
     lines = []
 
-    for label, function in zip(labels, functions):
+    for label, function, plot_kwargs in zip(labels, functions, plot_kwargses):
         _logger.info(f"Plotting {get_name(function)}")
         lines += plot_function(ax, x_axis_arg_name, function, dict(function_kwargs), plot_kwargs | dict(label=label),
                                results_transform, x_axis_values_transform, concurrently)
