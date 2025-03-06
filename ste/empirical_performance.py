@@ -5,13 +5,16 @@ import random
 import warnings
 from typing import Callable, Sequence
 
+from matplotlib import ticker
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 
 from ste.Forest import Forest
 from ste.ForestWithStoppingStrategy import ForestWithGivenStoppingStrategy
-from ste.utils.figures import DISTINCT_DASH_STYLES, MARKERS, create_independent_plots_grid, create_subplot_grid, plot_functions, save_drawing
+from ste.utils.figures import (
+    DISTINCT_DASH_STYLES, MARKERS, create_independent_plots_grid, create_subplot_grid, enforce_character_limit, plot_functions, save_drawing
+)
 from ste.utils.logging import configure_logging, get_module_logger
 from ste.utils.multiprocessing import parallelize_to_array
 from ste.optimization import get_optimal_stopping_strategy
@@ -244,6 +247,7 @@ def draw_metrics(n_trees, metrics, dataset_names, allowable_disagreement_rates, 
                 ax.plot([0, 1], [0, 1], color="black", label="ADR", linestyle='dashed')
                 ax.legend()
             elif metric_name == "Error Rate":
+                ax.yaxis.set_major_formatter(ticker.FuncFormatter(functools.partial(enforce_character_limit, max_characters=5)))
                 ax.axhline(y=base_error_rates[i_dataset], color="black", label="Base", linestyle='dashed')
                 ax.legend()
             elif metric_name == "Expected Runtime":

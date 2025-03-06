@@ -302,3 +302,10 @@ def save_drawing(drawing, path, file_name_suffix=".pdf"):
         return
 
     raise TypeError("First argument to save_drawing must be an Axes, Figure, or MultiFigure")
+
+
+def enforce_character_limit(x, pos, max_characters):
+    label = f"{x:.10g}"
+    if len(label) > max_characters:
+        return ""
+    return label
