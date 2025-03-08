@@ -8,7 +8,8 @@ from diskcache.core import full_name
 from .misc import function_call_to_tuple
 
 
-default_cache = Cache(os.path.join(os.path.dirname(__file__), "../.cache"))
+CACHE_NAME_SUFFIX = os.getenv("STE_CACHE_SUFFIX", "")
+default_cache = Cache(os.path.join(os.path.dirname(__file__), "../.cache" + CACHE_NAME_SUFFIX))
 SHOULD_DUMMY_CACHING = bool(os.getenv("STE_DUMMY_CACHE", False))
 
 
