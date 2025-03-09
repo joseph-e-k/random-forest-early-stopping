@@ -1,6 +1,7 @@
 import argparse
 import functools
 import operator
+import os
 import random
 import warnings
 from typing import Callable, Sequence
@@ -24,6 +25,10 @@ from ste.utils.misc import get_output_path, swap_indices_of_axis
 
 
 _logger = get_module_logger()
+
+
+class ReproducibilityError(Exception):
+    pass
 
 
 @memoize()
@@ -360,7 +365,12 @@ def main():
     args = parse_args()
 
     configure_logging()
+
     random.seed(args.random_seed)
+    np.random.seed(args.random_seed)
+    if not os.getenv("PYTHONHASHSEED"):
+        raise ReproducibilityError("Please set the PYTHONHASHSEED environment variable for reproducible results")
+
     pd.options.mode.chained_assignment = None
 
     dataset_names, datasets = get_names_and_datasets(full_benchmark=args.benchmark)
