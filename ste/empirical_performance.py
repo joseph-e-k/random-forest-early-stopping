@@ -7,6 +7,7 @@ import warnings
 from typing import Callable, Sequence
 
 from matplotlib import ticker
+import matplotlib
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
@@ -289,6 +290,12 @@ def draw_metrics(n_trees, metrics, dataset_names, allowable_disagreement_rates, 
             ax.legend()
             ax.set_title(f"{metric_names[i_metric]} ({dataset_names[i_dataset]})")
             ax.set_xlabel("Allowable disagreement rate")
+            ax.figure.canvas.draw()
+
+            xtick_offset = matplotlib.transforms.ScaledTranslation(-0.1, 0, ax.figure.dpi_scale_trans)
+            for tick in ax.xaxis.get_major_ticks():
+                if tick.get_loc() >= ax.get_xlim()[1]:
+                    tick.label1.set_transform(tick.label1.get_transform() + xtick_offset)
     
     return fig
 

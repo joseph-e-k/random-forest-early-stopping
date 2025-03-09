@@ -207,7 +207,7 @@ class Dummy:
     def __call__(self, *args, **kwargs):
         args_rep = ", ".join(repr(arg) for arg in args)
         kwargs_rep = ", ".join(f"{key!r}={value!r}" for key, value in kwargs.items())
-        args_and_kwargs_rep = ", ".join(args_rep, kwargs_rep)
+        args_and_kwargs_rep = ", ".join([args_rep, kwargs_rep])
         return f"{self!r}({args_and_kwargs_rep})"
     
     def __getattr__(self, attribute):
