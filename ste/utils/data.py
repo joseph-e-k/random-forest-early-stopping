@@ -18,7 +18,6 @@ from ste.utils.misc import unzip
 
 BENCHMARK_DATASET_IDS = [44089, 44090, 44091, 44120, 44121, 44122, 44123, 44124, 44125, 44126, 44127, 44128, 44129, 44130, 44131, 44156, 44157, 44158, 44159, 44160, 44161, 44162]
 DATA_DIRECTORY = os.path.join(os.path.dirname(__file__), "../../data")
-DICHOTOMIZATION_SEED = 0
 
 
 dataset_cache = Cache(os.path.join(DATA_DIRECTORY, ".cache"))
@@ -47,7 +46,7 @@ class LazyDataset:
     @staticmethod
     def _clean_data(features, target):
         features = coerce_nonnumeric_columns_to_numeric(features)
-        target = to_binary_classifications(target, DICHOTOMIZATION_SEED)
+        target = to_binary_classifications(target)
         return features, target
 
 
@@ -81,17 +80,16 @@ def covariates_response_split(dataframe: pd.DataFrame, response_column=-1) -> Da
     return dataframe.drop([response_column], axis=1), dataframe[response_column]
 
 
-def to_binary_classifications(classifications, seed):
-    classes = set(classifications)
+def to_binary_classifications(classifications):
+    classes = classifications.unique()
     n_classes = len(classes)
 
     if n_classes < 2:
         raise ValueError("Cannot make binary classification from fewer than 2 classes")
-
-    randomizer = np.random.RandomState(seed=seed)
-    positive_classes = randomizer.choice(np.array(list(classes)), size=n_classes // 2, replace=False)
-
-    return np.isin(classifications, positive_classes)
+    
+    classes, class_counts = np.unique(classifications, return_counts=True)
+    most_common_class = classes[np.argmax(class_counts)]
+    return np.array(classifications == most_common_class, dtype=int)
 
 
 def coerce_nonnumeric_columns_to_numeric(df: pd.DataFrame):
