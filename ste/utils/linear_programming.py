@@ -318,19 +318,3 @@ class OptimizationResult:
             variable_values=variable_values,
             seconds_to_solve=seconds_to_solve
         )
-
-
-if __name__ == "__main__":
-    prob = Problem()
-    x = prob.add_variable("x", lower_bound=0)
-    y = prob.add_variable("y", lower_bound=0)
-    objective = -(50 * x + 60 * y)
-    prob.set_objective(objective)
-    prob.add_constraint(5 * x + 8 * y <= 180)
-    prob.add_constraint(5 * x + 4 * y <= 120)
-
-    print("Solving with SoPlex:")
-    solution = prob.solve_with_soplex()
-    print(f"x = {x.evaluate(solution)}, y = {y.evaluate(solution)}")
-    print(f"objective = {objective.evaluate(solution)}")
-    print(solution)
