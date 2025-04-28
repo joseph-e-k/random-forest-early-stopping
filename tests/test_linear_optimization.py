@@ -16,3 +16,22 @@ def test_minimax_sanity():
         [1. , 1. , 1. , 1. , 1. , 1. ]
     ])
     assert are_equivalent_ss(computed_oss, expected_oss)
+
+
+def test_minimean_sanity():
+    computed_oss = get_optimal_stopping_strategy(
+        n=5,
+        alpha=0.05,
+        freqs_n_plus=np.array([[1, 0, 0, 0, 0, 1]]),
+        disagreement_minimax=False,
+        runtime_minimax=False
+    )
+    expected_oss = np.array([
+        [0.1, 1. , 1. , 1. , 1. , 1. ],
+        [1. , 1. , 1. , 1. , 1. , 1. ],
+        [1. , 1. , 1. , 1. , 1. , 1. ],
+        [1. , 1. , 1. , 1. , 1. , 1. ],
+        [1. , 1. , 1. , 1. , 1. , 1. ],
+        [1. , 1. , 1. , 1. , 1. , 1. ]
+    ])
+    assert are_equivalent_ss(computed_oss, expected_oss)
