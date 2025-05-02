@@ -40,7 +40,7 @@ class ForestWithStoppingStrategy:
         self._n_good = self.n_total_positive
         self._n_bad = self.n_total - self._n_good
 
-        self._n_seen = np.row_stack([np.full(self._n_values, i_step) for i_step in range(self._n_steps)])
+        self._n_seen = np.vstack([np.full(self._n_values, i_step) for i_step in range(self._n_steps)])
         self._n_seen_good = np.column_stack([np.full(self._n_steps, i_value) for i_value in range(self._n_values)])
 
         self._n_unseen = self.n_total - self._n_seen
@@ -70,8 +70,8 @@ class ForestWithStoppingStrategy:
         for i_step in range(start_index, end_index + 1):
             prev_log_prob_stop = self._log_prob_stop[i_step - 1, :]
             prev_log_prob_no_stop = logsumexp(
-                a=np.row_stack([np.zeros_like(prev_log_prob_stop), prev_log_prob_stop]),
-                b=np.row_stack([np.ones_like(prev_log_prob_stop), np.full_like(prev_log_prob_stop, -1)]),
+                a=np.vstack([np.zeros_like(prev_log_prob_stop), prev_log_prob_stop]),
+                b=np.vstack([np.ones_like(prev_log_prob_stop), np.full_like(prev_log_prob_stop, -1)]),
                 axis=0
             )
             prev_log_prob_arrive_and_continue = self._log_state_probabilities[i_step - 1, :] + prev_log_prob_no_stop
