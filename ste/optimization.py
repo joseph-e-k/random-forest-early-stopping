@@ -9,7 +9,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from scipy.special import comb
 
-from ste.ForestWithStoppingStrategy import Forest, ForestWithGivenStoppingStrategy
+from ste.EnsembleVoteWithStoppingStrategy import EnsembleVote, EnsembleVoteWithGivenStoppingStrategy
 from ste.utils.figures import plot_fwss
 from ste.utils.linear_programming import Problem, OptimizationResult, ArithmeticExpression
 from ste.utils.logging import configure_logging, get_module_logger
@@ -207,7 +207,7 @@ def show_stopping_strategy(ss, save_to_folder=None):
     fig_height = n + 1
     for n_plus in values_of_n_plus:
         fig, ax = plt.subplots(figsize=(fig_width, fig_height))
-        fwss = ForestWithGivenStoppingStrategy(Forest(n, n_plus), ss)
+        fwss = EnsembleVoteWithGivenStoppingStrategy(EnsembleVote(n, n_plus), ss)
         plot_fwss(fwss, ax=ax)
 
         if save_to_folder is not None:

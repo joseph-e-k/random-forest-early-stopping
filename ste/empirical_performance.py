@@ -12,8 +12,8 @@ import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 
-from ste.Forest import Forest
-from ste.ForestWithStoppingStrategy import ForestWithGivenStoppingStrategy
+from ste.EnsembleVote import EnsembleVote
+from ste.EnsembleVoteWithStoppingStrategy import EnsembleVoteWithGivenStoppingStrategy
 from ste.utils.figures import (
     DISTINCT_DASH_STYLES, MARKERS, create_independent_plots_grid, create_subplot_grid, enforce_character_limit, plot_functions, save_drawing
 )
@@ -112,9 +112,9 @@ def _analyse_stopping_strategy_if_relevant(i_ss_kind, i_adr, true_class, n_posit
         return out
 
     ss = stopping_strategies[i_ss_kind, i_adr]
-    forest = Forest(n_trees, n_positive_trees)
-    fwss = ForestWithGivenStoppingStrategy(forest, ss)
-    analysis = fwss.analyse()
+    ensemble_vote = EnsembleVote(n_trees, n_positive_trees)
+    evwss = EnsembleVoteWithGivenStoppingStrategy(ensemble_vote, ss)
+    analysis = evwss.analyse()
 
     if is_base_ensemble_correct:
         prob_error = analysis.prob_disagreement

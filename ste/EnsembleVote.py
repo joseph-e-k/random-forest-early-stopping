@@ -8,7 +8,7 @@ from scipy import stats
 
 
 @dataclasses.dataclass(frozen=True)
-class Forest:
+class EnsembleVote:
     n_total: int
     n_total_positive: int
 

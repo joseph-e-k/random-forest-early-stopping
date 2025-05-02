@@ -7,22 +7,22 @@ import warnings
 import numpy as np
 from scipy.special import logsumexp
 
-from .Forest import Forest
+from .EnsembleVote import EnsembleVote
 from .utils.misc import shift_array
 
 
-class ForestExecutionError(Exception):
+class EnsembleVoteExecutionError(Exception):
     pass
 
 
 @dataclasses.dataclass
-class ForestWithStoppingStrategy:
-    forest: Forest
+class EnsembleVoteWithStoppingStrategy:
+    ensemble_vote: EnsembleVote
 
-    n_total = property(lambda self: self.forest.n_total)
-    n_total_positive = property(lambda self: self.forest.n_total_positive)
-    result = property(lambda self: self.forest.result)
-    n_steps = property(lambda self: self.forest.n_steps)
+    n_total = property(lambda self: self.ensemble_vote.n_total)
+    n_total_positive = property(lambda self: self.ensemble_vote.n_total_positive)
+    result = property(lambda self: self.ensemble_vote.result)
+    n_steps = property(lambda self: self.ensemble_vote.n_steps)
     prob_see_good = property(lambda self: np.exp(self._log_prob_see_good))
     prob_see_bad = property(lambda self: np.exp(self._log_prob_see_bad))
 
@@ -117,7 +117,7 @@ class ForestWithStoppingStrategy:
     def get_state_result(n_seen, n_seen_good):
         return n_seen_good > n_seen / 2
 
-    def analyse(self) -> ForestAnalysis:
+    def analyse(self) -> EnsembleVoteAnalysis:
         self._recompute_state_probabilities()
 
         log_prob_reach_state_and_stop = self._log_state_probabilities + self._log_prob_stop
@@ -127,7 +127,7 @@ class ForestWithStoppingStrategy:
         log_prob_disagreement = logsumexp(log_prob_reach_state_and_stop, b=is_state_disagreement)
         log_expected_runtime = logsumexp(log_prob_reach_state_and_stop, b=self._n_seen)
 
-        return ForestAnalysis(
+        return EnsembleVoteAnalysis(
             prob_disagreement=np.exp(log_prob_disagreement),
             expected_runtime=np.exp(log_expected_runtime)
         )
@@ -152,7 +152,7 @@ class ForestWithStoppingStrategy:
             if rng.random() < np.exp(self._log_prob_stop[n_seen, n_positive_seen]):
                 return n_seen, (n_positive_seen > n_seen / 2)
 
-        raise ForestExecutionError("Fell off the end of a forest while executing. This should be impossible.", self)
+        raise EnsembleVoteExecutionError("Fell off the end of an ensemble vote while executing. This should be impossible.", self)
 
     def get_pi_and_pi_bar(self) -> tuple[np.ndarray, np.ndarray]:
         theta = np.exp(self._get_log_prob_stop())
@@ -174,7 +174,7 @@ class ForestWithStoppingStrategy:
 
 
 @dataclasses.dataclass
-class ForestWithGivenStoppingStrategy(ForestWithStoppingStrategy):
+class EnsembleVoteWithGivenStoppingStrategy(EnsembleVoteWithStoppingStrategy):
     stopping_strategy: np.ndarray
 
     def __post_init__(self):
@@ -190,6 +190,6 @@ class ForestWithGivenStoppingStrategy(ForestWithStoppingStrategy):
 
 
 @dataclasses.dataclass(frozen=True)
-class ForestAnalysis:
+class EnsembleVoteAnalysis:
     prob_disagreement: float
     expected_runtime: float
