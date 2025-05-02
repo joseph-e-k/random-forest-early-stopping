@@ -1,4 +1,6 @@
+import os
 import numpy as np
+from matplotlib.testing.compare import compare_images
 
 
 def are_equivalent_ss(ss_1, ss_2, atol=1e-08):
@@ -25,3 +27,21 @@ def are_equivalent_ss(ss_1, ss_2, atol=1e-08):
         ss_2 * is_reachable,
         atol=atol
     )
+
+
+def compare_images_with_cleanup(expected_path, actual_path, tol):
+    garbage_paths = []
+
+    for path in [expected_path, actual_path]:
+        path_without_ext, ext = os.path.splitext(path)
+        if ext != ".png":
+            garbage_paths.append(
+                path_without_ext + "_" + ext[1:] + ".png"
+            )
+
+    try:
+        return compare_images(expected_path, actual_path, tol)
+    finally:
+        for garbage_path in garbage_paths:
+            if os.path.exists(garbage_path):
+                os.remove(garbage_path)
