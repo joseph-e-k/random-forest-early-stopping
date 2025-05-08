@@ -249,7 +249,7 @@ def plot_fwss(fwss, ax: Axes, node_radius=0.2):
     transition_probs = []
 
     for ((i_src, j_src), (_, j_dest)) in G.edges:
-        if i_src > fwss.n_total or j_src > fwss.n_total_positive:
+        if i_src > fwss.n_total or j_src > fwss.n_yes:
             transition_probs.append(0)
         else:
             prob_reach = np.exp(fwss.get_log_state_probability(i_src, j_src))
