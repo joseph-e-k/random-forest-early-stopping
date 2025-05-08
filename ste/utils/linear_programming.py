@@ -10,14 +10,13 @@ import tempfile
 from enum import Enum
 from fractions import Fraction
 from io import StringIO
+from typing import Self
 
 from ste.utils.logging import get_module_logger
 
 
 CONSTANT_COEFF_KEY = None
 
-GUROBI_CL_PATH = "/home/josephkalman/gurobi1100/linux64/bin/gurobi_cl"
-GUROBI_LIB_PATH = "/home/josephkalman/gurobi1100/linux64/lib"
 SOPLEX_CL_FORMAT = "soplex {} --real:feastol=0 --real:opttol=0 --int:solvemode=2 --int:syncmode=1 --int:readmode=1 --int:checkmode=2 --int:multiprecision_limit=2147483647 -X={}"
 
 
@@ -36,6 +35,11 @@ class ComparisonOperator(Enum):
     LEq = "<="
 
 
+class OptimizationSense(Enum):
+    Minimize = "Minimize"
+    Maximize = "Maximize"
+
+
 Constant = int | float | Fraction
 
 
@@ -43,13 +47,12 @@ class ArithmeticExpression(defaultdict[str | None, Constant]):
     def __init__(self, items_source=(), /, **kwargs):
         super().__init__(lambda: 0, items_source, **kwargs)
 
-    def evaluate(self, context):
-        # This insanity allows us to call ArithmeticExpression.evaluate() as if it were a static function,
-        # and have it work for constants as well
-        if isinstance(self, Constant):
-            return self
+    @staticmethod
+    def evaluate(expression: Self | Constant, context: Mapping[str, Constant]):
+        if isinstance(expression, Constant):
+            return expression
 
-        return sum(context[name] * value for (name, value) in self.items())
+        return sum(context[name] * value for (name, value) in expression.items())
 
     @classmethod
     def from_constant(cls, const: Constant):
@@ -174,6 +177,7 @@ class Problem:
         self._constraints_file = tempfile.NamedTemporaryFile("wt", delete_on_close=False)
         self._n_constraints = 0
         self._variables_file = tempfile.NamedTemporaryFile("wt", delete_on_close=False)
+        self._optimization_sense = OptimizationSense.Minimize
 
     def add_variable(self, variable_name: str, lower_bound: Constant = None, upper_bound: Constant = None) -> ArithmeticExpression:
         variable = ArithmeticExpression.from_coeffs([(variable_name, 1)])
@@ -193,8 +197,9 @@ class Problem:
         constraint_str = self._logical_expression_to_lp_format(constraint)
         self._constraints_file.write(f" c{self._n_constraints}: {constraint_str}\n")
 
-    def set_objective(self, objective: ArithmeticExpression):
+    def set_objective(self, objective: ArithmeticExpression, sense: OptimizationSense = OptimizationSense.Minimize):
         self._objective_file.write(f" {self._arithmetic_expression_to_lp_format(objective)}\n")
+        self._optimization_sense = sense
 
     def solve_with_soplex(self) -> OptimizationResult:
         lp_file = tempfile.NamedTemporaryFile("wt")
@@ -226,7 +231,7 @@ class Problem:
             shutil.copyfileobj(source_file, dest_file)
 
     def save_as_lp_format(self, lp_file):
-        lp_file.write("Minimize\n")
+        lp_file.write(f"{self._optimization_sense.value}\n")
         self.close_and_copy_file(self._objective_file, lp_file)
         
         lp_file.write("Subject To\n")
