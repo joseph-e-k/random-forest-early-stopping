@@ -18,6 +18,7 @@ class EnsembleVoteExecutionError(Exception):
 @dataclasses.dataclass
 class EnsembleVoteWithStoppingStrategy:
     ensemble_vote: EnsembleVote
+    stopping_strategy: np.ndarray
 
     n_total = property(lambda self: self.ensemble_vote.n_total)
     n_total_positive = property(lambda self: self.ensemble_vote.n_total_positive)
@@ -28,12 +29,15 @@ class EnsembleVoteWithStoppingStrategy:
 
     # TODO: Consistent naming style: log_prob_thing vs thing_log_prob vs log_thing_prob
     def _get_log_prob_stop(self):
-        raise NotImplementedError()
-    
+        with warnings.catch_warnings(category=RuntimeWarning, action="ignore"):
+            return np.log(np.asarray(self.stopping_strategy, dtype=float))
+        
     def get_prob_stop(self):
-        return np.exp(self._get_log_prob_stop())
+        return self.stopping_strategy
 
     def __post_init__(self):
+        self.stopping_strategy = self.stopping_strategy[:self.n_total + 1, :self.n_total_positive + 1]
+
         self._n_steps = self.n_total + 1
         self._n_values = self.n_total_positive + 1
 
@@ -171,22 +175,6 @@ class EnsembleVoteWithStoppingStrategy:
                 pi_bar[n, c] = theta_bar[n, c] * combinatoric_factor
 
         return pi, pi_bar
-
-
-@dataclasses.dataclass
-class EnsembleVoteWithGivenStoppingStrategy(EnsembleVoteWithStoppingStrategy):
-    stopping_strategy: np.ndarray
-
-    def __post_init__(self):
-        self.stopping_strategy = self.stopping_strategy[:self.n_total + 1, :self.n_total_positive + 1]
-        super().__post_init__()
-
-    def _get_log_prob_stop(self):
-        with warnings.catch_warnings(category=RuntimeWarning, action="ignore"):
-            return np.log(np.asarray(self.stopping_strategy, dtype=float))
-        
-    def get_prob_stop(self):
-        return self.stopping_strategy
 
 
 @dataclasses.dataclass(frozen=True)
