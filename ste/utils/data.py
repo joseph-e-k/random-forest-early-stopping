@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 import logging
 import os
-from typing import Iterable, Sequence
+from typing import Iterable, Iterator, Sequence
 from weakref import WeakKeyDictionary
 
 from diskcache import Cache
@@ -9,33 +9,43 @@ import openml
 import pandas as pd
 import numpy as np
 
-from ucimlrepo import fetch_ucirepo as _fetch_uci_repo
+import ucimlrepo
 
 from ste.utils.caching  import memoize
 from ste.utils.logging import logged
 from ste.utils.misc import unzip
 
-
+# The benchmark referenced in this module is that of Grinsztajn, Grinjsztajn, and Varoquax (2022). The exact list can be found in Appendix A.1 of
+# https://arxiv.org/pdf/2207.08815. Since we are only interested in classification, only tables A.1.1 and A.1.3 were used.
+# The numerical IDs are for the OpenML repository.
 BENCHMARK_DATASET_IDS = [44089, 44090, 44091, 44120, 44121, 44122, 44123, 44124, 44125, 44126, 44127, 44128, 44129, 44130, 44131, 44156, 44157, 44158, 44159, 44160, 44161, 44162]
+
 DATA_DIRECTORY = os.path.join(os.path.dirname(__file__), "../../data")
 
-
+# Since we will often want to delete the cache of computations without deleting the cache of datasets, we store them separately
 dataset_cache = Cache(os.path.join(DATA_DIRECTORY, ".cache"))
 
 
 @memoize(cache=dataset_cache)
 @logged(message_level=logging.INFO)
 def fetch_uci_repo(repo_id):
-    return _fetch_uci_repo(id=repo_id)
+    """Logged and cached wrapper to ucimlrepo.fetch_ucirepo"""
+    return ucimlrepo.fetch_ucirepo(id=repo_id)
 
+
+# For our purposes, a "concrete dataset" is a DataFrame of features and a 1-D array of target categories.
+type ConcreteDataset = tuple[pd.DataFrame, np.ndarray]
+
+type Dataset = ConcreteDataset | LazyDataset
 
 class LazyDataset:
+    """Dataset that actually loads its data only when unpacked to features and target. Useful for multiprocessing."""
     _wkd = WeakKeyDictionary()
     
     def _load(self):
         raise NotImplementedError()
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[ConcreteDataset]:
         try:
             data = self._wkd[self]
         except KeyError:
@@ -46,12 +56,13 @@ class LazyDataset:
     @staticmethod
     def _clean_data(features, target):
         features = coerce_nonnumeric_columns_to_numeric(features)
-        target = to_binary_classifications(target)
+        target = dichotomize_classifications(target)
         return features, target
 
 
 @dataclass(frozen=True)
 class UCIDataset(LazyDataset):
+    """A dataset stored in the UCI Machine Learning Repository"""
     id: int
     
     def _load(self):
@@ -61,6 +72,7 @@ class UCIDataset(LazyDataset):
 
 @dataclass(frozen=True)
 class OpenMLDataset(LazyDataset):
+    """A dataset stored in the OpenML repository"""
     id: int
     
     def _load(self):
@@ -70,29 +82,39 @@ class OpenMLDataset(LazyDataset):
         return features, target
 
 
-type Dataset = tuple[pd.DataFrame, np.ndarray] | LazyDataset
+def dichotomize_classifications(classifications):
+    """Dichotomize an array of classes.
 
+    Args:
+        classifications (np.ndarray): original classifications
 
-def covariates_response_split(dataframe: pd.DataFrame, response_column=-1) -> Dataset:
-    if isinstance(response_column, int):
-        response_column = dataframe.columns[response_column]
-    
-    return dataframe.drop([response_column], axis=1), dataframe[response_column]
+    Raises:
+        ValueError: if there are fewer than 2 classes to begin with
 
-
-def to_binary_classifications(classifications):
+    Returns:
+        np.ndarray: new array of the same length, with only 2 classes: the original most common class, and an "everything else" class
+    """
     classes = classifications.unique()
     n_classes = len(classes)
 
     if n_classes < 2:
         raise ValueError("Cannot make binary classification from fewer than 2 classes")
     
-    classes, class_counts = np.unique(classifications, return_counts=True)
-    most_common_class = classes[np.argmax(class_counts)]
+    classes, class_member_counts = np.unique(classifications, return_counts=True)
+    most_common_class = classes[np.argmax(class_member_counts)]
     return np.array(classifications == most_common_class, dtype=int)
 
 
-def coerce_nonnumeric_columns_to_numeric(df: pd.DataFrame):
+def coerce_nonnumeric_columns_to_numeric(df: pd.DataFrame) -> pd.DataFrame:
+    """Transform all 'object' and 'category' columns in a dataframe to numeric codes using Series.cat.codes.
+    Note that this mutates the original dataframe.
+
+    Args:
+        df (pd.DataFrame): dataframe to be adjusted
+
+    Returns:
+        pd.DataFrame: the original dataframe, after coercion
+    """
     object_columns = df.select_dtypes(["object"]).columns
     df[object_columns] = df[object_columns].astype("category")
     category_columns = df.select_dtypes(["category"]).columns
@@ -100,7 +122,8 @@ def coerce_nonnumeric_columns_to_numeric(df: pd.DataFrame):
     return df
 
 
-def get_benchmark_datasets():
+def get_benchmark_datasets() -> dict[str, Dataset]:
+    """Return a dictionary of datasets in the Grinsztajn et al. benchmark, indexed by name"""
     datasets_by_name = {}
     for dataset_id in BENCHMARK_DATASET_IDS:
         dataset = openml.datasets.get_dataset(dataset_id)
@@ -110,7 +133,15 @@ def get_benchmark_datasets():
 
 
 @logged(message_level=logging.DEBUG)
-def get_names_and_datasets(full_benchmark=False):
+def get_names_and_datasets(full_benchmark=False) -> dict[str, Dataset]:
+    """Get a collection of datasets with their names.
+
+    Args:
+        full_benchmark (bool, optional): If True, use the Grinsztajn et al. datasets. Otherwise (the default), use eight large datasets from UCIML.
+
+    Returns:
+        dict[str, Dataset]: The requested datasets, keyed by name.
+    """
     if full_benchmark:
         named_datasets = get_benchmark_datasets()
     else:
@@ -129,6 +160,7 @@ def get_names_and_datasets(full_benchmark=False):
 
 
 def split_dataset(dataset: Dataset, relative_proportions: Sequence[float | int]) -> Iterable[Dataset]:
+    """Randomly split a given dataset into chunks with specified relative sizes."""
     X, y = dataset
     n_rows = len(X)
 
