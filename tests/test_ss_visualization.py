@@ -1,7 +1,7 @@
 import os
 import tempfile
 from ste.optimization import get_optimal_stopping_strategy, show_stopping_strategy
-from tests.utils import compare_images_with_cleanup
+from tests.utils import assert_directory_of_images_matches_reference
 
 
 REFERENCES_DIR = os.path.join(os.path.dirname(__file__), "references")
@@ -17,11 +17,4 @@ def test_regression_sanity():
 
     with tempfile.TemporaryDirectory() as output_dir:
         show_stopping_strategy(oss, output_dir)
-
-        for file_name in os.listdir(reference_dir):
-            diff = compare_images_with_cleanup(
-                os.path.join(reference_dir, file_name),
-                os.path.join(output_dir, file_name),
-                tol=0
-            )
-            assert diff is None, f"Images differ: {diff}"
+        assert_directory_of_images_matches_reference(reference_dir, output_dir)
