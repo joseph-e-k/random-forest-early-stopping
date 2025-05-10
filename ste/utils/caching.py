@@ -4,7 +4,7 @@ import os
 from diskcache import Cache
 from diskcache.core import full_name
 
-from .misc import function_call_to_tuple
+from .misc import function_call_to_tuple, no_change
 
 
 # Set this environment variable to modify the name of the directory used for caching (useful for debugging)
@@ -40,4 +40,4 @@ def memoize(name=None, *, args_to_ignore=(), arg_transformations=None, cache=def
 
 
 if SHOULD_DUMMY_CACHING:
-    memoize = lambda *args, **kwargs: (lambda function: function)
+    memoize = lambda *args, **kwargs: no_change

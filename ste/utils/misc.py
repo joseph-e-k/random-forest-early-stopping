@@ -215,3 +215,7 @@ class Dummy:
 
     def __repr__(self):
         return self.__rep
+
+
+def no_change(arg):
+    return arg

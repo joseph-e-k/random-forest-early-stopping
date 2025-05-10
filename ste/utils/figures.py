@@ -25,7 +25,7 @@ import networkx as nx
 
 from ste.utils.logging import get_module_logger
 from ste.utils.multiprocessing import parallelize
-from ste.utils.misc import Dummy, extend_array, get_name, stringify_kwargs
+from ste.utils.misc import Dummy, extend_array, get_name, stringify_kwargs, no_change
 
 
 _logger = get_module_logger()
@@ -49,8 +49,8 @@ def interpolate_color(color1, color2, t):
     return tuple((1 - t) * c1 + t * c2 for c1, c2 in zip(rgba1, rgba2))
 
 
-def plot_function(ax, x_axis_arg_name, function, function_kwargs=None, plot_kwargs=None, results_transform=lambda y: y,
-                  x_axis_values_transform=lambda x: x, concurrently=True):
+def plot_function(ax, x_axis_arg_name, function, function_kwargs=None, plot_kwargs=None, results_transform=no_change,
+                  x_axis_values_transform=no_change, concurrently=True):
     function_kwargs = function_kwargs or {}
     plot_kwargs = plot_kwargs or {}
 
@@ -82,8 +82,8 @@ def plot_function(ax, x_axis_arg_name, function, function_kwargs=None, plot_kwar
     return ax.plot(x_axis_values, y_axis_values, **plot_kwargs)
 
 
-def plot_functions(ax, x_axis_arg_name, functions, function_kwargs=None, plot_kwargses=None, results_transform=lambda y: y,
-                   x_axis_values_transform=lambda x: x, concurrently=True, labels=None):
+def plot_functions(ax, x_axis_arg_name, functions, function_kwargs=None, plot_kwargses=None, results_transform=no_change,
+                   x_axis_values_transform=no_change, concurrently=True, labels=None):
     if plot_kwargses is None:
         plot_kwargses = itertools.repeat({})
 
