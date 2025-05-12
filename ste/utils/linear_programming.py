@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 from collections.abc import Mapping
 import dataclasses
+import os
 import re
 import shutil
 import subprocess
@@ -17,10 +18,15 @@ from ste.utils.logging import get_module_logger
 
 CONSTANT_COEFF_KEY = None
 
-SOPLEX_CL_FORMAT = "soplex {} --real:feastol=0 --real:opttol=0 --int:solvemode=2 --int:syncmode=1 --int:readmode=1 --int:checkmode=2 --int:multiprecision_limit=2147483647 -X={}"
+SOPLEX_EXECUTABLE_PATH = os.getenv("SOPLEX_PATH", None)
 
 
 _logger = get_module_logger()
+
+
+class UnspecifiedExecutableError(Exception):
+    pass
+
 
 class OptimizationFailure(Exception):
     pass
@@ -202,6 +208,9 @@ class Problem:
         self._optimization_sense = sense
 
     def solve_with_soplex(self) -> OptimizationResult:
+        if SOPLEX_EXECUTABLE_PATH is None:
+            raise UnspecifiedExecutableError("SOPLEX_PATH environment variable must be set to point to the SoPlex executable file")
+
         lp_file = tempfile.NamedTemporaryFile("wt")
         solution_file = tempfile.NamedTemporaryFile("rt")
 
@@ -211,8 +220,18 @@ class Problem:
             lp_file.flush()
             _logger.info("Running SoPlex to solve problem...")
             process = subprocess.run(
-                SOPLEX_CL_FORMAT.format(lp_file.name, solution_file.name),
-                shell=True,
+                [
+                    SOPLEX_EXECUTABLE_PATH,
+                    lp_file.name,
+                    "--real:feastol=0",
+                    "--real:opttol=0",
+                    "--int:solvemode=2",
+                    "--int:syncmode=1",
+                    "--int:readmode=1",
+                    "--int:checkmode=2",
+                    "--int:multiprecision_limit=2147483647",
+                    "-X={}".format(solution_file.name)
+                ],
                 capture_output=True,
                 text=True
             )
