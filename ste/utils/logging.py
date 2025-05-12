@@ -19,6 +19,13 @@ _TLS = threading.local()
 
 @dataclasses.dataclass
 class SetBreadcrumbsContext:
+    """
+    Context manager to temporarily set breadcrumbs for logging.
+
+    Attributes:
+        new_breadcrumbs (tuple[str, ...]): The new breadcrumbs to set.
+        old_breadcrumbs (tuple[str, ...]): The previous breadcrumbs, restored on exit.
+    """
     new_breadcrumbs: tuple[str, ...]
     old_breadcrumbs: tuple[str, ...] = None
 
@@ -32,6 +39,13 @@ class SetBreadcrumbsContext:
 
 @dataclasses.dataclass
 class PushBreadcrumbContext:
+    """
+    Context manager to push a breadcrumb onto the current breadcrumb stack.
+
+    Attributes:
+        new_breadcrumb (str): The breadcrumb to push.
+        old_breadcrumbs (tuple[str, ...]): The previous breadcrumbs, restored on exit.
+    """
     new_breadcrumb: str
     old_breadcrumbs: tuple[str, ...] = None
 
@@ -48,11 +62,26 @@ breadcrumbs = SetBreadcrumbsContext
 
 
 def get_breadcrumbs():
+    """
+    Retrieve the current breadcrumbs.
+
+    Returns:
+        tuple[str, ...]: The current breadcrumb stack.
+    """
     return _TLS.breadcrumbs
 
 
 @dataclasses.dataclass(frozen=True)
 class LogEntryAndExitContext:
+    """
+    Context manager to log entry and exit messages for a block of code.
+
+    Attributes:
+        message_level (int): The logging level for the messages.
+        entry_text (str | None): The message to log on entry.
+        exit_text (str | None): The message to log on exit.
+        logger (logging.Logger): The logger to use for logging.
+    """
     message_level: int
     entry_text: str | None
     exit_text: str | None
@@ -69,6 +98,14 @@ class LogEntryAndExitContext:
 
 @dataclasses.dataclass(frozen=True)
 class _LoggedGenerator:
+    """
+    Wrapper for a generator so logs that happen from within the generator will use the breadcrumb stack
+    at the generator's callsite rather than at wherever flow has continued to in the main program.
+
+    Attributes:
+        generator (GeneratorType): The wrapped generator.
+        breadcrumbs (tuple[str, ...]): The breadcrumbs to log during iteration.
+    """
     generator: GeneratorType
     breadcrumbs: tuple[str, ...]
 
@@ -93,6 +130,17 @@ class _LoggedGenerator:
 
 @dataclasses.dataclass
 class _LoggedFunction[**P, R]:
+    """
+    Wrapper for a function to log entry and exit and adjust the breadcrumb stack.
+
+    Attributes:
+        function (Callable[P, R]): The wrapped function.
+        breadcrumb_text (str | None): How this function will appear in the breadcrumb stack.
+        entry_text (str | None): The entry message to log.
+        exit_text (str | None): The exit message to log.
+        message_level (int | None): The logging level for messages.
+        logger (logging.Logger): The logger to use for logging.
+    """
     function: Callable[P, R]
     breadcrumb_text: str | None
     entry_text: str | None
@@ -150,13 +198,24 @@ _DEFAULT = object()
 
 
 def logged[**P, R](*args, **kwargs) -> Callable[[Callable[P, R]], _LoggedFunction[P, R]]:
+    """Decorator for a function to log entry and exit and adjust the breadcrumb stack."""
     logger: MyLogger = get_module_logger(up_frames=1)
     return logger.logged(*args, **kwargs)
 
 
 @logging.setLoggerClass
 class MyLogger(logging.getLoggerClass()):
+    """
+    Custom logger class with additional functionality for logging breadcrumbs and entry/exit messages.
+    """
     def _log(self, level, msg, *args, **kwargs):
+        """
+        Log a message with breadcrumbs and a timestamp.
+
+        Args:
+            level (int): The logging level.
+            msg (str): The message to log.
+        """
         now = datetime.now().astimezone(timezone.utc)
         timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
         level_symbol = self._get_level_symbol(level)
@@ -166,9 +225,30 @@ class MyLogger(logging.getLoggerClass()):
     
     @staticmethod
     def _get_level_symbol(level: int):
+        """
+        Get the symbol for a logging level.
+
+        Args:
+            level (int): The logging level.
+
+        Returns:
+            str: The symbol for the logging level.
+        """
         return logging.getLevelName(level)[0]
     
     def log_entry_and_exit(self, message_level=logging.INFO, entry_text=_DEFAULT, exit_text=_DEFAULT, name=None):
+        """
+        Create a context manager to log entry and exit messages.
+
+        Args:
+            message_level (int, optional): The logging level for the messages.
+            entry_text (str, optional): The entry message.
+            exit_text (str, optional): The exit message.
+            name (str, optional): The name of the scope (used to autogenerate entry and exit messages if not provided).
+
+        Returns:
+            LogEntryAndExitContext: The context manager.
+        """
         if name is None and entry_text in (_DEFAULT, None) and exit_text in (_DEFAULT, None):
             raise TypeError("At least one of 'entry_message', 'exit_message', or 'name' must be provided")
         
@@ -181,6 +261,16 @@ class MyLogger(logging.getLoggerClass()):
         return LogEntryAndExitContext(message_level, entry_text, exit_text, self)
     
     def logged[**P, R](self, message_level=logging.DEBUG, breadcrumb_text=_DEFAULT, entry_text=_DEFAULT, exit_text=_DEFAULT, name=None) -> Callable[[Callable[P, R]], _LoggedFunction[P, R]]:
+        """
+        Decorator for a function to log entry and exit and adjust the breadcrumb stack.
+
+        Args:
+            message_level (int, optional): The logging level for messages.
+            breadcrumb_text (str, optional): The breadcrumb text.
+            entry_text (str, optional): The entry message.
+            exit_text (str, optional): The exit message.
+            name (str, optional): The name for inference.
+        """
         if isinstance(message_level, Callable):
             raise TypeError("argument 'message_level' must be int, not callable; did you forget some empty parentheses?")
 
@@ -198,8 +288,13 @@ class MyLogger(logging.getLoggerClass()):
         )
 
 
-
 def get_main_module_name():
+    """
+    Get the name of the main module.
+
+    Returns:
+        str | None: The name of the main module, or None if not available.
+    """
     import __main__
     
     try:
@@ -212,6 +307,12 @@ def get_main_module_name():
 
 
 def get_log_file_path():
+    """
+    Get the path for the log file.
+
+    Returns:
+        str: The path to the log file.
+    """
     timestamp = datetime.now().astimezone(timezone.utc).strftime("%Y%m%d%H%M%S")
 
     main_module_name = get_main_module_name()
@@ -225,6 +326,12 @@ def get_log_file_path():
 
 
 def configure_logging(console_level=logging.INFO):
+    """
+    Configure logging with both file and console handlers, and set up the breadcrumb stack.
+
+    Args:
+        console_level (int): The logging level for the console handler.
+    """
     root_logger = logging.getLogger()
     root_logger.setLevel(logging.DEBUG)
 
@@ -243,6 +350,14 @@ def configure_logging(console_level=logging.INFO):
 
 
 def log_uncaught_exception(exc_type, exc_value, exc_traceback):
+    """
+    Log uncaught exceptions using our custom logger.
+
+    Args:
+        exc_type (type): The exception type.
+        exc_value (Exception): The exception instance.
+        exc_traceback (traceback): The traceback object.
+    """
     if issubclass(exc_type, KeyboardInterrupt):
         sys.__excepthook__(exc_type, exc_value, exc_traceback)
         return
@@ -251,6 +366,15 @@ def log_uncaught_exception(exc_type, exc_value, exc_traceback):
 
 
 def get_module_logger(up_frames=0):
+    """
+    Get a logger for the current module.
+
+    Args:
+        up_frames (int, optional): The number of stack frames to go up to get to the "current" module. Defaults to zero.
+
+    Returns:
+        logging.Logger: The logger for the module.
+    """
     frame = inspect.stack()[1 + up_frames].frame
     name = frame.f_locals["__name__"]
     if name == "__main__":
