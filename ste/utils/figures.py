@@ -1,15 +1,3 @@
-# Presets for making nice LaTeX-compatible figures.
-#
-# Use as follows:
-#
-# with matplotlib.rc_context(rc = RCPARAMS_LATEX_DOUBLE_COLUMN):
-#     fig, ax = plt.subplots()
-#     ax.plot(...)
-#     ...
-#     save_figure(fig, 'very-plot-such-amazing-wow')
-#
-#
-# Amit Moscovich, Tel Aviv University, 2023.
 import functools
 import itertools
 import os
@@ -20,11 +8,10 @@ from matplotlib import colors
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 import numpy as np
-import scipy
 import networkx as nx
 
 from ste.utils.logging import get_module_logger
-from ste.utils.multiprocessing import parallelize
+from ste.utils.multiprocessing import parallelize, parallelize_to_array
 from ste.utils.misc import Dummy, extend_array, get_name, stringify_kwargs, no_change
 
 
@@ -38,19 +25,39 @@ STYLE_PATH = os.path.join(os.path.dirname(__file__), "latex-paper.mplstyle")
 mplstyle.use(STYLE_PATH)
 
 
-def save_drawing(fig, filename):
-    _logger.info(f'Saving figure to "{os.path.realpath(filename)}"')
-    fig.savefig(filename, dpi=DPI, bbox_inches='tight')
-
-
 def interpolate_color(color1, color2, t):
+    """Return a color somewhere between the two given colors
+
+    Args:
+        color1 (Matplotlib color): First color
+        color2 (Matplotlib color): Second color
+        t (float): Where the new color should fall on a scale between 0 (color1) and 1 (color2)
+
+    Returns:
+        Matplotlib color
+    """
     rgba1 = colors.to_rgba(color1)
     rgba2 = colors.to_rgba(color2)
     return tuple((1 - t) * c1 + t * c2 for c1, c2 in zip(rgba1, rgba2))
 
 
-def plot_function(ax, x_axis_arg_name, function, function_kwargs=None, plot_kwargs=None, results_transform=no_change,
+def plot_function(ax, x_axis_arg_name, function, function_kwargs, plot_kwargs=None, results_transform=no_change,
                   x_axis_values_transform=no_change, concurrently=True):
+    """Plot values of given function.
+
+    Args:
+        ax (Axes): Axes on which to plot the function.
+        x_axis_arg_name (str): Argument to use as the horizontal axis. Must be the name of an argument of the function.
+        function (Callable): Function to plot.
+        function_kwargs (dict, optional): Dictionary of keyword arguments to pass to the function. Must have a key equal to x_axis_arg_name, which should be a Sequence of values to use for that argument. All other keys should map to single values.
+        plot_kwargs (dict, optional): Dictionary of keyword arguments to pass to ax.plot(). Defaults to None.
+        results_transform (Callable, optional): Transformation to apply to the function's return values before plotting. Defaults to no_change.
+        x_axis_values_transform (Callable, optional): Transformation to apply to the x-axis values before plotting. Defaults to no_change.
+        concurrently (bool, optional): If True (the default), compute the different values of the function concurrently using parallelize().
+
+    Returns:
+        list[Line2D]: List of lines drawn by ax.plot()
+    """
     function_kwargs = function_kwargs or {}
     plot_kwargs = plot_kwargs or {}
 
@@ -63,18 +70,11 @@ def plot_function(ax, x_axis_arg_name, function, function_kwargs=None, plot_kwar
         title += f" ({stringify_kwargs(function_kwargs)})"
     ax.set_title(title)
 
-    y_axis_values = np.zeros(len(x_axis_values))
-
-    tasks = parallelize(
+    y_axis_values = parallelize_to_array(
         functools.partial(function, **function_kwargs),
-        argses_to_iter=({x_axis_arg_name: x} for x in x_axis_values),
+        argses_to_iter=[{x_axis_arg_name: x} for x in x_axis_values],
         dummy=(not concurrently)
     )
-
-    for task in tasks:
-        x = task.args_or_kwargs[x_axis_arg_name]
-        _logger.debug(f"Computed {get_name(function)} value at {x!r} in {task.duration:.1f}s")
-        y_axis_values[task.index] = task.result
 
     y_axis_values = results_transform(y_axis_values)
     x_axis_values = x_axis_values_transform(x_axis_values)
@@ -82,8 +82,24 @@ def plot_function(ax, x_axis_arg_name, function, function_kwargs=None, plot_kwar
     return ax.plot(x_axis_values, y_axis_values, **plot_kwargs)
 
 
-def plot_functions(ax, x_axis_arg_name, functions, function_kwargs=None, plot_kwargses=None, results_transform=no_change,
+def plot_functions(ax, x_axis_arg_name, functions, function_kwargs, plot_kwargses=None, results_transform=no_change,
                    x_axis_values_transform=no_change, concurrently=True, labels=None):
+    """Plot multiple functions on the same set of axes.
+
+    Args:
+        ax (Axes): Axes on which to plot the functions.
+        x_axis_arg_name (str): Argument to use as the horizontal axis. Must be the name of an argument of all functions.
+        functions (Iterable[Callable]): Functions to plot.
+        function_kwargs (dict, optional): Dictionary of keyword arguments to pass to the functions. Must have a key equal to x_axis_arg_name, which should be a Sequence of values to use for that argument. All other keys should map to single values.
+        plot_kwargses (Iterable[dict], optional): Iterable of dictionaries of keyword arguments to pass to ax.plot(). If provided, should be the same length as `functions`. Defaults to repeated empty dictionaries.
+        results_transform (Callable, optional): Transformation to apply to the functions' return values before plotting. Defaults to no_change.
+        x_axis_values_transform (Callable, optional): Transformation to apply to the x-axis values before plotting. Defaults to no_change.
+        concurrently (bool, optional): If True (the default), compute the different values of the functions concurrently using parallelize().
+        labels (Iterable[str], optional): Label to use for each function in the plot. Defaults to function names.
+
+    Returns:
+        list[Line2D]: List of lines drawn by ax.plot()
+    """
     if plot_kwargses is None:
         plot_kwargses = itertools.repeat({})
 
@@ -108,34 +124,9 @@ def plot_functions(ax, x_axis_arg_name, functions, function_kwargs=None, plot_kw
     return lines
 
 
-def plot_function_many_curves(ax, x_axis_arg_name, distinct_curves_arg_name, function,
-                              function_kwargs=None, plot_kwargs=None, concurrently=True):
-    function_kwargs = function_kwargs or {}
-    plot_kwargs = plot_kwargs or {}
-
-    distinct_curves_arg_values = function_kwargs.pop(distinct_curves_arg_name)
-
-    for distinct_curves_arg_value in distinct_curves_arg_values:
-        plot_function(
-            ax,
-            x_axis_arg_name,
-            function,
-            function_kwargs | {distinct_curves_arg_name: distinct_curves_arg_value},
-            plot_kwargs | dict(label=f"{distinct_curves_arg_name}={distinct_curves_arg_value}"),
-            concurrently=concurrently
-        )
-
-    title = get_name(function)
-    if function_kwargs:
-        title_kwargs = dict(function_kwargs)
-        title_kwargs.pop(x_axis_arg_name)
-        title += f" ({stringify_kwargs(title_kwargs)})"
-    ax.set_title(title)
-
-    ax.legend()
-
-
-def resolve_grid_shape(n_total=None, n_rows=None, n_columns=None):
+def resolve_grid_shape(n_total: int = None, n_rows: int = None, n_columns: int = None) -> tuple[int, int]:
+    """Compute correct grid dimensions given the total number of items and a known number of rows or columns."""
+    
     if sum(arg is not None for arg in (n_total, n_rows, n_columns)) < 2:
         raise ValueError("At least 2 of n_total, n_rows and n_columns must be specified")
     if n_total is None:
@@ -153,6 +144,20 @@ def resolve_grid_shape(n_total=None, n_rows=None, n_columns=None):
 
 
 def create_subplot_grid(n_subplots=None, n_rows=None, n_columns=None, tight_layout=True, figsize=None):
+    """Create a Figure object and a 2D array of Axes objects as returned from plt.subplots(). Unlike plt.subplots(), however:
+        - One missing dimension of the grid may be inferred from the total number of subplots required; and
+        - The second member of the returned pair is always a 2D array, instead of sometimes being a 1D array or a bare Axes object.
+
+    Args:
+        n_subplots (int, optional): Total number of subplots required. May be omitted if n_rows and n_columns are specified.
+        n_rows (int, optional): Number of rows in the grid of subplots. May be omitted if n_subplots and n_columns are specified.
+        n_columns (int, optional): Number of columns in the grid of subplots. May be omitted if n_subplots and n_rows are specified.
+        tight_layout (bool, optional): See the tight_layout argument to plt.subplots(). Defaults to True.
+        figsize (tuple[int, int], optional): See the figsize argument to plt.subplots(). Defaults to None.
+
+    Returns:
+        tuple[Figure, np.ndarray]: a Figure and a 2D array of Axes contained therein, arranged on a grid.
+    """
     n_rows, n_columns = resolve_grid_shape(n_subplots, n_rows, n_columns)
 
     fig, axs = plt.subplots(nrows=n_rows, ncols=n_columns, tight_layout=tight_layout, figsize=figsize)
@@ -165,12 +170,27 @@ def create_subplot_grid(n_subplots=None, n_rows=None, n_columns=None, tight_layo
 
 
 class MultiFigure(Dummy):
+    """Dummy object to stand in for the Figure returned by plt.subplots(), when we want to create multiple Axes at once with *separate* Figures instead."""
     def __init__(self, axs):
         super().__init__("<dummy figure>")
         self.axs = axs
 
 
 def create_independent_plots_grid(n_plots=None, n_rows=None, n_columns=None, axs_kw=None, **fig_kw):
+    """Create a 2D array of Axes objects, each owned by a separate Figure.
+    Designed to be usable interchangably with create_subplot_grid() and therefore also returns a dummy MultiFigure object.
+
+    Args:
+        n_plots (int, optional): Total number of desired Axes. May be omitted if n_rows and n_columns are specified.
+        n_rows (int, optional): Number of rows in the array of Axes. May be omitted if n_plots and n_columns are specified.
+        n_columns (int, optional): Number of columns in the array of Axes. May be omitted if n_plots and n_rows are specified.
+        axs_kw (dict[str, Any], optional): Additional keywords to be passed to fig.add_subplot() call used to create each Axes.
+    
+    All other keyword arguments will be passed directly to the plt.figure() call used to create each Figure.
+
+    Returns:
+        tuple[MultiFigure, np.ndarray]
+    """
     axs_kw = axs_kw or {}
 
     grid_shape = resolve_grid_shape(n_plots, n_rows, n_columns)
@@ -184,23 +204,7 @@ def create_independent_plots_grid(n_plots=None, n_rows=None, n_columns=None, axs
     return MultiFigure(axs), axs
 
 
-def draw_smooth_curve(points, **kwargs):
-    # Separate the points into x and y
-    points = np.array(points)
-    x = points[:, 0]
-    y = points[:, 1]
-    
-    # Generate more points along the curve
-    x_smooth = np.linspace(x.min(), x.max(), 500)  # Dense x for smooth curve
-    # Interpolate with spline
-    spline = scipy.interpolate.make_interp_spline(x, y, k=3)  # k=3 gives cubic spline
-    y_smooth = spline(x_smooth)
-    
-    # Plot the original points and the smooth curve
-    plt.plot(x_smooth, y_smooth, **kwargs)
-
-
-def compute_node_size_in_square_points(ax: Axes, r, axis="x"):
+def _compute_node_size_in_square_points(ax: Axes, r, axis="x"):
     bbox = ax.get_window_extent().transformed(ax.figure.dpi_scale_trans.inverted())
 
     match axis:
@@ -220,6 +224,13 @@ def compute_node_size_in_square_points(ax: Axes, r, axis="x"):
 
 
 def plot_fwss(fwss, ax: Axes, node_radius=0.2):
+    """Plot a state transition chart of the given EnsembleVoteWithStoppingStrategy on the given Axes
+
+    Args:
+        fwss (EnsembleVoteWithStoppingStrategy): EVWSS whose transition chart is to be generated.
+        ax (Axes): Axes to draw the chart on.
+        node_radius (float, optional): Radius of the circles used to represent states. Defaults to 0.2.
+    """
     ss = np.asarray(fwss.get_prob_stop(), dtype=float)
     n_base_models = ss.shape[0] - 1
     ss = extend_array(ss, new_shape=(n_base_models + 1, n_base_models + 1), fill_value=1)
@@ -257,7 +268,7 @@ def plot_fwss(fwss, ax: Axes, node_radius=0.2):
             prob_transition_if_continue = fwss.prob_see_bad[i_src, j_src] if j_dest == j_src else fwss.prob_see_good[i_src, j_src]
             transition_probs.append(prob_reach * prob_continue_if_reached * prob_transition_if_continue)
 
-    node_size = compute_node_size_in_square_points(ax, node_radius)
+    node_size = _compute_node_size_in_square_points(ax, node_radius)
     arrow_size = np.sqrt(node_size) / 4
     nx.draw_networkx_edges(G, positions, ax=ax, arrowsize=arrow_size, edge_color="black", node_size=node_size, alpha=transition_probs)
 
@@ -281,6 +292,16 @@ def plot_fwss(fwss, ax: Axes, node_radius=0.2):
 
 
 def save_drawing(drawing, path, file_name_suffix=".pdf"):
+    """Save a given Axes, Figure or Multifigure to disk. MultiFigures will be saved as a directory containing multiple image files.
+
+    Args:
+        drawing (Axes | Figure | MultiFigure): Image to be saved to disk.
+        path (str): Path to save at, without the file name suffix.
+        file_name_suffix (str, optional): File name suffix, which also determines file type. Defaults to ".pdf".
+
+    Raises:
+        TypeError: _description_
+    """
     if isinstance(drawing, Axes):
         drawing = drawing.figure
 
@@ -305,6 +326,16 @@ def save_drawing(drawing, path, file_name_suffix=".pdf"):
 
 
 def enforce_character_limit(x, pos, max_characters):
+    """Stringify the given floating-point number, but return an empty string if over the given number of characters.
+
+    Args:
+        x (float): Number to represent.
+        pos (Any): Dummy argument to conform to the ticker.FuncFormatter() interface.
+        max_characters (int): Maximum number of allowable characters.
+
+    Returns:
+        str
+    """
     label = f"{x:.10g}"
     if len(label) > max_characters:
         return ""
