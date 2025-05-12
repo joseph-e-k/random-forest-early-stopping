@@ -345,11 +345,6 @@ def swap_indices_of_axis(array, i, j, axis):
     return array
 
 
-def deterministic_hash(thing):
-    h = hashlib.sha256(repr(thing).encode("utf8"), usedforsecurity=False)
-    return int(h.hexdigest(), base=16)
-
-
 def function_call_to_tuple(function, name, args_to_ignore, arg_transformations, /, *args, **kwargs):
     """
     Convert a function call into a tuple representation.

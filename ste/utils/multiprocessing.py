@@ -15,7 +15,7 @@ import numpy as np
 import tblib
 
 from .logging import get_breadcrumbs, get_module_logger, logged, breadcrumbs
-from .misc import TimerContext, enumerate_product, get_name, repeat_enumerated, deterministic_hash
+from .misc import TimerContext, enumerate_product, get_name, repeat_enumerated
 
 
 _logger = get_module_logger()
@@ -25,12 +25,19 @@ N_WORKER_PROCESSES = int(os.getenv("STE_N_WORKER_PROCESSES", 32))
 SHOULD_DUMMY_MULTIPROCESSING = bool(os.getenv("STE_DUMMY_MULTIPROCESS", False))
 
 
-class SynchronizationError(Exception):
-    pass
-
-
 @dataclasses.dataclass
 class _RawTaskOutcome:
+    """
+    Represents the outcome of a task executed in parallel, before processing to parse exception traceback.
+
+    Attributes:
+        index (int | tuple[int, ...]): The index of the task.
+        args_or_kwargs (tuple | dict): The arguments or keyword arguments used for the task.
+        duration (timedelta): The duration of the task execution.
+        result (Any, optional): The result of the task. Defaults to None.
+        exception (Exception | None, optional): The exception raised during the task, if any. Defaults to None.
+        traceback_string (str, optional): The traceback string of the exception, if any. Defaults to None.
+    """
     index: int | tuple[int, ...]
     args_or_kwargs: tuple | dict
     duration: timedelta
@@ -41,6 +48,16 @@ class _RawTaskOutcome:
 
 @dataclasses.dataclass(frozen=True)
 class TaskOutcome:
+    """
+    Represents the processed outcome of a task executed in parallel.
+
+    Attributes:
+        index (int | tuple[int, ...]): The index of the task.
+        args_or_kwargs (tuple | dict): The arguments or keyword arguments used for the task.
+        duration (timedelta): The duration of the task execution.
+        result (Any): The result of the task.
+        exception (Exception): The exception raised during the task, if any, along with its traceback.
+    """
     index: int | tuple[int, ...]
     args_or_kwargs: tuple | dict
     duration: timedelta
@@ -50,6 +67,19 @@ class TaskOutcome:
 
 @dataclasses.dataclass
 class _Job:
+    """
+    Represents a job consisting of multiple tasks to be executed in parallel, each being the same function with different arguments.
+
+    Attributes:
+        function (Callable): The function to execute for each task.
+        name (str): The name of the job.
+        breadcrumbs_at_creation (tuple[str, ...]): The breadcrumbs at the time of job creation.
+        n_total_tasks (int): The total number of tasks. Defaults to None.
+        start_time_ns (int): The start time of the job in nanoseconds.
+        n_completed_tasks (int): The number of completed tasks.
+        random_nonce (float): A random nonce for seeding random number generators.
+        np_random_nonce (float): A random nonce for seeding NumPy random number generators.
+    """
     function: Callable
     name: str
     breadcrumbs_at_creation: tuple[str, ...]
@@ -60,11 +90,20 @@ class _Job:
     np_random_nonce: float = dataclasses.field(default_factory=np.random.random)
 
     def run_single_task(self, index_and_args_or_kwargs):
+        """
+        Execute a single task.
+
+        Args:
+            index_and_args_or_kwargs (tuple): A tuple containing the task index and arguments.
+
+        Returns:
+            _RawTaskOutcome: The raw outcome of the task.
+        """
         index, args_or_kwargs = index_and_args_or_kwargs
         task_name = self.get_single_task_name(index)
 
-        random.seed(deterministic_hash((self.random_nonce, index)) % (2 ** 32 - 1))
-        np.random.seed(deterministic_hash((self.np_random_nonce, index)) % (2 ** 32 - 1))
+        random.seed(hash((self.random_nonce, index)) % (2 ** 32 - 1))
+        np.random.seed(hash((self.np_random_nonce, index)) % (2 ** 32 - 1))
         
         try:
             with breadcrumbs(self.breadcrumbs_at_creation + (task_name,)), TimerContext(verbose=False) as timer:
@@ -90,11 +129,26 @@ class _Job:
             )
         
     def get_single_task_name(self, index):
+        """
+        Get the name of a single task.
+
+        Args:
+            index (int | tuple[int, ...]): The index of the task. Can be a tuple if the job was started using `argses_to_combine`.
+
+        Returns:
+            str: The name of the task.
+        """
         if isinstance(index, int):
             return f"{self.name}[{index}]"
         return f"{self.name}[{', '.join(str(i) for i in index)}]"
     
     def single_task_completed(self, task_index):
+        """
+        Mark a single task as completed and log its progress.
+
+        Args:
+            task_index (int | tuple[int, ...]): The index of the completed task.
+        """
         self.n_completed_tasks += 1
         now = datetime.now().astimezone(timezone.utc)
         task_name = self.get_single_task_name(task_index)
@@ -109,12 +163,23 @@ class _Job:
             expected_time_remaining = timedelta(microseconds=expected_time_remaining_ns // 1e3)
             expected_end_time = now + expected_time_remaining
             timing_estimate = f"expect to be finished at {expected_end_time.strftime('%Y-%m-%d %H:%M:%S')}"
-            log_message= log_message = f"{task_name} completed ({self.n_completed_tasks} / {self.n_total_tasks}; {timing_estimate})"
+            log_message = f"{task_name} completed ({self.n_completed_tasks} / {self.n_total_tasks}; {timing_estimate})"
 
         _logger.info(log_message)
 
 
 def _infer_n_tasks(reps, argses_to_iter, argses_to_combine):
+    """
+    Infer the total number of tasks to execute.
+
+    Args:
+        reps (int | None): Number of times each argument set is repeated.
+        argses_to_iter (Iterable | None): Iterable of argument sets to iterate over. Mutually exclusive with `argses_to_combine`.
+        argses_to_combine (Iterable | None): Iterable of iterables of individual arguments to combine into argument sets.
+
+    Returns:
+        int | None: The total number of tasks, or None if it cannot be determined.
+    """
     if reps is None:
         reps = 1
     try:
@@ -130,6 +195,20 @@ def _infer_n_tasks(reps, argses_to_iter, argses_to_combine):
 
 
 def _process_raw_task_outcome(raw_outcome: _RawTaskOutcome, reraise_exceptions: bool) -> TaskOutcome:
+    """
+    Process the raw outcome of a task by attaching the traceback to the exception if it exists.
+    If `reraise_exceptions` is True, re-raise the exception.
+
+    Args:
+        raw_outcome (_RawTaskOutcome): The raw outcome of the task.
+        reraise_exceptions (bool): Whether to re-raise exceptions.
+
+    Returns:
+        TaskOutcome: The processed task outcome.
+
+    Raises:
+        Exception: If `reraise_exceptions` is True and an exception occurred during the task.
+    """
     if raw_outcome.exception is None:
         return TaskOutcome(
             index=raw_outcome.index,
@@ -152,6 +231,22 @@ def _process_raw_task_outcome(raw_outcome: _RawTaskOutcome, reraise_exceptions: 
 
 @logged()
 def parallelize(function, reps=None, argses_to_iter=None, argses_to_combine=None, n_workers=N_WORKER_PROCESSES, reraise_exceptions=True, job_name=None, dummy=False):
+    """
+    Execute a function in parallel across multiple tasks.
+
+    Args:
+        function (Callable): The function to execute.
+        reps (int, optional): Number of repetitions per argument set. Defaults to None.
+        argses_to_iter (Iterable, optional): Iterable of argument sets to iterate over. Mutually exclusive with `argses_to_combine`.
+        argses_to_combine (Iterable, optional): Iterable of iterables of individual arguments to combine into argument sets.
+        n_workers (int, optional): Number of worker processes. Defaults to `N_WORKER_PROCESSES`.
+        reraise_exceptions (bool, optional): Whether to re-raise exceptions that occur in tasks. Defaults to True.
+        job_name (str, optional): The name of the job. Defaults to None.
+        dummy (bool, optional): If True, no actual multiprocessing will be used. Defaults to False.
+
+    Yields:
+        TaskOutcome: The outcome of each task.
+    """
     if not ((argses_to_iter is None) ^ (argses_to_combine is None)):
         raise TypeError("argses_to_iter or argses_to_combine must be specified (but not both)")
     
@@ -195,6 +290,25 @@ def parallelize(function, reps=None, argses_to_iter=None, argses_to_combine=None
 
 
 def parallelize_to_array(function, reps=None, argses_to_iter=None, argses_to_combine=None, n_workers=N_WORKER_PROCESSES, reraise_exceptions=True, job_name=None, dummy=False):
+    """
+    Execute a function in parallel and store the results in an array.
+
+    Args:
+        function (Callable): The function to execute.
+        reps (int, optional): Number of repetitions per argument set. Defaults to None (equivalent to 1, except it is given no dimension in the result array).
+        argses_to_iter (Iterable, optional): Iterable of argument sets to iterate over. Mutually exclusive with `argses_to_combine`.
+        argses_to_combine (Iterable, optional): Iterable of iterables of individual arguments to combine into argument sets.
+        n_workers (int, optional): The number of worker processes. Defaults to `N_WORKER_PROCESSES`.
+        reraise_exceptions (bool, optional): Whether to re-raise exceptions from tasks. Defaults to True.
+        job_name (str, optional): The name of the job. Defaults to None.
+        dummy (bool, optional): If True, no actual multiprocessing will be used. Defaults to False.
+
+    Returns:
+        np.ndarray: An array containing the results of the tasks. Its dimensions are inferred from the input arguments:
+            - If `reps` is provided, the first dimension is `reps`.
+            - If `argses_to_iter` is provided, the (rest of the) shape is `(len(argses_to_iter),)`.
+            - If `argses_to_combine` is provided, the (rest of the) shape matches that of `argses_to_combine`.
+    """
     results_array = None
 
     if argses_to_iter:
