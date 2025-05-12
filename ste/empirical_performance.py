@@ -15,7 +15,8 @@ from sklearn.ensemble import RandomForestClassifier
 from .EnsembleVote import EnsembleVote
 from .EnsembleVoteWithStoppingStrategy import EnsembleVoteWithStoppingStrategy
 from .utils.figures import (
-    DISTINCT_DASH_STYLES, MARKERS, create_independent_plots_grid, create_subplot_grid, enforce_character_limit, plot_functions, save_drawing
+    DISTINCT_DASH_STYLES, MARKERS, create_independent_plots_grid, create_subplot_grid,
+    enforce_character_limit, plot_functions, save_drawing
 )
 from .utils.logging import configure_logging, get_module_logger
 from .utils.multiprocessing import parallelize_to_array

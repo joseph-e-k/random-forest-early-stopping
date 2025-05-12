@@ -10,7 +10,7 @@ from matplotlib import pyplot as plt
 from scipy.special import comb
 
 from .EnsembleVoteWithStoppingStrategy import EnsembleVote, EnsembleVoteWithStoppingStrategy
-from .utils.figures import plot_fwss
+from .utils.figures import plot_evwss
 from .utils.linear_programming import Problem, OptimizationResult, ArithmeticExpression
 from .utils.logging import configure_logging, get_module_logger
 from .utils.misc import forwards_to, get_output_path
@@ -207,8 +207,8 @@ def show_stopping_strategy(ss, save_to_folder=None):
     fig_height = n + 1
     for n_plus in values_of_n_plus:
         fig, ax = plt.subplots(figsize=(fig_width, fig_height))
-        fwss = EnsembleVoteWithStoppingStrategy(EnsembleVote(n, n_plus), ss)
-        plot_fwss(fwss, ax=ax)
+        evwss = EnsembleVoteWithStoppingStrategy(EnsembleVote(n, n_plus), ss)
+        plot_evwss(evwss, ax=ax)
 
         if save_to_folder is not None:
             if not os.path.exists(save_to_folder):

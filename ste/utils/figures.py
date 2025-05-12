@@ -223,15 +223,15 @@ def _compute_node_size_in_square_points(ax: Axes, r, axis="x"):
     return np.pi * (r_points ** 2)
 
 
-def plot_fwss(fwss, ax: Axes, node_radius=0.2):
+def plot_evwss(evwss, ax: Axes, node_radius=0.2):
     """Plot a state transition chart of the given EnsembleVoteWithStoppingStrategy on the given Axes
 
     Args:
-        fwss (EnsembleVoteWithStoppingStrategy): EVWSS whose transition chart is to be generated.
+        evwss (EnsembleVoteWithStoppingStrategy): EVWSS whose transition chart is to be generated.
         ax (Axes): Axes to draw the chart on.
         node_radius (float, optional): Radius of the circles used to represent states. Defaults to 0.2.
     """
-    ss = np.asarray(fwss.get_prob_stop(), dtype=float)
+    ss = np.asarray(evwss.get_prob_stop(), dtype=float)
     n_base_models = ss.shape[0] - 1
     ss = extend_array(ss, new_shape=(n_base_models + 1, n_base_models + 1), fill_value=1)
     G = nx.DiGraph()
@@ -249,7 +249,7 @@ def plot_fwss(fwss, ax: Axes, node_radius=0.2):
             G.add_edge((i, j), (i + 1, j))
             G.add_edge((i, j), (i + 1, j + 1))
 
-    node_probs = np.exp([fwss.get_log_state_probability(*node) for node in G.nodes])
+    node_probs = np.exp([evwss.get_log_state_probability(*node) for node in G.nodes])
 
     # Draw the graph
     x_positions, y_positions = zip(*positions.values())
@@ -260,12 +260,12 @@ def plot_fwss(fwss, ax: Axes, node_radius=0.2):
     transition_probs = []
 
     for ((i_src, j_src), (_, j_dest)) in G.edges:
-        if i_src > fwss.n_total or j_src > fwss.n_yes:
+        if i_src > evwss.n_total or j_src > evwss.n_yes:
             transition_probs.append(0)
         else:
-            prob_reach = np.exp(fwss.get_log_state_probability(i_src, j_src))
+            prob_reach = np.exp(evwss.get_log_state_probability(i_src, j_src))
             prob_continue_if_reached = 1 - ss[i_src, j_src]
-            prob_transition_if_continue = fwss.prob_see_bad[i_src, j_src] if j_dest == j_src else fwss.prob_see_good[i_src, j_src]
+            prob_transition_if_continue = evwss.prob_see_bad[i_src, j_src] if j_dest == j_src else evwss.prob_see_good[i_src, j_src]
             transition_probs.append(prob_reach * prob_continue_if_reached * prob_transition_if_continue)
 
     node_size = _compute_node_size_in_square_points(ax, node_radius)
