@@ -14,8 +14,8 @@ from typing import Any, Callable
 import numpy as np
 import tblib
 
-from ste.utils.logging import get_breadcrumbs, get_module_logger, logged, breadcrumbs
-from ste.utils.misc import TimerContext, enumerate_product, get_name, repeat_enumerated, deterministic_hash
+from .logging import get_breadcrumbs, get_module_logger, logged, breadcrumbs
+from .misc import TimerContext, enumerate_product, get_name, repeat_enumerated, deterministic_hash
 
 
 _logger = get_module_logger()

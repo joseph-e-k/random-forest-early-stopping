@@ -9,11 +9,11 @@ import numpy as np
 from matplotlib import pyplot as plt
 from scipy.special import comb
 
-from ste.EnsembleVoteWithStoppingStrategy import EnsembleVote, EnsembleVoteWithStoppingStrategy
-from ste.utils.figures import plot_fwss
-from ste.utils.linear_programming import Problem, OptimizationResult, ArithmeticExpression
-from ste.utils.logging import configure_logging, get_module_logger
-from ste.utils.misc import forwards_to, get_output_path
+from .EnsembleVoteWithStoppingStrategy import EnsembleVote, EnsembleVoteWithStoppingStrategy
+from .utils.figures import plot_fwss
+from .utils.linear_programming import Problem, OptimizationResult, ArithmeticExpression
+from .utils.logging import configure_logging, get_module_logger
+from .utils.misc import forwards_to, get_output_path
 
 
 _logger = get_module_logger()

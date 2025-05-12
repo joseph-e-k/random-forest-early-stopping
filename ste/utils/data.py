@@ -11,9 +11,9 @@ import numpy as np
 
 import ucimlrepo
 
-from ste.utils.caching  import memoize
-from ste.utils.logging import logged
-from ste.utils.misc import unzip
+from .caching  import memoize
+from .logging import logged
+from .misc import unzip
 
 # The benchmark referenced in this module is that of Grinsztajn, Grinjsztajn, and Varoquax (2022). The exact list can be found in Appendix A.1 of
 # https://arxiv.org/pdf/2207.08815. Since we are only interested in classification, only tables A.1.1 and A.1.3 were used.

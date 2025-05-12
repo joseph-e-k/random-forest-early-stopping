@@ -12,7 +12,7 @@ import numpy as np
 from scipy import stats
 from diskcache.core import full_name
 
-from ste.utils.logging import get_module_logger
+from .logging import get_module_logger
 
 
 _logger = get_module_logger()

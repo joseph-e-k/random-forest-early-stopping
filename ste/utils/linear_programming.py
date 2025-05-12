@@ -13,7 +13,7 @@ from fractions import Fraction
 from io import StringIO
 from typing import Self
 
-from ste.utils.logging import get_module_logger
+from .logging import get_module_logger
 
 
 CONSTANT_COEFF_KEY = None

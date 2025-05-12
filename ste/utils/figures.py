@@ -10,9 +10,9 @@ from matplotlib.figure import Figure
 import numpy as np
 import networkx as nx
 
-from ste.utils.logging import get_module_logger
-from ste.utils.multiprocessing import parallelize, parallelize_to_array
-from ste.utils.misc import Dummy, extend_array, get_name, stringify_kwargs, no_change
+from .logging import get_module_logger
+from .multiprocessing import parallelize_to_array
+from .misc import Dummy, extend_array, get_name, stringify_kwargs, no_change
 
 
 _logger = get_module_logger()

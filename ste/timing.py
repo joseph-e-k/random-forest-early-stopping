@@ -3,13 +3,13 @@ import time
 
 import numpy as np
 
-from ste.optimization import make_optimal_stopping_problem
-from ste.qcp import make_and_time_qcp
-from ste.utils.figures import create_independent_plots_grid, save_drawing
-from ste.utils.logging import configure_logging, get_module_logger
-from ste.utils.misc import get_output_path
-from ste.utils.multiprocessing import parallelize_to_array
-from ste.utils.caching import memoize
+from .optimization import make_optimal_stopping_problem
+from .qcp import make_and_time_qcp
+from .utils.figures import create_independent_plots_grid, save_drawing
+from .utils.logging import configure_logging, get_module_logger
+from .utils.misc import get_output_path
+from .utils.multiprocessing import parallelize_to_array
+from .utils.caching import memoize
 
 
 _logger = get_module_logger()

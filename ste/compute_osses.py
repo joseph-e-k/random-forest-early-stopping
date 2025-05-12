@@ -3,10 +3,10 @@ import pickle
 
 import numpy as np
 
-from ste.utils.logging import configure_logging, get_module_logger
-from ste.utils.multiprocessing import parallelize
-from ste.optimization import get_optimal_stopping_strategy
-from ste.utils.misc import TimerContext, get_output_path
+from .utils.logging import configure_logging, get_module_logger
+from .utils.multiprocessing import parallelize
+from .optimization import get_optimal_stopping_strategy
+from .utils.misc import TimerContext, get_output_path
 
 
 _logger = get_module_logger()

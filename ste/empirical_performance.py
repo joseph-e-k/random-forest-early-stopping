@@ -12,17 +12,17 @@ import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 
-from ste.EnsembleVote import EnsembleVote
-from ste.EnsembleVoteWithStoppingStrategy import EnsembleVoteWithStoppingStrategy
-from ste.utils.figures import (
+from .EnsembleVote import EnsembleVote
+from .EnsembleVoteWithStoppingStrategy import EnsembleVoteWithStoppingStrategy
+from .utils.figures import (
     DISTINCT_DASH_STYLES, MARKERS, create_independent_plots_grid, create_subplot_grid, enforce_character_limit, plot_functions, save_drawing
 )
-from ste.utils.logging import configure_logging, get_module_logger
-from ste.utils.multiprocessing import parallelize_to_array
-from ste.optimization import get_optimal_stopping_strategy
-from ste.utils.caching import memoize
-from ste.utils.data import Dataset, get_names_and_datasets, split_dataset
-from ste.utils.misc import get_output_path, swap_indices_of_axis
+from .utils.logging import configure_logging, get_module_logger
+from .utils.multiprocessing import parallelize_to_array
+from .optimization import get_optimal_stopping_strategy
+from .utils.caching import memoize
+from .utils.data import Dataset, get_names_and_datasets, split_dataset
+from .utils.misc import get_output_path, swap_indices_of_axis
 
 
 _logger = get_module_logger()
