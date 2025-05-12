@@ -16,6 +16,14 @@ DEFAULT_AERS = (0.0, 1e-1, 1e-2, 5e-2, 1e-3, 1e-4, 1e-5, 1e-6)
 
 
 def compute_optimal_stopping_strategies(low_n_total, high_n_total, aers, should_pickle=False):
+    """Compute optimal stopping strategies for a range of ensemble sizes and AERs.
+
+    Args:
+        low_n_total (int): Lower bound for the ensemble size.
+        high_n_total (int): Upper bound for the ensemble size.
+        aers (Iterable[float]): List of allowable error rates.
+        should_pickle (bool, optional): If True, save computed OSSes to .pickle files as they are computed. Defaults to False.
+    """
     n_totals = range(low_n_total, high_n_total + 1)
     task_outcomes = parallelize(
         get_optimal_stopping_strategy,
