@@ -50,6 +50,7 @@ Constant = int | float | Fraction
 
 
 class ArithmeticExpression(defaultdict[str | None, Constant]):
+    """A constant, variable, or linear combination of constants and variables"""
     def __init__(self, items_source=(), /, **kwargs):
         super().__init__(lambda: 0, items_source, **kwargs)
 
@@ -156,6 +157,7 @@ class ArithmeticExpression(defaultdict[str | None, Constant]):
 
 @dataclasses.dataclass(frozen=True)
 class LogicalExpression:
+    """Two arithmetic expressions joined connected by a comparison operator (== or <=)"""
     lhs: ArithmeticExpression
     rhs: ArithmeticExpression
     operator: ComparisonOperator
@@ -178,14 +180,36 @@ class LogicalExpression:
 
 
 class Problem:
+    """A linear programming problem consisting of variables, constraints, and an objective"""
+
     def __init__(self):
         self._objective_file = tempfile.NamedTemporaryFile("wt", delete_on_close=False)
         self._constraints_file = tempfile.NamedTemporaryFile("wt", delete_on_close=False)
         self._n_constraints = 0
         self._variables_file = tempfile.NamedTemporaryFile("wt", delete_on_close=False)
         self._optimization_sense = OptimizationSense.Minimize
+        self._is_finalized = False
+        self._optimization_result = None
+
+    is_finalized = property(lambda self: self._is_finalized)
 
     def add_variable(self, variable_name: str, lower_bound: Constant = None, upper_bound: Constant = None) -> ArithmeticExpression:
+        """Add a variable to the problem.
+
+        Args:
+            variable_name (str): Name of the variable to be created.
+            lower_bound (Constant, optional): Lower bound of the variable's feasible range. Defaults to -infinity.
+            upper_bound (Constant, optional): Upper bound of the variable's feasible range. Defaults to +infinity.
+
+        Raises:
+            FinalizedProblemError: The problem has already been finalized (by trying to solve it) and cannot be changed further.
+
+        Returns:
+            ArithmeticExpression: The newly created variable.
+        """
+        if self._is_finalized:
+            raise FinalizedProblemError("This problem has been finalized and cannot be changed")
+
         variable = ArithmeticExpression.from_coeffs([(variable_name, 1)])
         self._variables_file.write(f" {variable_name}\n")
 
@@ -197,26 +221,63 @@ class Problem:
         return variable
 
     def add_constraint(self, constraint: LogicalExpression):
+        """Add a constraint to the problem.
+
+        Args:
+            constraint (LogicalExpression): Constraint to be added. Must not include any variables that do not belong to this problem.
+
+        Raises:
+            FinalizedProblemError: The problem has already been finalized (by trying to solve it) and cannot be changed further.
+        """
+        if self._is_finalized:
+            raise FinalizedProblemError("This problem has been finalized and cannot be changed")
+
         if constraint.is_tautology():
             return
+        
         self._n_constraints += 1
         constraint_str = self._logical_expression_to_lp_format(constraint)
         self._constraints_file.write(f" c{self._n_constraints}: {constraint_str}\n")
 
     def set_objective(self, objective: ArithmeticExpression, sense: OptimizationSense = OptimizationSense.Minimize):
+        """Set the the expression to minimized or maximized
+
+        Args:
+            objective (ArithmeticExpression): Expression to be minimized or maximized
+            sense (OptimizationSense, optional): Whether the expression should be minimized or maximized. Defaults to OptimizationSense.Minimize.
+
+        Raises:
+            FinalizedProblemError: The problem has already been finalized (by trying to solve it) and cannot be changed further.
+        """
+        if self._is_finalized:
+            raise FinalizedProblemError("This problem has been finalized and cannot be changed")
+        
         self._objective_file.write(f" {self._arithmetic_expression_to_lp_format(objective)}\n")
         self._optimization_sense = sense
 
     def solve_with_soplex(self) -> OptimizationResult:
+        """Solve this linear programming problem using SoPlex's precise rational solver.
+
+        Raises:
+            UnspecifiedExecutableError: The SOPLEX_PATH environment variable was not set.
+
+        Returns:
+            OptimizationResult
+        """
+        if self._is_finalized:
+            return self._optimization_result
+
         if SOPLEX_EXECUTABLE_PATH is None:
             raise UnspecifiedExecutableError("SOPLEX_PATH environment variable must be set to point to the SoPlex executable file")
+        
+        self._is_finalized = True
 
         lp_file = tempfile.NamedTemporaryFile("wt")
         solution_file = tempfile.NamedTemporaryFile("rt")
 
         with lp_file:
             _logger.info("Serializing problem to disk...")
-            self.save_as_lp_format(lp_file)
+            self._save_as_lp_format(lp_file)
             lp_file.flush()
             _logger.info("Running SoPlex to solve problem...")
             process = subprocess.run(
@@ -237,27 +298,28 @@ class Problem:
             )
 
         _logger.info("Parsing SoPlex output...")
-        return OptimizationResult.from_soplex_output(
+        self._optimization_result = OptimizationResult.from_soplex_output(
             StringIO(process.stdout),
             StringIO(process.stderr),
             solution_file
         )
+        return self._optimization_result
     
     @staticmethod
-    def close_and_copy_file(source_file, dest_file, mode="t"):
+    def _close_and_copy_file(source_file, dest_file, mode="t"):
         source_file.close()
         with open(source_file.name, "r" + mode) as source_file:
             shutil.copyfileobj(source_file, dest_file)
 
-    def save_as_lp_format(self, lp_file):
+    def _save_as_lp_format(self, lp_file):
         lp_file.write(f"{self._optimization_sense.value}\n")
-        self.close_and_copy_file(self._objective_file, lp_file)
+        self._close_and_copy_file(self._objective_file, lp_file)
         
         lp_file.write("Subject To\n")
-        self.close_and_copy_file(self._constraints_file, lp_file)
+        self._close_and_copy_file(self._constraints_file, lp_file)
 
         lp_file.write("Generals\n")
-        self.close_and_copy_file(self._variables_file, lp_file)
+        self._close_and_copy_file(self._variables_file, lp_file)
 
         lp_file.write("End\n")
 
@@ -287,21 +349,52 @@ class Problem:
             ComparisonOperator.Eq: "="
         }[expr.operator]
         rhs_str = cls._arithmetic_expression_to_lp_format(expr.rhs)
-        ret = f"{lhs_str} {operator_str} {rhs_str}"
-        return ret
+        return f"{lhs_str} {operator_str} {rhs_str}"
 
 
 @dataclasses.dataclass(frozen=True)
 class OptimizationResult:
+    """
+    Represents the result of solving a linear programming problem.
+
+    Attributes:
+        variable_values (Mapping[str, Constant]): A mapping of variable names to their optimized values.
+        objective_value (Constant): The value of the objective function at the optimal solution.
+        seconds_to_solve (float): The time taken to solve the problem, in seconds.
+    """
+
     variable_values: Mapping[str, Constant]
     objective_value: Constant
     seconds_to_solve: float
 
     def __getitem__(self, item):
+        """
+        Retrieve the value of a specific variable by its name.
+
+        Args:
+            item (str): The name of the variable.
+
+        Returns:
+            Constant: The value of the variable.
+        """
         return self.variable_values[item]
 
     @classmethod
     def from_soplex_output(cls, stdout, stderr, solution_file):
+        """
+        Parse the output of the SoPlex solver to create an OptimizationResult instance.
+
+        Args:
+            stdout (StringIO): The standard output from the SoPlex solver.
+            stderr (StringIO): The standard error output from the SoPlex solver.
+            solution_file (file): The file containing the solution values.
+
+        Returns:
+            OptimizationResult: An instance containing the parsed results.
+
+        Raises:
+            OptimizationFailure: If the solver did not return an optimal solution or if parsing failed.
+        """
         success = False
         objective_value = None
         seconds_to_solve = None
