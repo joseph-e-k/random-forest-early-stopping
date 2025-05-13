@@ -21,12 +21,25 @@ _logger = get_module_logger()
 
 @dataclasses.dataclass(frozen=True)
 class PiSolution:
+    """A solution to the optimal problem in Pi form"""
     p: np.ndarray
     pi: np.ndarray
     pi_bar: np.ndarray
 
 
 def make_and_solve_optimal_stopping_problem(n: int, alpha: float, freqs_n_plus: np.ndarray = None, disagreement_minimax=True, runtime_minimax=True) -> tuple[PiSolution, float]:
+    """Constructs and solves the optimal stopping problem in Pi form for the given parameters.
+
+    Args:
+        n (int): Number of base models.
+        alpha (float): Allowable disagreement rate.
+        freqs_n_plus (np.ndarray, optional): Estimated frequencies of different values of n_plus. Unused if `disagreement_minimax` and `runtime_minimax` are both True (the default).
+        disagreement_minimax (bool, optional): If True (the default), the disagreement probability is minimized for each value of `n_plus` separately. If False, the disagreement probability is minimized for the given distribution of `n_plus`.
+        runtime_minimax (bool, optional): If True (the default), the expected runtime is minimized for each value of `n_plus` separately. If False, the expected runtime is minimized for the given distribution of `n_plus`.
+
+    Returns:
+        tuple[PiSolution, float]: The solution in Pi form and the expected runtime of that solution.
+    """
     problem, p, pi, pi_bar = make_optimal_stopping_problem(n, alpha, freqs_n_plus, disagreement_minimax, runtime_minimax)
 
     solution = problem.solve_with_soplex()
@@ -41,52 +54,90 @@ def make_and_solve_optimal_stopping_problem(n: int, alpha: float, freqs_n_plus: 
 
 
 def make_optimal_stopping_problem(n: int, alpha: float, freqs_n_plus: np.ndarray = None, disagreement_minimax=True, runtime_minimax=True) -> tuple[Problem, np.ndarray, np.ndarray, np.ndarray]:
+    """Constructs the optimal stopping problem for the given parameters.
+
+    Args:
+        n (int): Number of base models.
+        alpha (float): Allowable disagreement rate.
+        freqs_n_plus (np.ndarray, optional): Estimated frequencies of different values of n_plus. Unused if `disagreement_minimax` and `runtime_minimax` are both True (the default).
+        disagreement_minimax (bool, optional): If True (the default), the disagreement probability is minimized for each value of `n_plus` separately. If False, the disagreement probability is minimized for the given distribution of `n_plus`.
+        runtime_minimax (bool, optional): If True (the default), the expected runtime is minimized for each value of `n_plus` separately. If False, the expected runtime is minimized for the given distribution of `n_plus`.
+
+    Returns:
+        tuple[Problem, np.ndarray, np.ndarray, np.ndarray]: The problem object and the decision variable matrices p, pi, and pi_bar.
+    """
     _logger.info(f"Constructing optimal-stopping problem for {n=}, {alpha=}...")
     problem = Problem()
 
     if disagreement_minimax and runtime_minimax and freqs_n_plus is not None:
         raise ValueError("frequencies were provided for n_plus but both disagreement_minimax and runtime_minimax are True, so those frequencies cannot be used")
 
-    n_plus = np.arange(0, n + 1)
+    # `n_pluses` is an array of all possible values of `n_plus`
+    n_pluses = np.arange(0, n + 1)
+
+    # Declare decision variables. Technically this is doable with only two of these three, but this makes the code cleaner
     p, pi, pi_bar = _make_decision_variables(n, problem)
-    a = make_abstract_probability_matrix(n, n_plus)
+
+    # `a` is the probability matrix for the "abstract process", that is, the the probability that an unstopped ensemble would reach a certain state
+    # Its dimensions are (len(n_pluses), n + 1, n + 1), where the first index corresponds to the case (the value of `n_plus`) and the second and third correspond to i and j
+    a = make_abstract_probability_matrix(n, n_pluses)
+
+    # `beta` is the matrix of probabilities that our stopped ensemble reaches a certain state and stops there
     beta = a * pi
 
+    # `B` is the expected number of base models that are executed in the stopped ensemble,
+    # so Prob(B = i | n^+ = k) is the sum of `beta`s in a single column
     prob_B_equals = np.sum(beta, axis=2)
+
+    # `expected_B` is the expected number of base models that are executed in the stopped ensemble
+    # This is still an array, now with only 1 dimension corresponding to the different values of `n_plus`
     expected_B = np.sum(prob_B_equals * np.arange(n + 1), axis=1)
 
     if runtime_minimax:
+        # If we are minimaxing the expected runtime, we need to constrain it for each value of `n_plus` separately
         max_expected_B = problem.add_variable("max_expected_B")
-        for k in range(len(n_plus)):
+        for k in range(len(n_pluses)):
             problem.add_constraint(max_expected_B >= expected_B[k])
         problem.set_objective(max_expected_B)
     else:
+        # Otherwise, we minimize E[E[B | n^+]] over the given distribution of `n_plus`
         expected_expected_B = np.sum(expected_B * freqs_n_plus)
         problem.set_objective(expected_expected_B)
 
+    # `d` is the disagreement mask, which is 1 for states where the stopped ensemble would disagree with the complete ensemble and 0 elsewhere
+    # Its dimensions are (len(n_pluses), n + 1, n + 1), where the first index corresponds to the case (the value of `n_plus`) and the second and third correspond to i and j
+    d = _make_disagreement_mask(n, n_pluses)
+
+    # `prob_disagreement` is the probability that the stopped ensemble disagrees with the complete ensemble
+    # It has only 1 dimension, corresponding to the different values of `n_plus`
+    prob_disagreement = np.sum(d * beta, axis=(1, 2))
+
+    if disagreement_minimax:
+        # If we are minimaxing the disagreement probability, we need to constrain it for each value of `n_plus` separately
+        for k in range(len(n_pluses)):
+            problem.add_constraint(prob_disagreement[k] <= alpha)
+    else:
+        # Otherwise, we minimize E[Prob(disagreement | n^+)] over the given distribution of `n_plus`
+        expected_prob_disagreement = np.sum(prob_disagreement * freqs_n_plus) / np.sum(freqs_n_plus)
+        problem.add_constraint(expected_prob_disagreement <= alpha)
+
+    # Now the constraints to force our decision variables to be in Pi
+
+    # All our decision variables represent probabilities and therefore must be between 0 and 1
     for decision_variable in [p, pi, pi_bar]:
         for i in range(n + 1):
             for j in range(i + 1):
                 problem.add_constraint(decision_variable[i, j] >= 0)
                 problem.add_constraint(decision_variable[i, j] <= 1)
 
-    d = _make_disagreement_mask(n, n_plus)
-    prob_disagreement = np.sum(d * beta, axis=(1, 2))
-
-    if disagreement_minimax:
-        # In minimax mode, disagreement probability must be controlled in each scenario separately
-        for k in range(len(n_plus)):
-            problem.add_constraint(prob_disagreement[k] <= alpha)
-    else:
-        expected_prob_disagreement = np.sum(prob_disagreement * freqs_n_plus) / np.sum(freqs_n_plus)
-        problem.add_constraint(expected_prob_disagreement <= alpha)
-
-
+    # Before any base models are executed, the probability of being in state (0, 0) is 1
     problem.add_constraint(p[0, 0] == 1)
 
+    # The only way to reach state (i + 1, 0) is to reach state (i, 0) and not stop there
     for i in range(n):
         problem.add_constraint(p[i + 1, 0] == pi_bar[i, 0])
 
+    # All other states (i, j) have two antecedents: (i - 1, j) and (i - 1, j + 1)
     for i in range(n):
         for j in range(i + 1):
             constraint = (
@@ -96,6 +147,8 @@ def make_optimal_stopping_problem(n: int, alpha: float, freqs_n_plus: np.ndarray
             )
             problem.add_constraint(constraint)
 
+    # Once the ensemble is exhausted, we must stop, so the probability of reaching and
+    # stopping at a state (n, j) is equal to the probability of reaching it
     for j in range(n + 1):
         problem.add_constraint(pi[n, j] == p[n, j])
 
@@ -119,12 +172,12 @@ def _make_decision_variable_matrix(n, variable_name, problem: Problem) -> np.nda
     return matrix
 
 
-def make_abstract_probability_matrix(n, n_plus):
-    """Probability matrices for the abstract process. Shape is (len(n_plus), n + 1, n + 1).
+def make_abstract_probability_matrix(n, n_pluses):
+    """Probability matrices for the abstract process. Shape is (len(n_pluses), n + 1, n + 1).
     The first index corresponds to the case (the value of n_plus); the second and third correspond to i and j."""
-    out = np.zeros(shape=(len(n_plus), n + 1, n + 1), dtype=object)
+    out = np.zeros(shape=(len(n_pluses), n + 1, n + 1), dtype=object)
     for k, i, j in np.ndindex(out.shape):
-        out[k, i, j] = _precise_hypergeometric_probability_mass(n, n_plus[k], i, j)
+        out[k, i, j] = _precise_hypergeometric_probability_mass(n, n_pluses[k], i, j)
     return out
 
 
@@ -221,6 +274,12 @@ def show_stopping_strategy(ss, save_to_folder=None):
 
 @forwards_to(make_and_solve_optimal_stopping_problem)
 def get_optimal_stopping_strategy(*args, **kwargs):
+    """Get the optimal stopping strategy for the given parameters.
+    This is a wrapper around `make_and_solve_optimal_stopping_problem` that converts the solution to Theta form.
+
+    Returns:
+        np.ndarray: matrix of stopping probabilities
+    """
     pi_solution, objective_value = make_and_solve_optimal_stopping_problem(*args, **kwargs)
     return make_theta_from_pi(pi_solution)
 
