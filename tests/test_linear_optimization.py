@@ -20,9 +20,9 @@ def test_minimax_sanity():
 
 def test_minimean_sanity():
     computed_oss = get_optimal_stopping_strategy(
-        n=5,
+        N=5,
         alpha=0.05,
-        freqs_n_plus=np.array([[1, 0, 0, 0, 0, 1]]),
+        D_hat=np.array([[1, 0, 0, 0, 0, 1]]),
         disagreement_minimax=False,
         runtime_minimax=False
     )
