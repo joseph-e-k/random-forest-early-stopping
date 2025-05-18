@@ -364,7 +364,10 @@ def function_call_to_tuple(function, name, args_to_ignore, arg_transformations, 
         name = full_name(function)
 
     signature = inspect.signature(function)
-    bound_arguments = signature.bind(*args, **kwargs)
+    try:
+        bound_arguments = signature.bind(*args, **kwargs)
+    except TypeError as e:
+        raise TypeError(f"Function {function} cannot be bound to arguments {args} and keyword arguments {kwargs}") from e
     bound_arguments.apply_defaults()
 
     key = [name]
