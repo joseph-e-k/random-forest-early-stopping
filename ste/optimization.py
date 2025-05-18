@@ -107,7 +107,7 @@ def make_optimal_stopping_problem(N: int, alpha: float, D_hat: np.ndarray = None
 
     # `d` is the disagreement mask, which is 1 for states where the stopped ensemble would disagree with the complete ensemble and 0 elsewhere
     # Its dimensions are (len(values_of_n), N + 1, N + 1), where the first index corresponds to the case (the value of `n`) and the second and third correspond to i and j
-    d = _make_disagreement_mask(N, values_of_n)
+    d = make_disagreement_mask(N, values_of_n)
 
     # `prob_disagreement` is the probability that the stopped ensemble disagrees with the complete ensemble
     # It has only 1 dimension, corresponding to the different values of `n`
@@ -191,13 +191,22 @@ def _precise_hypergeometric_probability_mass(n_total, n_good, n_draws, n_good_dr
     )
 
 
-def _make_disagreement_mask(N, n) -> np.ndarray:
+def make_disagreement_mask(N, values_of_n) -> np.ndarray:
+    """For each state, determine whether stopping in that state would give a result different from that of the complete ensemble.
+    
+    Args:
+        N (int): Number of base models.
+        values_of_n (np.ndarray): Possible values of n (number of 'yes' votes).
+
+    Returns:
+        np.ndarray: A mask of shape (len(values_of_n), N + 1, N + 1) where the first index corresponds to the case (the value of n) and the second and third correspond to i and j.
+    """
     i_arange = np.arange(N + 1).reshape(1, -1, 1)
     j_arange = np.arange(N + 1).reshape(1, 1, -1)
-    R = (j_arange > (i_arange / 2))
-    r = n > (N / 2)
-    e = (R != r.reshape(-1, 1, 1))
-    return e
+    stopped_result = (j_arange > (i_arange / 2))
+    unstopped_result = values_of_n > (N / 2)
+    disagreement = (stopped_result != unstopped_result.reshape(-1, 1, 1))
+    return disagreement
 
 
 def _get_decision_variable_values(solution: OptimizationResult, decision_variable_matrix):
