@@ -48,10 +48,10 @@ def compare_images_with_cleanup(expected_path, actual_path, tol):
 
 
 def assert_directory_of_images_matches_reference(reference_dir, actual_dir, tol=0):
-        for file_name in os.listdir(reference_dir):
-            diff = compare_images_with_cleanup(
-                os.path.join(reference_dir, file_name),
-                os.path.join(actual_dir, file_name),
-                tol=tol
-            )
-            assert diff is None, f"Images differ: {diff}"
+    for file_name in os.listdir(reference_dir):
+        diff = compare_images_with_cleanup(
+            os.path.join(reference_dir, file_name),
+            os.path.join(actual_dir, file_name),
+            tol=tol
+        )
+        assert diff is None, f"Images differ: {diff}"
