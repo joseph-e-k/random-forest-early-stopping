@@ -265,7 +265,7 @@ def plot_evwss(evwss, ax: Axes, node_radius=0.2):
         else:
             prob_reach = np.exp(evwss.get_log_state_probability(i_src, j_src))
             prob_continue_if_reached = 1 - ss[i_src, j_src]
-            prob_transition_if_continue = evwss.prob_see_bad[i_src, j_src] if j_dest == j_src else evwss.prob_see_good[i_src, j_src]
+            prob_transition_if_continue = evwss.prob_see_no[i_src, j_src] if j_dest == j_src else evwss.prob_see_yes[i_src, j_src]
             transition_probs.append(prob_reach * prob_continue_if_reached * prob_transition_if_continue)
 
     node_size = _compute_node_size_in_square_points(ax, node_radius)

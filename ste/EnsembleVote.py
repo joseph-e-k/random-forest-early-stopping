@@ -28,7 +28,7 @@ class EnsembleVote:
         m = np.empty((self.n_steps, self.n_values))
 
         for n_seen in range(self.n_steps):
-            for n_seen_good in range(self.n_values):
-                m[n_seen, n_seen_good] = stats.hypergeom(self.n_total, self.n_yes, n_seen).pmf(n_seen_good)
+            for n_seen_yes in range(self.n_values):
+                m[n_seen, n_seen_yes] = stats.hypergeom(self.n_total, self.n_yes, n_seen).pmf(n_seen_yes)
 
         return m

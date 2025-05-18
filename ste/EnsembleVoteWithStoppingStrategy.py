@@ -24,8 +24,8 @@ class EnsembleVoteWithStoppingStrategy:
     n_yes = property(lambda self: self.ensemble_vote.n_yes)
     result = property(lambda self: self.ensemble_vote.result)
     n_steps = property(lambda self: self.ensemble_vote.n_steps)
-    prob_see_good = property(lambda self: np.exp(self._log_prob_see_yes))
-    prob_see_bad = property(lambda self: np.exp(self._log_prob_see_no))
+    prob_see_yes = property(lambda self: np.exp(self._log_prob_see_yes))
+    prob_see_no = property(lambda self: np.exp(self._log_prob_see_no))
 
     # TODO: Consistent naming style: log_prob_thing vs thing_log_prob vs log_thing_prob
     def _get_log_ss(self):
@@ -92,24 +92,24 @@ class EnsembleVoteWithStoppingStrategy:
             # than 0. We just clamp these, as allowing them to persist will NaN-poison our entire program.
             np.clip(self._log_prob_reach[i_step, :], None, 0, out=self._log_prob_reach[i_step, :])
 
-    def get_log_state_probability(self, n_seen, n_seen_good):
+    def get_log_state_probability(self, n_seen, n_seen_yes):
         if any([
             n_seen < 0,
-            n_seen_good < 0,
+            n_seen_yes < 0,
             n_seen > self.n_total,
-            n_seen_good > self.n_yes,
-            n_seen_good > n_seen
+            n_seen_yes > self.n_yes,
+            n_seen_yes > n_seen
         ]):
             return -np.inf
 
-        return self._log_prob_reach[n_seen, n_seen_good]
+        return self._log_prob_reach[n_seen, n_seen_yes]
 
     def get_lowest_finite_log_probability(self):
         return np.min(self._log_prob_reach[np.isfinite(self._log_prob_reach)])
 
     @staticmethod
-    def get_state_result(n_seen, n_seen_good):
-        return n_seen_good > n_seen / 2
+    def get_state_result(n_seen, n_seen_yes):
+        return n_seen_yes > n_seen / 2
 
     def analyse(self) -> EnsembleVoteAnalysis:
         log_prob_reach_state_and_stop = self._log_prob_reach + self._log_prob_stop_if_reach
