@@ -231,7 +231,7 @@ def plot_evwss(evwss, ax: Axes, node_radius=0.2):
         ax (Axes): Axes to draw the chart on.
         node_radius (float, optional): Radius of the circles used to represent states. Defaults to 0.2.
     """
-    ss = np.asarray(evwss.get_prob_stop(), dtype=float)
+    ss = evwss.stopping_strategy
     n_base_models = ss.shape[0] - 1
     ss = extend_array(ss, new_shape=(n_base_models + 1, n_base_models + 1), fill_value=1)
     G = nx.DiGraph()
