@@ -34,14 +34,40 @@ class ReproducibilityError(Exception):
 
 
 @memoize()
-def _split_and_train_and_estimate_smopdises(dataset, n_trees, eval_proportion):
+def _split_and_train_and_estimate_smopdises(dataset: Dataset, n_trees: int, eval_proportion: float) -> np.ndarray:
+    """
+    Estimate the conditional SMOPDISes for a dataset.
+    'SMOPDIS' is short for 'SubModel Positivity DIStribution': the distribution of the number of trees returning "yes" for a given observation.
+
+    Args:
+        dataset (Dataset): Dataset whose SMOPDISes are to be estimated.
+        n_trees (int): Number of trees in the forest.
+        eval_proportion (float): Proportion of the dataset to use for evaluation. The rest will be used for training.
+
+    Returns:
+        np.ndarray: 2D array of shape (2, n_trees + 1) containing the estimated SMOPDISes for each class.
+    """
     training_data, evaluation_data = split_dataset(dataset, (1-eval_proportion, eval_proportion))
     forest = RandomForestClassifier(n_trees)
     forest.fit(*training_data)
     return estimate_conditional_smopdises(forest, evaluation_data)
 
 
-def draw_smopdises(n_trees: int, datasets: Sequence[Dataset], dataset_names: Sequence[str], eval_proportion: float = 0.2, n_forests: int = 30):
+def draw_smopdises(n_trees: int, datasets: Sequence[Dataset], dataset_names: Sequence[str], eval_proportion: float = 0.2, n_forests: int = 30) -> matplotlib.figure.Figure:
+    """
+    Estimate and draw the conditional SMOPDISes for a sequence of datasets.
+    'SMOPDIS' is short for 'SubModel Positivity DIStribution': the distribution of the number of trees returning "yes" for a given observation.
+
+    Args:
+        n_trees (int): Number of trees in each forest.
+        datasets (Sequence[Dataset]): Datasets to estimate the SMOPDISes for.
+        dataset_names (Sequence[str]): Names of the datasets.
+        eval_proportion (float, optional): Proportion of each dataset to use for evaluation. Defaults to 0.2.
+        n_forests (int, optional): Number of forests per dataset to average over. Defaults to 30.
+
+    Returns:
+        matplotlib.Figure: a histogram of mean conditional SMOPDISes for each dataset.
+    """
     n_datasets = len(datasets)
     if n_datasets % 2 == 0:
         n_columns = 2
@@ -83,26 +109,22 @@ def draw_smopdises(n_trees: int, datasets: Sequence[Dataset], dataset_names: Seq
     return fig
 
 
-def _get_stopping_strategies(n_trees, smopdis_estimated_normally, smopdis_estimated_badly, smopdis_estimated_perfectly, adrs, stopping_strategy_getters):
-    return parallelize_to_array(
-        operator.call,
-        argses_to_combine=[
-            [
-                functools.partial(
-                    ss_getter,
-                    n_trees=n_trees,
-                    smopdis_estimated_normally=smopdis_estimated_normally,
-                    smopdis_estimated_badly=smopdis_estimated_badly,
-                    smopdis_estimated_perfectly=smopdis_estimated_perfectly
-                ) for ss_getter in stopping_strategy_getters
-            ],
-            adrs
-        ],
-        job_name="get_ss"
-    )
-
-
 def _analyse_stopping_strategy_if_relevant(i_ss_kind, i_adr, true_class, n_positive_trees, n_trees, smopdis_estimates, stopping_strategies):
+    """Compute the metrics for a stopping strategy under a certain EV, if that EV has positive probability in our SMOPDIS estimates.
+
+    Args:
+        i_ss_kind (int): Index of the kind of stopping strategy.
+        i_adr (int): Index of the allowable disagreement rate.
+        true_class (bool): True class of the observation.
+        n_positive_trees (int): Number of trees returning "yes" for the observation.
+        n_trees (int): Number of trees in the forest.
+        smopdis_estimates (np.ndarray): Estimated SMOPDISes for the dataset.
+        stopping_strategies (np.ndarray): Precomputed stopping strategies, one of which will be analyzed.
+
+    Returns:
+        np.ndarray: 1D array of metrics for the stopping strategy, of length 4: base error rate, disagreement rate, expected runtime, and error rate.
+                    If the EV is not possible, the array will contain only the base error rate and the remaining values will be 0.
+    """
     base_ensemble_result = (n_positive_trees > (n_trees // 2))
     is_base_ensemble_correct = (base_ensemble_result == true_class)
     
@@ -157,12 +179,31 @@ type StoppingStrategyGetter = Callable[[float, np.ndarray, int], np.ndarray]
 
 
 def train_forest(n_trees, training_data) -> RandomForestClassifier:
+    """Train a random forest classifier on the given training data.
+
+    Args:
+        n_trees (int): Number of trees in the forest.
+        training_data (Dataset): Data on which to train the forest.
+
+    Returns:
+        RandomForestClassifier: The trained random forest classifier.
+    """
     rf_classifier = RandomForestClassifier(n_estimators=n_trees)
     rf_classifier.fit(*training_data)
     return rf_classifier
 
 
 def estimate_smopdis(rf_classifier: RandomForestClassifier, dataset: Dataset):
+    """Estimate the SMOPDIS for a given dataset using a trained random forest classifier.
+    'SMOPDIS' is short for 'SubModel Positivity DIStribution': the distribution of the number of trees returning "yes" for a given observation.
+
+    Args:
+        rf_classifier (RandomForestClassifier): Trained random forest classifier.
+        dataset (Dataset): Dataset for which to estimate the SMOPDIS.
+
+    Returns:
+        np.ndarray: 1D array of shape (n_trees + 1) containing the estimated SMOPDIS for the dataset.
+    """
     X, y = dataset
     n_trees = len(rf_classifier.estimators_)
     tree_predictions = np.array(np.vstack([tree.predict(X) for tree in rf_classifier.estimators_]), dtype=int)
@@ -170,6 +211,18 @@ def estimate_smopdis(rf_classifier: RandomForestClassifier, dataset: Dataset):
 
 
 def estimate_conditional_smopdises(rf_classifier: RandomForestClassifier, dataset: Dataset):
+    """"Estimate the conditional SMOPDISes for a given dataset using a trained random forest classifier.
+    'SMOPDIS' is short for 'SubModel Positivity DIStribution': the distribution of the number of trees returning "yes" for a given observation."
+    In this case, the SMOPDISes are estimated separately for each possible true class of the observation.
+
+    Args:
+        rf_classifier (RandomForestClassifier): Trained random forest classifier.
+        dataset (Dataset): Dataset for which to estimate the conditional SMOPDISes.
+
+    Returns:
+        np.ndarray: 2D array of shape (2, n_trees + 1) containing the estimated conditional SMOPDISes for each class.
+                    The first row corresponds to the negative class, and the second row corresponds to the positive class.
+    """
     X, y = dataset
 
     return np.stack([
@@ -179,6 +232,22 @@ def estimate_conditional_smopdises(rf_classifier: RandomForestClassifier, datase
 
 
 def get_metrics_once(data: Dataset, adrs: Sequence[float], n_trees: int, stopping_strategy_getters: list[StoppingStrategyGetter], data_partition_ratios):
+    """Compute the metrics for a given collection of kinds of stopping strategies on the given dataset.
+
+    Args:
+        data (Dataset): Dataset to test the stopping strategies on.
+        adrs (Sequence[float]): Allowable disagreement rates to compute the stopping strategies with.
+        n_trees (int): Number of trees in the forest.
+        stopping_strategy_getters (list[StoppingStrategyGetter]): List of functions to compute stopping strategies.
+        data_partition_ratios (Sequence[float]): Proportions of the dataset to use for training, calibration, and evaluation.
+    
+    Returns:
+        np.ndarray: 3D array of estimated metrics, with axes corresponding to:
+            0. Stopping strategy (length = len(stopping_strategy_getters))
+            1. Allowable disagreement rate (length = len(adrs))
+            2. Metric kind: base error rate, disagreement rate, expected runtime, and error rate (length = 4).
+            
+    """
     training_data, calibration_data, evaluation_data = split_dataset(data, data_partition_ratios)
 
     forest = train_forest(n_trees, training_data)
@@ -187,13 +256,45 @@ def get_metrics_once(data: Dataset, adrs: Sequence[float], n_trees: int, stoppin
     smopdis_estimated_perfectly = estimate_smopdis(forest, evaluation_data)
     smopdis_estimated_badly = estimate_smopdis(forest, training_data)
 
-    stopping_strategies = _get_stopping_strategies(n_trees, smopdis_estimated_normally, smopdis_estimated_badly, smopdis_estimated_perfectly, adrs, stopping_strategy_getters)
+    stopping_strategies = parallelize_to_array(
+        operator.call,
+        argses_to_combine=[
+            [
+                functools.partial(
+                    ss_getter,
+                    n_trees=n_trees,
+                    smopdis_estimated_normally=smopdis_estimated_normally,
+                    smopdis_estimated_badly=smopdis_estimated_badly,
+                    smopdis_estimated_perfectly=smopdis_estimated_perfectly
+                ) for ss_getter in stopping_strategy_getters
+            ],
+            adrs
+        ],
+        job_name="get_ss"
+    )
 
     return _analyse_stopping_strategies(stopping_strategies, smopdis_estimates_for_evaluation)
 
 
 @memoize()
 def get_metrics(n_forests, n_trees, datasets, adrs, stopping_strategy_getters, data_partition_ratios=(0.7, 0.1, 0.2)):
+    """Estimate performance metrics for a collection of kinds of stopping strategies on a collection of datasets by training number of random forest classifiers on each dataset.
+    Args:
+        n_forests (int): Number of forests to train and evaluate on each dataset.
+        n_trees (int): Number of trees in each forest.
+        datasets (Sequence[Dataset]): Datasets to test the stopping strategies on.
+        adrs (Sequence[float]): Allowable disagreement rates to compute the stopping strategies with.
+        stopping_strategy_getters (list[StoppingStrategyGetter]): List of functions to compute stopping strategies.
+        data_partition_ratios (Sequence[float], optional): Proportions of the dataset to use for training, calibration, and evaluation. Defaults to (0.7, 0.1, 0.2).
+    
+    Returns:
+        np.ndarray: 5D array of estimated metrics, with axes corresponding to:
+            0. Forest (length = n_forests)
+            1. Dataset (length = len(datasets))
+            2. Stopping strategy (length = len(stopping_strategy_getters))
+            3. Allowable disagreement rate (length = len(adrs))
+            4. Metric kind: base error rate, disagreement rate, expected runtime, and error rate (length = 4).
+    """
     metrics = parallelize_to_array(
         function=functools.partial(
             get_metrics_once,
@@ -215,11 +316,27 @@ def _getitem(sequence, index):
     return sequence[index]
 
 
-def draw_metrics(n_trees, metrics, dataset_names, allowable_disagreement_rates, ss_names, combine_plots=False):
+def draw_metrics(metrics, dataset_names, allowable_disagreement_rates, ss_names, combine_plots=False):
+    """Draw precomputed performance metrics for a collection of datasets and stopping strategies.
+
+    Args:
+        metrics (np.ndarray): 4D array of estimated metrics, with axes corresponding to:
+            0. Dataset (length = len(dataset_names))
+            1. Stopping strategy (length = len(ss_names))
+            2. Allowable disagreement rate (length = len(allowable_disagreement_rates))
+            3. Metric kind: base error rate, disagreement rate, expected runtime, and error rate (length = 4).
+        dataset_names (Sequence[str]): Names of the datasets.
+        allowable_disagreement_rates (Sequence[float]): Allowable disagreement rates used to compute the stopping strategies.
+        ss_names (Sequence[str]): Names of the stopping strategies.
+        combine_plots (bool, optional): Whether to combine all plots into a single figure. Defaults to False.
+    
+    Returns:
+        matplotlib.Figure or MultiFigure: Plots of the metrics.
+    """
     base_error_rates = metrics[..., -1]
 
     metrics = metrics[..., :-1]
-    n_datasets, n_ss_kinds, n_adrs,  n_metrics = metrics.shape
+    n_datasets, n_ss_kinds, n_adrs, n_metrics = metrics.shape
 
     assert len(dataset_names) == n_datasets
     assert len(ss_names) == n_ss_kinds
@@ -302,6 +419,20 @@ def draw_metrics(n_trees, metrics, dataset_names, allowable_disagreement_rates, 
 
 
 def get_and_draw_disagreement_rates_and_runtimes(n_forests, n_trees, datasets, dataset_names, allowable_disagreement_rates, ss_getters_by_name, combine_plots=False):
+    """Estimate and draw performance metrics for a collection of datasets and stopping strategy kinds.
+
+    Args:
+        n_forests (int): Number of forests to train and evaluate on each dataset.
+        n_trees (int): Number of trees in each forest.
+        datasets (Sequence[Dataset]): Datasets to test the stopping strategies on.
+        dataset_names (Sequence[str]): Names of the datasets.
+        allowable_disagreement_rates (Sequence[float]): Allowable disagreement rates to compute the stopping strategies with.
+        ss_getters_by_name (dict[str, StoppingStrategyGetter]): Dictionary of stopping strategy getters, with names as keys and functions as values.
+        combine_plots (bool, optional): Whether to combine all plots into a single figure. Defaults to False.
+    
+    Returns:
+        matplotlib.Figure or MultiFigure: Plots of the metrics.
+    """
     ss_names, ss_getters = zip(*ss_getters_by_name.items())
 
     metrics = get_metrics(
@@ -311,7 +442,6 @@ def get_and_draw_disagreement_rates_and_runtimes(n_forests, n_trees, datasets, d
     mean_metrics = metrics.mean(axis=0)
 
     return draw_metrics(
-        n_trees,
         mean_metrics,
         dataset_names,
         allowable_disagreement_rates,
