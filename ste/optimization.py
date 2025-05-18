@@ -9,7 +9,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from scipy.special import comb
 
-from .EnsembleVoteWithStoppingStrategy import EnsembleVote, EnsembleVoteWithStoppingStrategy
+from .EnsembleVote import EnsembleVote, EnsembleVoteWithStoppingStrategy
 from .utils.figures import plot_evwss
 from .utils.linear_programming import Problem, OptimizationResult, ArithmeticExpression
 from .utils.logging import configure_logging, get_module_logger

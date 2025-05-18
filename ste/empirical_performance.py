@@ -12,8 +12,7 @@ import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 
-from .EnsembleVote import EnsembleVote
-from .EnsembleVoteWithStoppingStrategy import EnsembleVoteWithStoppingStrategy
+from .EnsembleVote import EnsembleVote, EnsembleVoteWithStoppingStrategy
 from .utils.figures import (
     DISTINCT_DASH_STYLES, MARKERS, create_independent_plots_grid, create_subplot_grid,
     enforce_character_limit, plot_functions, save_drawing
