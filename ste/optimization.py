@@ -66,11 +66,19 @@ def make_optimal_stopping_problem(N: int, alpha: float, D_hat: np.ndarray = None
     Returns:
         tuple[Problem, np.ndarray, np.ndarray, np.ndarray]: The problem object and the decision variable matrices p, pi, and pi_bar.
     """
-    _logger.info(f"Constructing optimal-stopping problem for {N=}, {alpha=}...")
-    problem = Problem()
-
     if disagreement_minimax and runtime_minimax and D_hat is not None:
         raise ValueError("frequencies were provided for n but both disagreement_minimax and runtime_minimax are True, so those frequencies cannot be used")
+
+    stringified_args = f"{N=}, {alpha=}"
+    if D_hat is not None:
+        if (D_hat == 1).all():
+            stringified_args += ", D_hat = <uniform>"
+        else:
+            stringified_args += ", D_hat = <bespoke>"
+        stringified_args += f", {disagreement_minimax=}, {runtime_minimax=}"
+
+    _logger.info(f"Constructing optimal-stopping problem for {stringified_args}...")
+    problem = Problem()
 
     # `values_of_n` is an array of all possible values of `n`
     values_of_n = np.arange(0, N + 1)
@@ -153,7 +161,7 @@ def make_optimal_stopping_problem(N: int, alpha: float, D_hat: np.ndarray = None
     for j in range(N + 1):
         problem.add_constraint(pi[N, j] == p[N, j])
 
-    _logger.info(f"Finished constructing optimal-stopping problem for {N=}, {alpha=}")
+    _logger.info(f"Finished constructing optimal-stopping problem for {stringified_args}")
 
     return problem, p, pi, pi_bar
 
