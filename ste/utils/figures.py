@@ -70,11 +70,13 @@ def plot_function(ax, x_axis_arg_name, function, function_kwargs, plot_kwargs=No
         title += f" ({stringify_kwargs(function_kwargs)})"
     ax.set_title(title)
 
-    y_axis_values = parallelize_to_array(
-        functools.partial(function, **function_kwargs),
-        argses_to_iter=[{x_axis_arg_name: x} for x in x_axis_values],
-        dummy=(not concurrently)
-    )
+    if concurrently:
+        y_axis_values = parallelize_to_array(
+            functools.partial(function, **function_kwargs),
+            argses_to_iter=[{x_axis_arg_name: x} for x in x_axis_values]
+        )
+    else:
+        y_axis_values = np.array([function(**{x_axis_arg_name: x}, **function_kwargs) for x in x_axis_values])
 
     y_axis_values = results_transform(y_axis_values)
     x_axis_values = x_axis_values_transform(x_axis_values)
