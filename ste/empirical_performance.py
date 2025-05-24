@@ -450,6 +450,7 @@ def get_minimax_ss(adr: float, estimated_smopdis: np.ndarray, n_trees: int) -> n
     return get_optimal_stopping_strategy(n_trees, adr)
 
 
+@memoize()
 def get_minimean_ss(adr: float, estimated_smopdis: np.ndarray, n_trees: int) -> np.ndarray:
     return get_optimal_stopping_strategy(n_trees, adr, estimated_smopdis, disagreement_minimax=False, runtime_minimax=False)
 
@@ -459,6 +460,7 @@ def get_minimean_flat_ss(adr: float, estimated_smopdis: np.ndarray, n_trees: int
     return get_optimal_stopping_strategy(n_trees, adr, np.ones(shape=(n_trees + 1)), disagreement_minimax=False, runtime_minimax=False)
 
 
+@memoize()
 def get_minimixed_ss(adr: float, estimated_smopdis: np.ndarray, n_trees: int) -> np.ndarray:
     return get_optimal_stopping_strategy(n_trees, adr, estimated_smopdis, disagreement_minimax=True, runtime_minimax=False)
 
