@@ -72,13 +72,13 @@ def make_optimal_stopping_problem(N: int, alpha: float, D_hat: np.ndarray = None
     stringified_args = f"{N=}, {alpha=}"
     if D_hat is not None:
         if (D_hat == 1).all():
-            stringified_args += ", D_hat = <uniform>"
+            stringified_args += ", D_hat=<uniform>"
         else:
-            stringified_args += ", D_hat = <bespoke>"
+            stringified_args += f", {D_hat=}"
         stringified_args += f", {disagreement_minimax=}, {runtime_minimax=}"
 
-    _logger.info(f"Constructing optimal-stopping problem for {stringified_args}...")
     problem = Problem()
+    _logger.info(f"Constructing optimal-stopping problem for {stringified_args}, tagged {problem.tag!r}...")
 
     # `values_of_n` is an array of all possible values of `n`
     values_of_n = np.arange(0, N + 1)

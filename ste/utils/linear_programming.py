@@ -183,10 +183,12 @@ class Problem:
     """A linear programming problem consisting of variables, constraints, and an objective"""
 
     def __init__(self):
-        self._objective_file = tempfile.NamedTemporaryFile("wt", delete_on_close=False)
-        self._constraints_file = tempfile.NamedTemporaryFile("wt", delete_on_close=False)
+        self.tag = os.urandom(8).hex()
+        self._file_prefix = f"lp_problem_{self.tag}"
+        self._objective_file = tempfile.NamedTemporaryFile("wt", prefix=f"{self._file_prefix}_objective_", delete_on_close=False)
+        self._constraints_file = tempfile.NamedTemporaryFile("wt", prefix=f"{self._file_prefix}_constraints_", delete_on_close=False)
         self._n_constraints = 0
-        self._variables_file = tempfile.NamedTemporaryFile("wt", delete_on_close=False)
+        self._variables_file = tempfile.NamedTemporaryFile("wt", prefix=f"{self._file_prefix}_variables_", delete_on_close=False)
         self._optimization_sense = OptimizationSense.Minimize
         self._is_finalized = False
         self._optimization_result = None
@@ -272,8 +274,8 @@ class Problem:
         
         self._is_finalized = True
 
-        lp_file = tempfile.NamedTemporaryFile("wt")
-        solution_file = tempfile.NamedTemporaryFile("rt")
+        lp_file = tempfile.NamedTemporaryFile("wt", prefix=f"{self._file_prefix}_problem_")
+        solution_file = tempfile.NamedTemporaryFile("rt", prefix=f"{self._file_prefix}_solution_")
 
         with lp_file:
             _logger.info("Serializing problem to disk...")

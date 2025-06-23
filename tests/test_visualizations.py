@@ -4,7 +4,11 @@ import tempfile
 import warnings
 
 import numpy as np
-from ste.empirical_performance import DEFAULT_ADRS, get_and_draw_disagreement_rates_and_runtimes, get_bayesian_bad_ss, get_minimean_flat_ss, get_bayesian_perfect_ss, get_minimean_ss, get_minimax_ss
+import pytest
+from ste.empirical_performance import (
+    DEFAULT_ADRS, get_and_draw_disagreement_rates_and_runtimes,
+    get_minimean_flat_ss, get_minimean_ss, get_minimax_ss, get_minimixed_flat_ss, get_minimixed_ss
+)
 from ste.optimization import get_optimal_stopping_strategy, show_stopping_strategy
 from ste.utils.data import get_names_and_datasets
 from ste.utils.figures import save_drawing
@@ -28,10 +32,10 @@ def test_ss_visualization_sanity():
 
 
 def test_ss_performance_comparison_visualization():
-    reference_dir = os.path.join(REFERENCES_DIR, "empirical_comparison_30_forests_of_101_trees")
+    reference_dir = os.path.join(REFERENCES_DIR, "empirical_comparison_10_forests_of_51_trees")
 
-    n_forests = 30
-    n_trees = 101
+    n_forests = 10
+    n_trees = 51
     random_seed = 1234
     dataset_names, datasets = get_names_and_datasets()
     adrs = DEFAULT_ADRS
@@ -49,9 +53,9 @@ def test_ss_performance_comparison_visualization():
             {
                 "Minimax": get_minimax_ss,
                 "Minimean (Cal)": get_minimean_ss,
-                "Minimean (Test)": get_bayesian_perfect_ss,
-                "Minimean (Train)": get_bayesian_bad_ss,
-                "Minimean (Flat)": get_minimean_flat_ss
+                "Minimean (Flat)": get_minimean_flat_ss,
+                "Minimixed (Cal)": get_minimixed_ss,
+                "Minimixed (Flat)": get_minimixed_flat_ss,
             },
             combine_plots=False
         )
