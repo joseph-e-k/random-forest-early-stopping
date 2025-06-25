@@ -275,6 +275,10 @@ def parallelize(function, reps=None, argses_to_iter=None, argses_to_combine=None
         _logger.warning("Daemon process; falling back to dummy behaviour")
         dummy = True
 
+    elif n_tasks == 1:
+        _logger.info("Only 1 task; dummy mode activated")
+        dummy = True
+
     if dummy:
         context = contextlib.nullcontext()
         mapper = map
