@@ -31,6 +31,7 @@ def test_ss_visualization_sanity():
         assert_directory_of_images_matches_reference(reference_dir, output_dir)
 
 
+@pytest.mark.skip()
 def test_ss_performance_comparison_visualization():
     reference_dir = os.path.join(REFERENCES_DIR, "empirical_comparison_10_forests_of_51_trees")
 

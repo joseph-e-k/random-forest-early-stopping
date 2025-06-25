@@ -27,7 +27,8 @@ class PiSolution:
     pi_bar: np.ndarray
 
 
-def make_and_solve_optimal_stopping_problem(N: int, alpha: float, D_hat: np.ndarray = None, disagreement_minimax=True, runtime_minimax=True) -> tuple[PiSolution, float]:
+# @forwards_to(make_optimal_stopping_problem)
+def make_and_solve_optimal_stopping_problem(*args, **kwargs) -> tuple[PiSolution, float]:
     """Constructs and solves the optimal-stopping problem in Pi form for the given parameters.
 
     Args:
@@ -40,7 +41,7 @@ def make_and_solve_optimal_stopping_problem(N: int, alpha: float, D_hat: np.ndar
     Returns:
         tuple[PiSolution, float]: The solution in Pi form and the expected runtime of that solution.
     """
-    problem, p, pi, pi_bar = make_optimal_stopping_problem(N, alpha, D_hat, disagreement_minimax, runtime_minimax)
+    problem, p, pi, pi_bar = make_optimal_stopping_problem(*args, **kwargs)
 
     solution = problem.solve_with_soplex()
 
@@ -68,6 +69,9 @@ def make_optimal_stopping_problem(N: int, alpha: float, D_hat: np.ndarray = None
     """
     if disagreement_minimax and runtime_minimax and D_hat is not None:
         raise ValueError("frequencies were provided for n but both disagreement_minimax and runtime_minimax are True, so those frequencies cannot be used")
+    
+    if D_hat is None and not (disagreement_minimax and runtime_minimax):
+        raise ValueError("frequencies were not provided for n but at least one of disagreement_minimax and runtime_minimax were False, so frequencies are required")
 
     stringified_args = f"{N=}, {alpha=}"
     if D_hat is not None:
@@ -81,7 +85,15 @@ def make_optimal_stopping_problem(N: int, alpha: float, D_hat: np.ndarray = None
     _logger.info(f"Constructing optimal-stopping problem for {stringified_args}, tagged {problem.tag!r}...")
 
     # `values_of_n` is an array of all possible values of `n`
-    values_of_n = np.arange(0, N + 1)
+    if D_hat is None:
+        values_of_n = np.arange(0, N + 1)
+    else:
+        values_of_n = list(np.nonzero(D_hat)[0])
+    if disagreement_minimax or runtime_minimax:
+        for n in [N // 2, N // 2 + 1]:
+            if n not in values_of_n:
+                values_of_n += [n]
+    values_of_n = np.array(values_of_n)
 
     # Declare decision variables. Technically this is doable with only two of these three, but this makes the code cleaner
     p, pi, pi_bar = _make_decision_variables(N, problem)
@@ -110,7 +122,7 @@ def make_optimal_stopping_problem(N: int, alpha: float, D_hat: np.ndarray = None
         problem.set_objective(max_expected_B)
     else:
         # Otherwise, we minimize E[E[B | n]] over the given distribution of `n`, which is `D_hat`
-        expected_expected_B = np.sum(expected_B * D_hat)
+        expected_expected_B = np.sum(expected_B * D_hat[values_of_n])
         problem.set_objective(expected_expected_B)
 
     # `d` is the disagreement mask, which is 1 for states where the stopped ensemble would disagree with the complete ensemble and 0 elsewhere
@@ -123,11 +135,11 @@ def make_optimal_stopping_problem(N: int, alpha: float, D_hat: np.ndarray = None
 
     if disagreement_minimax:
         # If we are minimaxing the disagreement probability, we need to constrain it for each value of `n` separately
-        for n in range(len(values_of_n)):
-            problem.add_constraint(prob_disagreement[n] <= alpha)
+        for k in range(len(values_of_n)):
+            problem.add_constraint(prob_disagreement[k] <= alpha)
     else:
-        # Otherwise, we minimize E[Prob(disagreement | N^+)] over the given distribution of `n`
-        expected_prob_disagreement = np.sum(prob_disagreement * D_hat) / np.sum(D_hat)
+        # Otherwise, we minimize E[Prob(disagreement | n)] over the given distribution of `n`
+        expected_prob_disagreement = np.sum(prob_disagreement * D_hat[values_of_n]) / np.sum(D_hat)
         problem.add_constraint(expected_prob_disagreement <= alpha)
 
     # Now the constraints to force our decision variables to be in Pi
@@ -185,8 +197,9 @@ def make_abstract_probability_matrix(N, values_of_n):
     """Probability matrices for the abstract process. Shape is (len(values_of_n), N + 1, N + 1).
     The first index corresponds to the case (the value of n); the second and third correspond to i and j."""
     out = np.zeros(shape=(len(values_of_n), N + 1, N + 1), dtype=object)
-    for n, i, j in np.ndindex(out.shape):
-        out[n, i, j] = _precise_hypergeometric_probability_mass(N, n, i, j)
+    for k, i, j in np.ndindex(out.shape):
+        n = values_of_n[k]
+        out[k, i, j] = _precise_hypergeometric_probability_mass(N, n, i, j)
     return out
 
 
