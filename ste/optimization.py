@@ -84,16 +84,13 @@ def make_optimal_stopping_problem(N: int, alpha: float, D_hat: np.ndarray = None
     problem = Problem()
     _logger.info(f"Constructing optimal-stopping problem for {stringified_args}, tagged {problem.tag!r}...")
 
-    # `values_of_n` is an array of all possible values of `n`
-    if D_hat is None:
+    # `values_of_n` is an array of all values of `n` that need consideration
+    if runtime_minimax:
         values_of_n = np.arange(0, N + 1)
+    elif disagreement_minimax:
+        values_of_n = np.array(sorted(set(np.nonzero(D_hat)[0]) | { N // 2, N // 2 + 1}))
     else:
-        values_of_n = list(np.nonzero(D_hat)[0])
-    if disagreement_minimax or runtime_minimax:
-        for n in [N // 2, N // 2 + 1]:
-            if n not in values_of_n:
-                values_of_n += [n]
-    values_of_n = np.array(values_of_n)
+        values_of_n = np.nonzero(D_hat)[0]
 
     # Declare decision variables. Technically this is doable with only two of these three, but this makes the code cleaner
     p, pi, pi_bar = _make_decision_variables(N, problem)
@@ -117,16 +114,17 @@ def make_optimal_stopping_problem(N: int, alpha: float, D_hat: np.ndarray = None
     if runtime_minimax:
         # If we are minimaxing the expected runtime, we need to constrain it for each value of `n` separately
         max_expected_B = problem.add_variable("max_expected_B")
-        for n in values_of_n:
-            problem.add_constraint(max_expected_B >= expected_B[n])
+        for k, n in enumerate(values_of_n):
+            problem.add_constraint(max_expected_B >= expected_B[k])
         problem.set_objective(max_expected_B)
     else:
         # Otherwise, we minimize E[E[B | n]] over the given distribution of `n`, which is `D_hat`
-        expected_expected_B = np.sum(expected_B * D_hat[values_of_n])
+        ks = np.argwhere(np.isin(values_of_n, np.nonzero(D_hat)[0])).flatten()
+        expected_expected_B = np.sum(expected_B[ks] * D_hat[np.nonzero(D_hat)[0]])
         problem.set_objective(expected_expected_B)
 
     # `d` is the disagreement mask, which is 1 for states where the stopped ensemble would disagree with the complete ensemble and 0 elsewhere
-    # Its dimensions are (len(values_of_n), N + 1, N + 1), where the first index corresponds to the case (the value of `n`) and the second and third correspond to i and j
+    # Its dimensions are `(len(values_of_n), N + 1, N + 1)`, where the first index corresponds to the case (the value of `n`) and the second and third correspond to i and j
     d = make_disagreement_mask(N, values_of_n)
 
     # `prob_disagreement` is the probability that the stopped ensemble disagrees with the complete ensemble
@@ -134,12 +132,14 @@ def make_optimal_stopping_problem(N: int, alpha: float, D_hat: np.ndarray = None
     prob_disagreement = np.sum(d * prob_reach_and_stop, axis=(1, 2))
 
     if disagreement_minimax:
-        # If we are minimaxing the disagreement probability, we need to constrain it for each value of `n` separately
-        for k in range(len(values_of_n)):
+        # If we are minimaxing the disagreement probability, we need to constrain it separately for each worse-case `n`
+        for n in [N // 2, N // 2 + 1]:
+            k = np.argwhere(values_of_n == n)[0, 0]
             problem.add_constraint(prob_disagreement[k] <= alpha)
     else:
         # Otherwise, we minimize E[Prob(disagreement | n)] over the given distribution of `n`
-        expected_prob_disagreement = np.sum(prob_disagreement * D_hat[values_of_n]) / np.sum(D_hat)
+        ks = np.argwhere(np.isin(values_of_n, np.nonzero(D_hat)[0])).flatten()
+        expected_prob_disagreement = np.sum(prob_disagreement[ks] * D_hat[np.nonzero(D_hat)[0]]) / np.sum(D_hat)
         problem.add_constraint(expected_prob_disagreement <= alpha)
 
     # Now the constraints to force our decision variables to be in Pi
