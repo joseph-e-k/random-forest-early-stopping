@@ -39,3 +39,24 @@ def test_parallelize_to_array_sanity():
     for i in range(3):
         for j in range(5):
             assert results[i, j] == j + 10 * i
+
+
+def _other_binary_operation(x, y):
+    time.sleep(1)
+    return 2**x * 3**y
+
+def test_parallelize_to_array_multiple_functions():
+    with TimerContext(verbose=False) as timer:
+        results = parallelize_to_array(
+            [_binary_operation, _other_binary_operation],
+            argses_to_combine=[range(3), range(5)]
+        )
+    
+    assert timer.elapsed_time < 2
+
+    assert results.shape == (2, 3, 5)
+
+    for i in range(3):
+        for j in range(5):
+            assert results[0, i, j] == j + 10 * i
+            assert results[1, i, j] == 2**i * 3**j

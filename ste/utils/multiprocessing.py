@@ -229,14 +229,35 @@ def _process_raw_task_outcome(raw_outcome: _RawTaskOutcome, reraise_exceptions: 
     )
 
 
+def _make_job_name(function_or_functions):
+    if callable(function_or_functions):
+        return get_name(function_or_functions)
+    return f"({', '.join(get_name(f) for f in function_or_functions)})"
+
+
+def _make_indices_and_argses(function_or_functions, argses_to_iter, argses_to_combine):
+    if argses_to_iter is None:
+        if callable(function_or_functions):
+            return enumerate_product(*argses_to_combine)
+        return enumerate_product(function_or_functions, *argses_to_combine)
+    
+    if callable(function_or_functions):
+        return enumerate(argses_to_iter)
+    return [
+        ((i_func, i_args), (func,) + args)
+        for ((i_func, i_args), (func, args))
+        in enumerate_product(function_or_functions, argses_to_iter)
+    ]
+
+
 @logged()
-def parallelize(function, reps=None, argses_to_iter=None, argses_to_combine=None, n_workers=N_WORKER_PROCESSES, reraise_exceptions=True, job_name=None, dummy=False):
+def parallelize(function_or_functions, reps=None, argses_to_iter=None, argses_to_combine=None, n_workers=N_WORKER_PROCESSES, reraise_exceptions=True, job_name=None, dummy=False):
     """
-    Execute a function in parallel across multiple tasks.
+    Execute function(s) in parallel across multiple tasks.
 
     Args:
-        function (Callable): The function to execute.
-        reps (int, optional): Number of repetitions per argument set. Defaults to None.
+        function_or_functions (Callable | Iterable[Callable]): The function or functions to execute.
+        reps (int, optional): Number of repetitions per function and argument set. Defaults to None.
         argses_to_iter (Iterable, optional): Iterable of argument sets to iterate over. Mutually exclusive with `argses_to_combine`.
         argses_to_combine (Iterable, optional): Iterable of iterables of individual arguments to combine into argument sets.
         n_workers (int, optional): Number of worker processes. Defaults to `N_WORKER_PROCESSES`.
@@ -251,21 +272,22 @@ def parallelize(function, reps=None, argses_to_iter=None, argses_to_combine=None
         raise TypeError("argses_to_iter or argses_to_combine must be specified (but not both)")
     
     if job_name is None:
-        job_name = get_name(function)
+        job_name = _make_job_name(function_or_functions)
     
     _logger.info(f"Preparing task pool for {job_name}")
 
     n_tasks = _infer_n_tasks(reps, argses_to_iter, argses_to_combine)
     
-    if argses_to_iter is None:
-        indices_and_argses = enumerate_product(*argses_to_combine)
-    else:
-        indices_and_argses = enumerate(argses_to_iter)
+    indices_and_argses = _make_indices_and_argses(function_or_functions, argses_to_iter, argses_to_combine)
 
     if reps is not None:
         indices_and_argses = repeat_enumerated(reps, indices_and_argses)
 
-    job = _Job(function, job_name, get_breadcrumbs(), n_tasks)
+    if callable(function_or_functions):
+        function_for_job = function_or_functions
+    else:
+        function_for_job = operator.call
+    job = _Job(function_for_job, job_name, get_breadcrumbs(), n_tasks)
 
     if SHOULD_DUMMY_MULTIPROCESSING:
         _logger.info("Falling back to dummy multiprocessing, per environment variable flag")
@@ -293,12 +315,12 @@ def parallelize(function, reps=None, argses_to_iter=None, argses_to_combine=None
             yield outcome
 
 
-def parallelize_to_array(function, reps=None, argses_to_iter=None, argses_to_combine=None, n_workers=N_WORKER_PROCESSES, reraise_exceptions=True, job_name=None, dummy=False):
+def parallelize_to_array(function_or_functions, reps=None, argses_to_iter=None, argses_to_combine=None, n_workers=N_WORKER_PROCESSES, reraise_exceptions=True, job_name=None, dummy=False):
     """
-    Execute a function in parallel and store the results in an array.
+    Execute function(s) in parallel and store the results in an array.
 
     Args:
-        function (Callable): The function to execute.
+        function_or_functions (Callable | Sequence[Callable]): The function or functions to execute.
         reps (int, optional): Number of repetitions per argument set. Defaults to None (equivalent to 1, except it is given no dimension in the result array).
         argses_to_iter (Iterable, optional): Iterable of argument sets to iterate over. Mutually exclusive with `argses_to_combine`.
         argses_to_combine (Iterable, optional): Iterable of iterables of individual arguments to combine into argument sets.
@@ -309,7 +331,8 @@ def parallelize_to_array(function, reps=None, argses_to_iter=None, argses_to_com
 
     Returns:
         np.ndarray: An array containing the results of the tasks. Its dimensions are inferred from the input arguments:
-            - If `reps` is provided, the first dimension is `reps`.
+            - If `function_or_functions` is a sequence, the first dimension is its length.
+            - If `reps` is provided, the next dimension is `reps`.
             - If `argses_to_iter` is provided, the (rest of the) shape is `(len(argses_to_iter),)`.
             - If `argses_to_combine` is provided, the (rest of the) shape matches that of `argses_to_combine`.
     """
@@ -322,8 +345,22 @@ def parallelize_to_array(function, reps=None, argses_to_iter=None, argses_to_com
     
     if reps is not None:
         results_shape = (reps,) + results_shape
+    
+    if not callable(function_or_functions):
+        results_shape = (len(function_or_functions),) + results_shape
 
-    for task in parallelize(function, reps, argses_to_iter, argses_to_combine, n_workers, reraise_exceptions, job_name, dummy):
+    tasks = parallelize(
+        function_or_functions,
+        reps,
+        argses_to_iter,
+        argses_to_combine,
+        n_workers,
+        reraise_exceptions,
+        job_name,
+        dummy
+    )
+
+    for task in tasks:
         result = task.result
 
         if results_array is None:
@@ -335,6 +372,10 @@ def parallelize_to_array(function, reps=None, argses_to_iter=None, argses_to_com
 
             results_array = np.empty(shape=results_shape, dtype=result_type)
         
-        results_array[task.index] = result
+        try:
+            results_array[task.index] = result
+        except IndexError:
+            import pdb; pdb.set_trace()
+            raise
 
     return results_array
