@@ -1,6 +1,5 @@
 import argparse
 import functools
-import operator
 import os
 import random
 import warnings
@@ -254,16 +253,10 @@ def get_metrics_once(data: Dataset, adrs: Sequence[float], n_trees: int, stoppin
     smopdis_estimate_for_ss = estimate_smopdis(forest, calibration_data)
 
     stopping_strategies = parallelize_to_array(
-        operator.call,
-        argses_to_combine=[
-            [
-                functools.partial(
-                    ss_getter,
-                    n_trees=n_trees,
-                    estimated_smopdis=smopdis_estimate_for_ss
-                ) for ss_getter in stopping_strategy_getters
-            ],
-            adrs
+        stopping_strategy_getters,
+        argses_to_iter=[
+            (adr, smopdis_estimate_for_ss, n_trees)
+            for adr in adrs
         ],
         job_name="get_ss"
     )
@@ -291,7 +284,7 @@ def get_metrics(n_forests, n_trees, datasets, adrs, stopping_strategy_getters, d
             4. Metric kind: base error rate, disagreement rate, expected runtime, and error rate (length = 4).
     """
     metrics = parallelize_to_array(
-        function=functools.partial(
+        functools.partial(
             get_metrics_once,
             n_trees=n_trees,
             data_partition_ratios=data_partition_ratios,
