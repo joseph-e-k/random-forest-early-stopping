@@ -92,8 +92,51 @@ def make_optimal_stopping_problem(N: int, alpha: float, D_hat: np.ndarray = None
     else:
         values_of_n = np.nonzero(D_hat)[0]
 
-    # Declare decision variables. Technically this is doable with only two of these three, but this makes the code cleaner
-    p, pi, pi_bar = _make_decision_variables(N, problem)
+    # Declare decision variables
+    pi, pi_bar = _make_decision_variables(N, problem)
+
+    # Constrain our decision variables to be in Pi, plus some minor optimizations
+
+    # Once the ensemble is exhausted, we must stop, so the probability of reaching and
+    # a state (N, j) and not stopping there is zero
+    for j in range(N + 1):
+        pi_bar[N, j] = 0
+
+    # There's no point continuing past a state where the overall outcome is known,
+    # so the probability of reaching any state where j > N / 2 or (i - j) > N / 2
+    # and not stopping there is likewise zero
+    for i in range(N + 1):
+        for j in range(i + 1):
+            if j > N / 2 or (i - j) > N / 2:
+                pi_bar[i, j] = 0
+
+    p = pi + pi_bar
+
+    # All our decision variables represent probabilities and therefore must be between 0 and 1
+    for decision_variable in [p, pi, pi_bar]:
+        for i in range(N + 1):
+            for j in range(i + 1):
+                problem.add_constraint(decision_variable[i, j] >= 0)
+                problem.add_constraint(decision_variable[i, j] <= 1)
+
+    # Before any base models are executed, the probability of being in state (0, 0) is 1
+    problem.add_constraint(p[0, 0] == 1)
+
+    # The only way to reach state (i + 1, 0) is to reach state (i, 0) and not stop there
+    for i in range(N):
+        problem.add_constraint(p[i + 1, 0] == pi_bar[i, 0])
+
+    # All other states (i, j) have two antecedents: (i - 1, j) and (i - 1, j + 1)
+    for i in range(N):
+        for j in range(i + 1):
+            constraint = (
+                    p[i + 1, j + 1] ==
+                        Fraction(i - j, i + 1) * pi_bar[i, j + 1]
+                        + Fraction(j + 1, i + 1) * pi_bar[i, j]
+            )
+            problem.add_constraint(constraint)
+
+    # Now we define the expressions representing runtime and disagreement rate, and constrain/target them
 
     # Probability matrix for W_{ij}, that is, the the probability that an unstopped ensemble would reach a certain state.
     # Its dimensions are (len(values_of_n), N + 1, N + 1), where the first index corresponds to the case (the value of `n`) and the second and third correspond to i and j.
@@ -142,37 +185,6 @@ def make_optimal_stopping_problem(N: int, alpha: float, D_hat: np.ndarray = None
         expected_prob_disagreement = np.sum(prob_disagreement[ks] * D_hat[np.nonzero(D_hat)[0]]) / np.sum(D_hat)
         problem.add_constraint(expected_prob_disagreement <= alpha)
 
-    # Now the constraints to force our decision variables to be in Pi
-
-    # All our decision variables represent probabilities and therefore must be between 0 and 1
-    for decision_variable in [p, pi, pi_bar]:
-        for i in range(N + 1):
-            for j in range(i + 1):
-                problem.add_constraint(decision_variable[i, j] >= 0)
-                problem.add_constraint(decision_variable[i, j] <= 1)
-
-    # Before any base models are executed, the probability of being in state (0, 0) is 1
-    problem.add_constraint(p[0, 0] == 1)
-
-    # The only way to reach state (i + 1, 0) is to reach state (i, 0) and not stop there
-    for i in range(N):
-        problem.add_constraint(p[i + 1, 0] == pi_bar[i, 0])
-
-    # All other states (i, j) have two antecedents: (i - 1, j) and (i - 1, j + 1)
-    for i in range(N):
-        for j in range(i + 1):
-            constraint = (
-                    p[i + 1, j + 1] ==
-                        Fraction(i - j, i + 1) * pi_bar[i, j + 1]
-                        + Fraction(j + 1, i + 1) * pi_bar[i, j]
-            )
-            problem.add_constraint(constraint)
-
-    # Once the ensemble is exhausted, we must stop, so the probability of reaching and
-    # stopping at a state (N, j) is equal to the probability of reaching it
-    for j in range(N + 1):
-        problem.add_constraint(pi[N, j] == p[N, j])
-
     _logger.info(f"Finished constructing optimal-stopping problem for {stringified_args}")
 
     return problem, p, pi, pi_bar
@@ -181,8 +193,7 @@ def make_optimal_stopping_problem(N: int, alpha: float, D_hat: np.ndarray = None
 def _make_decision_variables(N, problem) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     pi = _make_decision_variable_matrix(N, "pi", problem)
     pi_bar = _make_decision_variable_matrix(N, "pi_bar", problem)
-    p = pi + pi_bar
-    return p, pi, pi_bar
+    return pi, pi_bar
 
 
 def _make_decision_variable_matrix(N, variable_name, problem: Problem) -> np.ndarray:

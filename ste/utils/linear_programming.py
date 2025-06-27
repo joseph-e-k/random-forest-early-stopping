@@ -222,7 +222,7 @@ class Problem:
 
         return variable
 
-    def add_constraint(self, constraint: LogicalExpression):
+    def add_constraint(self, constraint: LogicalExpression | bool):
         """Add a constraint to the problem.
 
         Args:
@@ -233,8 +233,11 @@ class Problem:
         """
         if self._is_finalized:
             raise FinalizedProblemError("This problem has been finalized and cannot be changed")
+        
+        if constraint is False:
+            raise ValueError("You're trying to add a contradiction as a constraint to an optimization problem. This is probably an error.")
 
-        if constraint.is_tautology():
+        if constraint is True or constraint.is_tautology():
             return
         
         self._n_constraints += 1
