@@ -1,4 +1,7 @@
+import functools
 import time
+
+import numpy as np
 from ste.utils.misc import TimerContext
 from ste.utils.multiprocessing import parallelize, parallelize_to_array
 
@@ -88,3 +91,14 @@ def test_parallelize_two_unary_functions():
         if task.index[0] == 1:
             assert task.function == _slowly_double
             assert task.result == 2 * arg
+
+
+def test_partial_function():
+    results = parallelize_to_array(
+        functools.partial(_binary_operation, y=0),
+        argses_to_combine=[
+            range(5)
+        ]
+    )
+    assert results.shape == (5,)
+    assert np.all(results == np.array([0, 10, 20, 30, 40]))
