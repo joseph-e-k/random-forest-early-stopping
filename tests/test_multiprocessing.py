@@ -3,15 +3,20 @@ from ste.utils.misc import TimerContext
 from ste.utils.multiprocessing import parallelize, parallelize_to_array
 
 
-def _unary_operation(arg):
+def _slow_unary_noop(arg):
     time.sleep(1)
     return arg
+
+
+def _slowly_double(arg):
+    time.sleep(1)
+    return 2 * arg
 
 
 def test_parallelize_sanity():
     with TimerContext(verbose=False) as timer:
         task_outcomes = parallelize(
-            _unary_operation,
+            _slow_unary_noop,
             argses_to_iter=[(i,) for i in range(10)]
         )
         results = set(outcome.result for outcome in task_outcomes)
@@ -60,3 +65,26 @@ def test_parallelize_to_array_multiple_functions():
         for j in range(5):
             assert results[0, i, j] == j + 10 * i
             assert results[1, i, j] == 2**i * 3**j
+
+
+def test_parallelize_two_unary_functions():
+    with TimerContext(verbose=False) as timer:
+        tasks = list(parallelize(
+            [_slow_unary_noop, _slowly_double],
+            argses_to_combine=[range(3)]
+        ))  
+    
+    assert timer.elapsed_time < 2
+
+    for function in [_slow_unary_noop, _slowly_double]:
+        for arg in range(3):
+            assert sum(task.function == function and task.args_or_kwargs == (arg,) for task in tasks) == 1
+
+    for task in tasks:
+        arg, = task.args_or_kwargs
+        if task.index[0] == 0:
+            assert task.function == _slow_unary_noop
+            assert task.result == arg
+        if task.index[0] == 1:
+            assert task.function == _slowly_double
+            assert task.result == 2 * arg

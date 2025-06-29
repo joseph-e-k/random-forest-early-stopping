@@ -9,7 +9,7 @@ import time
 import traceback
 from collections.abc import Mapping
 from datetime import datetime, timedelta, timezone
-from typing import Any, Callable
+from typing import Any, Callable, Sequence
 
 import numpy as np
 import tblib
@@ -31,6 +31,7 @@ class _RawTaskOutcome:
     Represents the outcome of a task executed in parallel, before processing to parse exception traceback.
 
     Attributes:
+        function (Callable): The function that was executed.
         index (int | tuple[int, ...]): The index of the task.
         args_or_kwargs (tuple | dict): The arguments or keyword arguments used for the task.
         duration (timedelta): The duration of the task execution.
@@ -38,6 +39,7 @@ class _RawTaskOutcome:
         exception (Exception | None, optional): The exception raised during the task, if any. Defaults to None.
         traceback_string (str, optional): The traceback string of the exception, if any. Defaults to None.
     """
+    function: Callable
     index: int | tuple[int, ...]
     args_or_kwargs: tuple | dict
     duration: timedelta
@@ -52,12 +54,14 @@ class TaskOutcome:
     Represents the processed outcome of a task executed in parallel.
 
     Attributes:
+        function (Callable): The function that was executed.
         index (int | tuple[int, ...]): The index of the task.
         args_or_kwargs (tuple | dict): The arguments or keyword arguments used for the task.
         duration (timedelta): The duration of the task execution.
         result (Any): The result of the task.
         exception (Exception): The exception raised during the task, if any, along with its traceback.
     """
+    function: Callable
     index: int | tuple[int, ...]
     args_or_kwargs: tuple | dict
     duration: timedelta
@@ -71,7 +75,7 @@ class _Job:
     Represents a job consisting of multiple tasks to be executed in parallel, each being the same function with different arguments.
 
     Attributes:
-        function (Callable): The function to execute for each task.
+        function_or_functions (Callable | Sequence[Callable]): The function to execute for each task, or a collection of functions to parallelize over.
         name (str): The name of the job.
         breadcrumbs_at_creation (tuple[str, ...]): The breadcrumbs at the time of job creation.
         n_total_tasks (int): The total number of tasks. Defaults to None.
@@ -80,7 +84,7 @@ class _Job:
         random_nonce (float): A random nonce for seeding random number generators.
         np_random_nonce (float): A random nonce for seeding NumPy random number generators.
     """
-    function: Callable
+    function_or_functions: Callable | Sequence[Callable]
     name: str
     breadcrumbs_at_creation: tuple[str, ...]
     n_total_tasks: int = None
@@ -88,6 +92,20 @@ class _Job:
     n_completed_tasks: int = 0
     random_nonce: float = dataclasses.field(default_factory=random.random)
     np_random_nonce: float = dataclasses.field(default_factory=np.random.random)
+
+    @property
+    def is_multifunction(self):
+        return not callable(self.function_or_functions)
+    
+    def get_function_for_index(self, index):
+        if isinstance(index, tuple):
+            index, *_ = index
+
+        if self.is_multifunction:
+            return self.function_or_functions[index]
+        
+        return self.function_or_functions
+        
 
     def run_single_task(self, index_and_args_or_kwargs):
         """
@@ -101,6 +119,7 @@ class _Job:
         """
         index, args_or_kwargs = index_and_args_or_kwargs
         task_name = self.get_single_task_name(index)
+        task_function = self.get_function_for_index(index)
 
         random.seed(hash((self.random_nonce, index)) % (2 ** 32 - 1))
         np.random.seed(hash((self.np_random_nonce, index)) % (2 ** 32 - 1))
@@ -108,12 +127,13 @@ class _Job:
         try:
             with breadcrumbs(self.breadcrumbs_at_creation + (task_name,)), TimerContext(verbose=False) as timer:
                 if isinstance(args_or_kwargs, Mapping):
-                    result = self.function(**args_or_kwargs)
+                    result = task_function(**args_or_kwargs)
                 else:
-                    result = self.function(*args_or_kwargs)
+                    result = task_function(*args_or_kwargs)
         except Exception as e:
             tb_string = traceback.format_exc()
             return _RawTaskOutcome(
+                task_function,
                 index,
                 args_or_kwargs,
                 timer.elapsed_time,
@@ -122,6 +142,7 @@ class _Job:
             )
         else:
             return _RawTaskOutcome(
+                task_function,
                 index,
                 args_or_kwargs,
                 timer.elapsed_time,
@@ -168,11 +189,12 @@ class _Job:
         _logger.info(log_message)
 
 
-def _infer_n_tasks(reps, argses_to_iter, argses_to_combine):
+def _infer_n_tasks(function_or_functions, reps, argses_to_iter, argses_to_combine):
     """
     Infer the total number of tasks to execute.
 
     Args:
+        function_or_functions (Callable | Sequence[Callable]): The function to execute for each task, or a collection of functions to parallelize over.
         reps (int | None): Number of times each argument set is repeated.
         argses_to_iter (Iterable | None): Iterable of argument sets to iterate over. Mutually exclusive with `argses_to_combine`.
         argses_to_combine (Iterable | None): Iterable of iterables of individual arguments to combine into argument sets.
@@ -180,18 +202,27 @@ def _infer_n_tasks(reps, argses_to_iter, argses_to_combine):
     Returns:
         int | None: The total number of tasks, or None if it cannot be determined.
     """
-    if reps is None:
-        reps = 1
-    try:
-        return reps * len(argses_to_iter)
-    except TypeError:
+    n_tasks = 1
+
+    if reps is not None:
+        n_tasks *= reps
+
+    if argses_to_iter is not None:
         try:
-            return reps * functools.reduce(
-                operator.mul,
-                (len(values) for values in argses_to_combine)
-            )
+            n_tasks *= len(argses_to_iter)
         except TypeError:
             return None
+    
+    if argses_to_combine is not None:
+        try:
+            n_tasks *= np.prod([len(values) for values in argses_to_combine])
+        except TypeError:
+            return None
+    
+    if not callable(function_or_functions):
+        n_tasks *= len(function_or_functions)
+
+    return n_tasks
 
 
 def _process_raw_task_outcome(raw_outcome: _RawTaskOutcome, reraise_exceptions: bool) -> TaskOutcome:
@@ -211,6 +242,7 @@ def _process_raw_task_outcome(raw_outcome: _RawTaskOutcome, reraise_exceptions: 
     """
     if raw_outcome.exception is None:
         return TaskOutcome(
+            function=raw_outcome.function,
             index=raw_outcome.index,
             args_or_kwargs=raw_outcome.args_or_kwargs,
             duration=raw_outcome.duration,
@@ -222,6 +254,7 @@ def _process_raw_task_outcome(raw_outcome: _RawTaskOutcome, reraise_exceptions: 
     if reraise_exceptions:
         raise exception
     return TaskOutcome(
+        function=raw_outcome.function,
         index=raw_outcome.index,
         args_or_kwargs=raw_outcome.args_or_kwargs,
         duration=raw_outcome.duration,
@@ -237,17 +270,15 @@ def _make_job_name(function_or_functions):
 
 def _make_indices_and_argses(function_or_functions, argses_to_iter, argses_to_combine):
     if argses_to_iter is None:
-        if callable(function_or_functions):
-            return enumerate_product(*argses_to_combine)
-        return enumerate_product(function_or_functions, *argses_to_combine)
+        indices_and_argses = enumerate_product(*argses_to_combine)
+    else:
+        indices_and_argses = enumerate(argses_to_iter)
     
-    if callable(function_or_functions):
-        return enumerate(argses_to_iter)
-    return [
-        ((i_func, i_args), (func,) + args)
-        for ((i_func, i_args), (func, args))
-        in enumerate_product(function_or_functions, argses_to_iter)
-    ]
+    if not callable(function_or_functions):
+        indices_and_argses = repeat_enumerated(len(function_or_functions), indices_and_argses)
+    
+    return list(indices_and_argses)
+
 
 
 @logged()
@@ -276,18 +307,14 @@ def parallelize(function_or_functions, reps=None, argses_to_iter=None, argses_to
     
     _logger.info(f"Preparing task pool for {job_name}")
 
-    n_tasks = _infer_n_tasks(reps, argses_to_iter, argses_to_combine)
+    n_tasks = _infer_n_tasks(function_or_functions, reps, argses_to_iter, argses_to_combine)
     
     indices_and_argses = _make_indices_and_argses(function_or_functions, argses_to_iter, argses_to_combine)
 
     if reps is not None:
         indices_and_argses = repeat_enumerated(reps, indices_and_argses)
 
-    if callable(function_or_functions):
-        function_for_job = function_or_functions
-    else:
-        function_for_job = operator.call
-    job = _Job(function_for_job, job_name, get_breadcrumbs(), n_tasks)
+    job = _Job(function_or_functions, job_name, get_breadcrumbs(), n_tasks)
 
     if SHOULD_DUMMY_MULTIPROCESSING:
         _logger.info("Falling back to dummy multiprocessing, per environment variable flag")
@@ -372,10 +399,6 @@ def parallelize_to_array(function_or_functions, reps=None, argses_to_iter=None, 
 
             results_array = np.empty(shape=results_shape, dtype=result_type)
         
-        try:
-            results_array[task.index] = result
-        except IndexError:
-            import pdb; pdb.set_trace()
-            raise
+        results_array[task.index] = result
 
     return results_array

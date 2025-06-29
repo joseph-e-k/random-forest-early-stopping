@@ -281,7 +281,7 @@ def enumerate_product(*iterables):
         *iterables (Iterable): The input iterables.
 
     Returns:
-        Iterator[tuple[int, tuple]]: An iterator over (index, t) pairs, where t is a tuple from the Cartesian product.
+        Iterator[tuple[tuple[int, ...], tuple]]: An iterator over (index, t) pairs, where t is a tuple from the Cartesian product.
     """
     indices = itertools.product(*(
         range(len(iterable))
