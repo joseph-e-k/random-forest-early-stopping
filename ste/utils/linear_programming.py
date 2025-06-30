@@ -296,6 +296,7 @@ class Problem:
                     "--int:readmode=1",
                     "--int:checkmode=2",
                     "--int:multiprecision_limit=2147483647",
+                    "--uint:random_seed=1234",
                     "-X={}".format(solution_file.name)
                 ],
                 capture_output=True,
