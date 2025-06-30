@@ -255,7 +255,7 @@ def get_metrics_once(data: Dataset, adrs: Sequence[float], n_trees: int, stoppin
     stopping_strategies = parallelize_to_array(
         stopping_strategy_getters,
         argses_to_iter=[
-            (adr, smopdis_estimate_for_ss, n_trees)
+            (adr, n_trees, smopdis_estimate_for_ss)
             for adr in adrs
         ],
         job_name="get_ss"
@@ -439,27 +439,27 @@ def get_and_draw_disagreement_rates_and_runtimes(n_forests, n_trees, datasets, d
 
 
 @memoize(args_to_ignore=["estimated_smopdis"])
-def get_minimax_ss(adr: float, estimated_smopdis: np.ndarray, n_trees: int) -> np.ndarray:
+def get_minimax_ss(adr: float, n_trees: int, estimated_smopdis: np.ndarray) -> np.ndarray:
     return get_optimal_stopping_strategy(n_trees, adr)
 
 
 @memoize()
-def get_minimean_ss(adr: float, estimated_smopdis: np.ndarray, n_trees: int) -> np.ndarray:
+def get_minimean_ss(adr: float, n_trees: int, estimated_smopdis: np.ndarray) -> np.ndarray:
     return get_optimal_stopping_strategy(n_trees, adr, estimated_smopdis, disagreement_minimax=False, runtime_minimax=False)
 
 
 @memoize(args_to_ignore=["estimated_smopdis"])
-def get_minimean_flat_ss(adr: float, estimated_smopdis: np.ndarray, n_trees: int) -> np.ndarray:
+def get_minimean_flat_ss(adr: float, n_trees: int, estimated_smopdis: np.ndarray) -> np.ndarray:
     return get_optimal_stopping_strategy(n_trees, adr, np.ones(shape=(n_trees + 1)), disagreement_minimax=False, runtime_minimax=False)
 
 
 @memoize()
-def get_minimixed_ss(adr: float, estimated_smopdis: np.ndarray, n_trees: int) -> np.ndarray:
+def get_minimixed_ss(adr: float, n_trees: int, estimated_smopdis: np.ndarray) -> np.ndarray:
     return get_optimal_stopping_strategy(n_trees, adr, estimated_smopdis, disagreement_minimax=True, runtime_minimax=False)
 
 
 @memoize(args_to_ignore=["estimated_smopdis"])
-def get_minimixed_flat_ss(adr: float, estimated_smopdis: np.ndarray, n_trees: int) -> np.ndarray:
+def get_minimixed_flat_ss(adr: float, n_trees: int, estimated_smopdis: np.ndarray) -> np.ndarray:
     return get_optimal_stopping_strategy(n_trees, adr, np.ones(shape=(n_trees + 1)), disagreement_minimax=True, runtime_minimax=False)
 
 
