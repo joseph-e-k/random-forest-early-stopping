@@ -295,7 +295,7 @@ def make_pi_from_theta(theta):
     return PiSolution(p, pi, pi_bar)
 
 
-def show_stopping_strategy(ss, save_to_folder=None):
+def show_stopping_strategy_state_graphs(ss, save_to_folder=None):
     N = ss.shape[0] - 1
     values_of_n = [N, N // 2]
     fig_width = 2 * N + 2
@@ -343,7 +343,7 @@ def main():
         return
 
     output_path = args.output_path or get_output_path(f"ss_visualization_{args.N}_submodels_{args.alpha}_adr", file_name_suffix="")
-    show_stopping_strategy(oss, save_to_folder=output_path)
+    show_stopping_strategy_state_graphs(oss, save_to_folder=output_path)
 
 
 if __name__ == "__main__":
