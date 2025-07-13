@@ -442,3 +442,22 @@ def no_change(arg):
         Any: The same argument.
     """
     return arg
+
+
+def retain_central_nonzeros(arr):
+    center = len(arr) // 2
+    nonzero_indices = np.nonzero(arr)[0]
+
+    below = nonzero_indices[nonzero_indices < center]
+    above = nonzero_indices[nonzero_indices > center]
+
+    lower_idx = below[-1] if below.size > 0 else None
+    upper_idx = above[0] if above.size > 0 else None
+
+    mask = np.zeros_like(arr, dtype=bool)
+    if lower_idx is not None:
+        mask[lower_idx] = True
+    if upper_idx is not None:
+        mask[upper_idx] = True
+
+    return np.where(mask, arr, 0)

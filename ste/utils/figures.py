@@ -14,7 +14,7 @@ import networkx as nx
 
 from .logging import get_module_logger
 from .multiprocessing import parallelize_to_array
-from .misc import Dummy, extend_array, get_name, stringify_kwargs, no_change
+from .misc import Dummy, extend_array, get_name, retain_central_nonzeros, stringify_kwargs, no_change
 
 
 _logger = get_module_logger()
@@ -351,25 +351,22 @@ def plot_stopping_strategy(ss, ax, ytick_gap=None):
     triviality_boundary = n_submodels // 2 + 1
     n_difference_values = 2 * triviality_boundary + 1
     i_center_row = triviality_boundary
-    out = np.empty((n_difference_values, n_submodels + 1), dtype=float)
-    out[:, :] = np.nan
+    out = np.zeros(shape=(n_difference_values, n_submodels + 1), dtype=float)
 
     for n_seen in range(n_submodels + 1):
-        for n_seen_good in range(n_seen + 1):
-            n_seen_bad = n_seen - n_seen_good
+        for n_seen_yes in range(n_seen + 1):
+            n_seen_no = n_seen - n_seen_yes
 
-            if n_seen_good > triviality_boundary or n_seen_bad > triviality_boundary:
+            if n_seen_yes > triviality_boundary or n_seen_no > triviality_boundary:
                 continue
 
-            difference = n_seen_bad - n_seen_good
-            out[difference + i_center_row, n_seen] = ss[n_seen, n_seen_good]
+            difference = n_seen_no - n_seen_yes
+            out[difference + i_center_row, n_seen] = ss[n_seen, n_seen_yes]
 
-    cmap = matplotlib.colormaps.get_cmap('viridis')
-    cmap.set_bad(color="lightgray")
-    cax = ax.matshow(out, cmap=cmap)
+    for j in range(1, out.shape[1]):
+        out[:, j] = retain_central_nonzeros(out[:, j])
 
-    divider = make_axes_locatable(ax)
-    cbar_ax = divider.append_axes("right", size="5%", pad=0.05)
+    ax.imshow(out, cmap="Greys")
 
     if ytick_gap is None:
         ytick_gap = out.shape[0] // min(11, out.shape[0])
@@ -384,5 +381,4 @@ def plot_stopping_strategy(ss, ax, ytick_gap=None):
 
     ax.set_yticks(yticks)
     ax.set_yticklabels(ytick_labels)
-    plt.colorbar(cax, cax=cbar_ax)
     return ax
