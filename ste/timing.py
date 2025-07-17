@@ -31,7 +31,7 @@ def get_os_solution_times(ensemble_sizes, adrs, n_reps, nonce, use_qcp=False):
     )
 
 
-def parse_args():
+def parse_args(args=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--n-lower", "-l", type=int, default=1)
     parser.add_argument("--n-upper", "-u", type=int)
@@ -46,13 +46,13 @@ def parse_args():
     parser.add_argument("--mean", action="store_const", const=np.mean, dest="aggregator")
     parser.add_argument("--med", "--median", action="store_const", const=np.median, dest="aggregator")
 
-    return parser.parse_args()
+    return parser.parse_args(args)
 
 
-def main():
+def main(args=None):
     configure_logging()
 
-    args = parse_args()
+    args = parse_args(args)
     ensemble_sizes = list(range(args.n_lower, args.n_upper + 1, args.n_step))
     nonce = args.nonce or time.time_ns()
 

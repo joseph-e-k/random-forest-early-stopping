@@ -114,10 +114,14 @@ def _get_prob_see_yes(n_total, values_of_n_yes):
     return np.divide(n_unseen_yes, n_unseen, where=n_unseen != 0, out=p)
 
 
-if __name__ == "__main__":
+def main(args=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("-N", type=int)
     parser.add_argument("--alpha", "--adr", "-a", type=float, default=0.05)
-    args = parser.parse_args()
+    args = parser.parse_args(args)
 
     print(make_and_solve_qcp(args.N, args.alpha))
+
+
+if __name__ == "__main__":
+    main()

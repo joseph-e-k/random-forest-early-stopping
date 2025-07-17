@@ -326,7 +326,7 @@ def get_optimal_stopping_strategy(*args, **kwargs):
     return make_theta_from_pi(pi_solution)
 
 
-def main():
+def main(args=None):
     configure_logging()
 
     parser = argparse.ArgumentParser()
@@ -334,7 +334,7 @@ def main():
     parser.add_argument("--alpha", "--adr", "-a", type=float, default=0.05)
     parser.add_argument("--graph", "-g", action="store_true")
     parser.add_argument("--output-path", "-o", type=str, default=None)
-    args = parser.parse_args()
+    args = parser.parse_args(args)
 
     oss = get_optimal_stopping_strategy(args.N, args.alpha)
     _logger.info(f"{np.asarray(oss, dtype=float)=}")

@@ -52,19 +52,19 @@ def compute_optimal_stopping_strategies(N_lower, N_upper, N_step, alphas, ss_get
                 _logger.error(f"Error ({task.duration:.1f}s): {N=}, {alpha=}, {task.exception=}")
 
 
-def _parse_args():
+def _parse_args(args=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--N-lower", "-l", type=int, default=1)
     parser.add_argument("--N-upper", "-u", type=int, required=True)
     parser.add_argument("--N-step", "-s", type=int, default=1)
     parser.add_argument("--alphas", "-a", type=float, nargs="+", default=DEFAULT_AERS)
     parser.add_argument("--pickle", "-p", action="store_true")
-    return parser.parse_args()
+    return parser.parse_args(args)
 
 
-if __name__ == "__main__":
+def main(args=None):
     configure_logging()
-    cmd_args = _parse_args()
+    cmd_args = _parse_args(args)
     compute_optimal_stopping_strategies(
         cmd_args.N_lower,
         cmd_args.N_upper,
@@ -73,3 +73,7 @@ if __name__ == "__main__":
         SS_GETTERS,
         cmd_args.pickle
     )
+
+
+if __name__ == "__main__":
+    main()
