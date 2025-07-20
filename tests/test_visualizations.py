@@ -10,8 +10,9 @@ from ste.empirical_performance import (
     get_minimean_flat_ss, get_minimean_ss, get_minimax_ss, get_minimixed_flat_ss, get_minimixed_ss
 )
 from ste.optimization import get_optimal_stopping_strategy, show_stopping_strategy_state_graphs
-from ste.utils.data import get_names_and_datasets
+from ste.utils.data import get_datasets_with_names
 from ste.utils.figures import save_drawing
+from ste.utils.misc import unzip
 from tests.utils import assert_directory_of_images_matches_reference
 
 
@@ -38,7 +39,7 @@ def test_ss_performance_comparison_visualization():
     n_forests = 10
     n_trees = 51
     random_seed = 1234
-    dataset_names, datasets = get_names_and_datasets()
+    dataset_names, datasets = unzip(get_datasets_with_names())
     adrs = DEFAULT_ADRS
 
     random.seed(random_seed)

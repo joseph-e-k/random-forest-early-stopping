@@ -133,7 +133,7 @@ def get_benchmark_datasets() -> dict[str, Dataset]:
 
 
 @logged(message_level=logging.DEBUG)
-def get_names_and_datasets(full_benchmark=False) -> dict[str, Dataset]:
+def get_datasets_with_names(full_benchmark=False) -> dict[str, Dataset]:
     """Get a collection of datasets with their names.
 
     Args:
@@ -156,7 +156,7 @@ def get_names_and_datasets(full_benchmark=False) -> dict[str, Dataset]:
             "Shuttle": UCIDataset(id=148)
         }
 
-    return unzip(named_datasets.items())
+    return named_datasets
 
 
 def split_dataset(dataset: Dataset, relative_proportions: Sequence[float | int]) -> Iterable[Dataset]:

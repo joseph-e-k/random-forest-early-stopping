@@ -20,8 +20,8 @@ from .utils.logging import configure_logging, get_module_logger
 from .utils.multiprocessing import parallelize_to_array
 from .optimization import get_optimal_stopping_strategy
 from .utils.caching import memoize
-from .utils.data import Dataset, get_names_and_datasets, split_dataset
-from .utils.misc import get_output_path, swap_indices_of_axis
+from .utils.data import Dataset, get_datasets_with_names, split_dataset
+from .utils.misc import get_output_path, swap_indices_of_axis, unzip
 
 
 _logger = get_module_logger()
@@ -479,6 +479,7 @@ def parse_args(args=None):
     ss_comparison_subparser.add_argument("--n-forests", "--number-of-forests", "-f", type=int, default=30)
     ss_comparison_subparser.add_argument("--combine-plots", "-c", action="store_true")
     ss_comparison_subparser.add_argument("--benchmark", "-b", action="store_true")
+    ss_comparison_subparser.add_argument("--dataset-names", "-d", type=str, nargs="*", default=None)
 
     tree_distribution_subparser = subparsers.add_parser("tree-distribution")
     tree_distribution_subparser.set_defaults(action_name="smopdis")
@@ -487,6 +488,7 @@ def parse_args(args=None):
     tree_distribution_subparser.add_argument("--random-seed", "-s", type=int, default=1234)
     tree_distribution_subparser.add_argument("--n-forests", "--number-of-forests", "-f", type=int, default=30)
     tree_distribution_subparser.add_argument("--benchmark", "-b", action="store_true")
+    tree_distribution_subparser.add_argument("--dataset-names", "-d", type=str, nargs="*", default=None)
 
     return parser.parse_args(args)
 
@@ -503,7 +505,13 @@ def main(args=None):
 
     pd.options.mode.chained_assignment = None
 
-    dataset_names, datasets = get_names_and_datasets(full_benchmark=args.benchmark)
+    datasets_by_name = get_datasets_with_names(full_benchmark=args.benchmark)
+
+    if args.dataset_names is None:
+        dataset_names, datasets = unzip(datasets_by_name.items())
+    else:
+        dataset_names = args.dataset_names
+        datasets = [datasets_by_name[name] for name in dataset_names]
 
     with warnings.catch_warnings(category=UserWarning, action="ignore"):
         if args.action_name == "empirical_comparison":
