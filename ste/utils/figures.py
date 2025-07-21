@@ -2,13 +2,11 @@ import functools
 import itertools
 import os
 
-import matplotlib
 import matplotlib.style as mplstyle
 from matplotlib import pyplot as plt
 from matplotlib import colors
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
-from mpl_toolkits.axes_grid1 import make_axes_locatable
 import numpy as np
 import networkx as nx
 

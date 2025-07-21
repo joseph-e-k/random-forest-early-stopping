@@ -337,7 +337,7 @@ def draw_metrics(metrics, dataset_names, allowable_disagreement_rates, ss_names,
     base_error_rates = base_error_rates[:, 0, 0]
 
     if combine_plots:
-        fig, axs = create_subplot_grid(n_metrics * n_datasets, n_rows=n_datasets, tight_layout=False, figsize=(10, 4 * n_datasets))
+        fig, axs = create_subplot_grid(n_metrics * n_datasets, n_rows=n_datasets, tight_layout=False, figsize=(10, 12.75))
         fig.subplots_adjust(hspace=10)
     else:
         fig, axs = create_independent_plots_grid(n_metrics * n_datasets, n_rows=n_datasets, figsize=(4, 4))
