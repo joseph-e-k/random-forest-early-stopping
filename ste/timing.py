@@ -15,19 +15,23 @@ from .utils.caching import memoize
 _logger = get_module_logger()
 
 
-def time_os_solution(n, alpha):
+def time_os_lp_solution(n, alpha, random_seed=None):
     problem, *_ = make_optimal_stopping_problem(n, alpha)
-    solution = problem.solve_with_soplex()
+    solution = problem.solve_with_soplex(random_seed=random_seed)
     return solution.seconds_to_solve
 
 
+def time_os_qcp_solution(n, alpha, random_seed=None):
+    return make_and_time_qcp(n, alpha)
+
+
 @memoize()
-def get_os_solution_times(ensemble_sizes, adrs, n_reps, nonce, use_qcp=False):
+def get_os_solution_times(ensemble_sizes, adrs, n_reps, nonce):
+    random_seeds = [hash(nonce) + i for i in range(n_reps)]
+
     return parallelize_to_array(
-        make_and_time_qcp if use_qcp else time_os_solution,
-        reps=n_reps,
-        argses_to_combine=(ensemble_sizes, adrs),
-        dummy=use_qcp
+        [time_os_lp_solution, time_os_qcp_solution],
+        argses_to_combine=(ensemble_sizes, adrs, random_seeds)
     )
 
 
@@ -39,7 +43,6 @@ def parse_args(args=None):
     parser.add_argument("--adrs", "--alphas", "-a", type=float, nargs="+", default=(0.0001, 0.001, 0.01, 0.05))
     parser.add_argument("--reps", "-r", type=int, default=3)
     parser.add_argument("--nonce", type=int, default=None)
-    parser.add_argument("--qcp", "-q", action="store_true")
 
     parser.add_argument("--min", action="store_const", const=np.min, dest="aggregator")
     parser.add_argument("--max", action="store_const", const=np.max, dest="aggregator")
@@ -56,38 +59,34 @@ def main(args=None):
     ensemble_sizes = list(range(args.n_lower, args.n_upper + 1, args.n_step))
     nonce = args.nonce or time.time_ns()
 
-    _logger.info(f"{ensemble_sizes=}, adrs={args.adrs}, n_reps={args.reps}, {nonce=}, use_qcp={args.qcp}")
+    _logger.info(f"{ensemble_sizes=}, adrs={args.adrs}, n_reps={args.reps}, {nonce=}")
 
     times = get_os_solution_times(
         ensemble_sizes=ensemble_sizes,
         adrs=args.adrs,
         n_reps=args.reps,
-        nonce=nonce,
-        use_qcp=args.qcp
+        nonce=nonce
     )
 
     _logger.info(f"{times=}")
 
     aggregator = args.aggregator or np.min
 
-    agg_times = aggregator(times, axis=0)
+    agg_times = aggregator(times, axis=2) + 1e-3
 
     fig, axs = create_independent_plots_grid(len(args.adrs), n_rows=len(args.adrs), figsize=(7, 4))
 
     for i_adr, adr in enumerate(args.adrs):
         ax = axs[i_adr, 0]
 
-        title = f"ADR = {adr}"
-        if args.qcp:
-            title += " (QCP)"
-            ax.set_yscale("log")
-
-        ax.scatter(ensemble_sizes, agg_times[:, i_adr], marker="o")
-        ax.set_title(title)
+        ax.set_yscale("log")
+        ax.scatter(ensemble_sizes, agg_times[0, :, i_adr], marker="o")
+        ax.scatter(ensemble_sizes, agg_times[1, :, i_adr], marker="x")
+        ax.set_title(f"ADR = {adr}")
         ax.set_xlabel("N")
         ax.set_ylabel("Time (sec)")
     
-    output_path = get_output_path(f"timing_{'q_' if args.qcp else ''}nonce_{nonce}")
+    output_path = get_output_path(f"timing_combined_nonce_{nonce}")
     save_drawing(fig, output_path)
 
 

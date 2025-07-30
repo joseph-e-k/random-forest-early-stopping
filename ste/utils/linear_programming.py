@@ -260,7 +260,7 @@ class Problem:
         self._objective_file.write(f" {self._arithmetic_expression_to_lp_format(objective)}\n")
         self._optimization_sense = sense
 
-    def solve_with_soplex(self) -> OptimizationResult:
+    def solve_with_soplex(self, random_seed=1234) -> OptimizationResult:
         """Solve this linear programming problem using SoPlex's precise rational solver.
 
         Raises:
@@ -296,8 +296,8 @@ class Problem:
                     "--int:readmode=1",
                     "--int:checkmode=2",
                     "--int:multiprecision_limit=2147483647",
-                    "--uint:random_seed=1234",
-                    "-X={}".format(solution_file.name)
+                    f"--uint:random_seed={random_seed}",
+                    f"-X={solution_file.name}"
                 ],
                 capture_output=True,
                 text=True
