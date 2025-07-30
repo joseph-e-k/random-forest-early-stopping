@@ -17,6 +17,23 @@ LOG_DIRECTORY = os.path.join(os.path.dirname(__file__), "../../logs")
 _TLS = threading.local()
 
 
+def get_breadcrumbs():
+    """
+    Retrieve the current breadcrumbs.
+
+    Returns:
+        tuple[str, ...]: The current breadcrumb stack.
+    """
+    try:
+        return _TLS.breadcrumbs
+    except AttributeError:
+        return ()
+    
+
+def set_breadcrumbs(value):
+    _TLS.breadcrumbs = value
+
+
 @dataclasses.dataclass
 class SetBreadcrumbsContext:
     """
@@ -30,11 +47,11 @@ class SetBreadcrumbsContext:
     old_breadcrumbs: tuple[str, ...] = None
 
     def __enter__(self):
-        self.old_breadcrumbs = _TLS.breadcrumbs
-        _TLS.breadcrumbs = self.new_breadcrumbs
+        self.old_breadcrumbs = get_breadcrumbs()
+        set_breadcrumbs(self.new_breadcrumbs)
     
     def __exit__(self, *args):
-        _TLS.breadcrumbs = self.old_breadcrumbs
+        set_breadcrumbs(self.old_breadcrumbs)
 
 
 @dataclasses.dataclass
@@ -50,25 +67,15 @@ class PushBreadcrumbContext:
     old_breadcrumbs: tuple[str, ...] = None
 
     def __enter__(self):
-        self.old_breadcrumbs = _TLS.breadcrumbs
-        _TLS.breadcrumbs = _TLS.breadcrumbs + (self.new_breadcrumb,)
+        self.old_breadcrumbs = get_breadcrumbs()
+        set_breadcrumbs(self.old_breadcrumbs + (self.new_breadcrumb,))
     
     def __exit__(self, *args):
-        _TLS.breadcrumbs = self.old_breadcrumbs
+        set_breadcrumbs(self.old_breadcrumbs)
 
 
 breadcrumb = PushBreadcrumbContext
 breadcrumbs = SetBreadcrumbsContext
-
-
-def get_breadcrumbs():
-    """
-    Retrieve the current breadcrumbs.
-
-    Returns:
-        tuple[str, ...]: The current breadcrumb stack.
-    """
-    return _TLS.breadcrumbs
 
 
 @dataclasses.dataclass(frozen=True)
@@ -184,7 +191,7 @@ class _LoggedFunction[**P, R]:
                 return self.function(*args, **kwargs)
 
     def _call_generator(self, *args, **kwargs):
-        breadcrumbs = _TLS.breadcrumbs
+        breadcrumbs = get_breadcrumbs()
         if self.breadcrumb_text is not None:
             breadcrumbs += (self.breadcrumb_text,)
         generator = self.function(*args, **kwargs)
@@ -219,7 +226,7 @@ class MyLogger(logging.getLoggerClass()):
         now = datetime.now().astimezone(timezone.utc)
         timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
         level_symbol = self._get_level_symbol(level)
-        breadcrumbs = " > ".join(_TLS.breadcrumbs)
+        breadcrumbs = " > ".join(get_breadcrumbs())
         complete_message = f"{timestamp} [{level_symbol}] {breadcrumbs}: {msg}"
         return super()._log(level, complete_message, *args, **kwargs)
     
@@ -344,7 +351,7 @@ def configure_logging(console_level=logging.INFO):
     for handler in [file_handler, console_handler]:
         root_logger.addHandler(handler)
 
-    _TLS.breadcrumbs = ()
+    set_breadcrumbs(())
 
     sys.excepthook = log_uncaught_exception
 

@@ -1,5 +1,6 @@
 import functools
 import itertools
+import operator
 import os
 
 import matplotlib.style as mplstyle
@@ -9,6 +10,8 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 import numpy as np
 import networkx as nx
+
+from ste.analysis import get_envelope
 
 from .logging import get_module_logger
 from .multiprocessing import parallelize_to_array
@@ -380,3 +383,21 @@ def plot_stopping_strategy(ss, ax, ytick_gap=None):
     ax.set_yticks(yticks)
     ax.set_yticklabels(ytick_labels)
     return ax
+
+
+def plot_stopping_strategies_as_envelopes(sses, ax, labels):
+    envelopes = [get_envelope(ss) for ss in sses]
+
+    lines = plot_functions(
+        ax,
+        x_axis_arg_name="i",
+        functions=[(lambda i, e=e: e[i]) for e in envelopes],
+        labels=labels,
+        function_kwargs=dict(i=range(sses[0].shape[0])),
+        concurrently=False
+    )
+
+    for (line, dash_pattern) in zip(lines, DISTINCT_DASH_STYLES):
+        line.set_dashes(dash_pattern)
+
+    return lines
