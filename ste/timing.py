@@ -5,7 +5,7 @@ import numpy as np
 
 from .optimization import make_optimal_stopping_problem
 from .qcp import make_and_time_qcp
-from .utils.figures import create_independent_plots_grid, save_drawing
+from .utils.figures import MARKERS, create_independent_plots_grid, save_drawing
 from .utils.logging import configure_logging, get_module_logger
 from .utils.misc import get_output_path
 from .utils.multiprocessing import parallelize_to_array
@@ -26,11 +26,16 @@ def time_os_qcp_solution(n, alpha, random_seed=None):
 
 
 @memoize()
-def get_os_solution_times(ensemble_sizes, adrs, n_reps, nonce):
+def get_os_solution_times(ensemble_sizes, adrs, n_reps, nonce, problem_kinds):
     random_seeds = [hash(nonce) + i for i in range(n_reps)]
 
+    timers = [
+        {"lp": time_os_lp_solution, "qp": time_os_qcp_solution}[pk]
+        for pk in problem_kinds
+    ]
+
     return parallelize_to_array(
-        [time_os_lp_solution, time_os_qcp_solution],
+        timers,
         argses_to_combine=(ensemble_sizes, adrs, random_seeds)
     )
 
@@ -49,7 +54,17 @@ def parse_args(args=None):
     parser.add_argument("--mean", action="store_const", const=np.mean, dest="aggregator")
     parser.add_argument("--med", "--median", action="store_const", const=np.median, dest="aggregator")
 
-    return parser.parse_args(args)
+    parser.add_argument('--lp', dest='problem_kinds', action='append_const', const='lp', default=[])
+    parser.add_argument('--qp', dest='problem_kinds', action='append_const', const='qp')
+
+    parser.add_argument("--log", action="store_true")
+
+    args = parser.parse_args(args)
+
+    if not args.problem_kinds:
+        parser.error("at least one of --lp and --qp must be specified")
+
+    return args
 
 
 def main(args=None):
@@ -58,14 +73,16 @@ def main(args=None):
     args = parse_args(args)
     ensemble_sizes = list(range(args.n_lower, args.n_upper + 1, args.n_step))
     nonce = args.nonce or time.time_ns()
+    problem_kinds = tuple(args.problem_kinds)
 
-    _logger.info(f"{ensemble_sizes=}, adrs={args.adrs}, n_reps={args.reps}, {nonce=}")
+    _logger.info(f"{ensemble_sizes=}, adrs={args.adrs}, n_reps={args.reps}, {nonce=}, {problem_kinds=}")
 
     times = get_os_solution_times(
         ensemble_sizes=ensemble_sizes,
         adrs=args.adrs,
         n_reps=args.reps,
-        nonce=nonce
+        nonce=nonce,
+        problem_kinds=problem_kinds
     )
 
     _logger.info(f"{times=}")
@@ -79,10 +96,18 @@ def main(args=None):
     for i_adr, adr in enumerate(args.adrs):
         ax = axs[i_adr, 0]
 
-        ax.set_yscale("log")
-        ax.scatter(ensemble_sizes, agg_times[0, :, i_adr], marker="o")
-        ax.scatter(ensemble_sizes, agg_times[1, :, i_adr], marker="x")
-        ax.set_title(f"ADR = {adr}")
+        if args.log:
+            ax.set_yscale("log")
+        
+        for (i_pk, pk), marker in zip(enumerate(problem_kinds), MARKERS):
+            label = {
+                "qp": "QCQP",
+                "lp": "LP"
+            }[pk]
+            ax.scatter(ensemble_sizes, agg_times[i_pk, :, i_adr], marker=marker, label=label)
+        
+        if len(problem_kinds) > 1:
+            ax.legend()
         ax.set_xlabel("N")
         ax.set_ylabel("Time (sec)")
     
