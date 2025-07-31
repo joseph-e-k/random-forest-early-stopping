@@ -10,7 +10,7 @@ from matplotlib import pyplot as plt
 from scipy.special import comb
 
 from .EnsembleVote import EnsembleVote, EnsembleVoteWithStoppingStrategy
-from .utils.figures import plot_evwss
+from .utils.figures import create_subplot_grid, plot_evwss, save_drawing
 from .utils.linear_programming import Problem, OptimizationResult, ArithmeticExpression
 from .utils.logging import configure_logging, get_module_logger
 from .utils.misc import forwards_to, get_output_path
@@ -295,23 +295,19 @@ def make_pi_from_theta(theta):
     return PiSolution(p, pi, pi_bar)
 
 
-def show_stopping_strategy_state_graphs(ss, save_to_folder=None):
+def plot_stopping_strategy_state_graphs(ss, combine_plots=False):
     N = ss.shape[0] - 1
-    values_of_n = [N, N // 2]
-    fig_width = 2 * N + 2
-    fig_height = N + 1
-    for n in values_of_n:
-        fig, ax = plt.subplots(figsize=(fig_width, fig_height))
+    values_of_n = [N // 2, N]
+
+    fig, axs = create_subplot_grid(len(values_of_n), n_rows=1, tight_layout=False, figsize=(4 * (N + 1), N + 1))
+    fig.subplots_adjust(hspace=10)
+
+    for i, n in enumerate(values_of_n):
         evwss = EnsembleVoteWithStoppingStrategy(EnsembleVote(N, n), ss)
+        ax = axs[0, i]
         plot_evwss(evwss, ax=ax)
 
-        if save_to_folder is not None:
-            if not os.path.exists(save_to_folder):
-                os.mkdir(save_to_folder)
-            path = os.path.join(save_to_folder, f"n_{n}.pdf")
-            fig.savefig(path)
-
-    plt.show()
+    return fig
 
 
 @forwards_to(make_and_solve_optimal_stopping_problem)
@@ -342,8 +338,9 @@ def main(args=None):
     if not args.graph:
         return
 
+    fig = plot_stopping_strategy_state_graphs(oss)
     output_path = args.output_path or get_output_path(f"ss_visualization_{args.N}_submodels_{args.alpha}_adr", file_name_suffix="")
-    show_stopping_strategy_state_graphs(oss, save_to_folder=output_path)
+    save_drawing(fig, output_path)
 
 
 if __name__ == "__main__":
