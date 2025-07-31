@@ -10,7 +10,7 @@ from matplotlib import pyplot as plt
 from scipy.special import comb
 
 from .EnsembleVote import EnsembleVote, EnsembleVoteWithStoppingStrategy
-from .utils.figures import create_subplot_grid, plot_evwss, save_drawing
+from .utils.figures import create_subplot_grid, label_subplots, plot_evwss, save_drawing
 from .utils.linear_programming import Problem, OptimizationResult, ArithmeticExpression
 from .utils.logging import configure_logging, get_module_logger
 from .utils.misc import forwards_to, get_output_path
@@ -299,13 +299,14 @@ def plot_stopping_strategy_state_graphs(ss, combine_plots=False):
     N = ss.shape[0] - 1
     values_of_n = [N // 2, N]
 
-    fig, axs = create_subplot_grid(len(values_of_n), n_rows=1, tight_layout=False, figsize=(4 * (N + 1), N + 1))
-    fig.subplots_adjust(hspace=10)
+    fig, axs = create_subplot_grid(len(values_of_n), n_rows=1, figsize=(4 * (N + 1), N + 1))
 
     for i, n in enumerate(values_of_n):
         evwss = EnsembleVoteWithStoppingStrategy(EnsembleVote(N, n), ss)
         ax = axs[0, i]
         plot_evwss(evwss, ax=ax)
+    
+    label_subplots(axs, fontsize=30, fontweight="black")
 
     return fig
 

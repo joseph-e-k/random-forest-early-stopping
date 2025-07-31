@@ -2,6 +2,7 @@ import functools
 import itertools
 import operator
 import os
+import string
 
 import matplotlib.style as mplstyle
 from matplotlib import pyplot as plt
@@ -401,3 +402,21 @@ def plot_stopping_strategies_as_envelopes(sses, ax, labels):
         line.set_dashes(dash_pattern)
 
     return lines
+
+
+def label_subplots(axs, labels=None, from_left=0.02, from_top=0.02, **kwargs):
+    axs = list(axs.flat)
+
+    if labels is None:
+        labels = [f"({string.ascii_lowercase[i]})" for (i, ax) in enumerate(axs)]
+
+    text_kwargs = dict(
+        fontsize=12,
+        fontweight='bold',
+        va='top',
+        ha='left',
+        bbox=dict(facecolor='white', alpha=0.6, edgecolor='none')
+    ) | kwargs
+
+    for ax, label in zip(axs, labels):
+        ax.text(from_left, 1-from_top, label, transform=ax.transAxes, **text_kwargs)
