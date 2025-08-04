@@ -229,7 +229,7 @@ def _compute_node_size_in_square_points(ax: Axes, r, axis="x"):
     return np.pi * (r_points ** 2)
 
 
-def plot_evwss(evwss, ax: Axes, node_radius=0.2):
+def plot_evwss(evwss, ax: Axes, node_radius=0.35):
     """Plot a state transition chart of the given EnsembleVoteWithStoppingStrategy on the given Axes
 
     Args:
@@ -284,7 +284,7 @@ def plot_evwss(evwss, ax: Axes, node_radius=0.2):
     nx.draw_networkx_nodes(G, positions, ax=ax, node_color=node_body_color, alpha=node_probs, node_size=node_size, edgecolors=node_border_colors, linewidths=2)
 
     # Add labels
-    nx.draw_networkx_labels(G, positions, {(i, j): j for (i, j) in G.nodes}, ax=ax, font_size=16)
+    nx.draw_networkx_labels(G, positions, {(i, j): j for (i, j) in G.nodes}, ax=ax, font_size=36)
 
     # Add vertical dashed lines for columns
     for i in range(1, n_base_models + 1):
@@ -292,7 +292,7 @@ def plot_evwss(evwss, ax: Axes, node_radius=0.2):
 
     # Add column headers
     for i in range(n_base_models + 1):
-        ax.text(i, n_base_models + 1, f"i = {i}", fontsize=20, ha="center")
+        ax.text(i, n_base_models + 1, f"i = {i}", fontsize=36, ha="center")
 
     ax.axis("off")
 

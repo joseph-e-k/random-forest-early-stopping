@@ -306,7 +306,7 @@ def plot_stopping_strategy_state_graphs(ss, combine_plots=False):
         ax = axs[0, i]
         plot_evwss(evwss, ax=ax)
     
-    label_subplots(axs, fontsize=30, fontweight="black")
+    label_subplots(axs, fontsize=36, fontweight="black")
 
     return fig
 
