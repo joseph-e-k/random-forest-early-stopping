@@ -463,7 +463,7 @@ def get_minimixed_flat_ss(adr: float, n_trees: int, estimated_smopdis: np.ndarra
     return get_optimal_stopping_strategy(n_trees, adr, np.ones(shape=(n_trees + 1)), disagreement_minimax=True, runtime_minimax=False)
 
 
-DEFAULT_ADRS = (0, 10**-4, 10**-3.5, 10**-3, 10**-2.5, 10**-2, 10**-1.5, 5*10**-2, 10**-1)
+DEFAULT_ADRS = (0, 10**-4, 10**-3.5, 10**-3, 10**-2.5, 10**-2, 10**-1.5, 10**-1)
 
 
 def parse_args(args=None):
