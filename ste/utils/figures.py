@@ -275,7 +275,7 @@ def plot_evwss(evwss, ax: Axes, node_radius=0.35):
             transition_probs.append(prob_reach * prob_continue_if_reached * prob_transition_if_continue)
 
     node_size = _compute_node_size_in_square_points(ax, node_radius)
-    arrow_size = np.sqrt(node_size) / 4
+    arrow_size = np.sqrt(node_size) * 0.75
     nx.draw_networkx_edges(G, positions, ax=ax, arrowsize=arrow_size, edge_color="black", node_size=node_size, alpha=transition_probs)
 
     # Draw nodes

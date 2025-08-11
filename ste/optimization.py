@@ -299,7 +299,7 @@ def plot_stopping_strategy_state_graphs(ss, combine_plots=False):
     N = ss.shape[0] - 1
     values_of_n = [N // 2, N]
 
-    fig, axs = create_subplot_grid(len(values_of_n), n_rows=1, figsize=(4 * (N + 1), N + 1))
+    fig, axs = create_subplot_grid(len(values_of_n), n_rows=1, figsize=(4 * (N + 1), 1.25 * (N + 1)))
 
     for i, n in enumerate(values_of_n):
         evwss = EnsembleVoteWithStoppingStrategy(EnsembleVote(N, n), ss)
