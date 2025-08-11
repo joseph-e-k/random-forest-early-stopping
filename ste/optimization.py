@@ -295,7 +295,7 @@ def make_pi_from_theta(theta):
     return PiSolution(p, pi, pi_bar)
 
 
-def plot_stopping_strategy_state_graphs(ss, combine_plots=False):
+def plot_stopping_strategy_state_graphs(ss, font_size=36, combine_plots=False):
     N = ss.shape[0] - 1
     values_of_n = [N // 2, N]
 
@@ -304,9 +304,9 @@ def plot_stopping_strategy_state_graphs(ss, combine_plots=False):
     for i, n in enumerate(values_of_n):
         evwss = EnsembleVoteWithStoppingStrategy(EnsembleVote(N, n), ss)
         ax = axs[0, i]
-        plot_evwss(evwss, ax=ax)
+        plot_evwss(evwss, ax=ax, font_size=font_size)
     
-    label_subplots(axs, fontsize=36, fontweight="black")
+    label_subplots(axs, fontsize=font_size, fontweight="black")
 
     return fig
 
@@ -339,7 +339,7 @@ def main(args=None):
     if not args.graph:
         return
 
-    fig = plot_stopping_strategy_state_graphs(oss)
+    fig = plot_stopping_strategy_state_graphs(oss, font_size=24)
     output_path = args.output_path or get_output_path(f"ss_visualization_{args.N}_submodels_{args.alpha}_adr", file_name_suffix="")
     save_drawing(fig, output_path)
 

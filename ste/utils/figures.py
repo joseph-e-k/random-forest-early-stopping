@@ -229,7 +229,7 @@ def _compute_node_size_in_square_points(ax: Axes, r, axis="x"):
     return np.pi * (r_points ** 2)
 
 
-def plot_evwss(evwss, ax: Axes, node_radius=0.35):
+def plot_evwss(evwss, ax: Axes, node_radius=0.35, font_size=36):
     """Plot a state transition chart of the given EnsembleVoteWithStoppingStrategy on the given Axes
 
     Args:
@@ -276,7 +276,7 @@ def plot_evwss(evwss, ax: Axes, node_radius=0.35):
 
     node_size = _compute_node_size_in_square_points(ax, node_radius)
     arrow_size = np.sqrt(node_size) * 0.75
-    nx.draw_networkx_edges(G, positions, ax=ax, arrowsize=arrow_size, edge_color="black", node_size=node_size, alpha=transition_probs)
+    nx.draw_networkx_edges(G, positions, ax=ax, arrowsize=arrow_size, edge_color="black", width=4, node_size=node_size, alpha=transition_probs)
 
     # Draw nodes
     node_body_color = "skyblue"
@@ -284,7 +284,7 @@ def plot_evwss(evwss, ax: Axes, node_radius=0.35):
     nx.draw_networkx_nodes(G, positions, ax=ax, node_color=node_body_color, alpha=node_probs, node_size=node_size, edgecolors=node_border_colors, linewidths=2)
 
     # Add labels
-    nx.draw_networkx_labels(G, positions, {(i, j): j for (i, j) in G.nodes}, ax=ax, font_size=36)
+    nx.draw_networkx_labels(G, positions, {(i, j): j for (i, j) in G.nodes}, ax=ax, font_size=font_size)
 
     # Add vertical dashed lines for columns
     for i in range(1, n_base_models + 1):
@@ -292,7 +292,7 @@ def plot_evwss(evwss, ax: Axes, node_radius=0.35):
 
     # Add column headers
     for i in range(n_base_models + 1):
-        ax.text(i, n_base_models + 1, f"i = {i}", fontsize=36, ha="center")
+        ax.text(i, n_base_models + 1.5, f"i = {i}", fontsize=font_size, ha="center")
 
     ax.axis("off")
 
