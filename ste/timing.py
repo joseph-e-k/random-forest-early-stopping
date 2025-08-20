@@ -67,6 +67,39 @@ def parse_args(args=None):
     return args
 
 
+def aggregate_and_plot_times(ensemble_sizes, times, adrs, problem_kinds, log, aggregator=None, fig_and_axs=None):
+    aggregator = aggregator or np.min
+
+    agg_times = aggregator(times, axis=2) + 1e-3
+
+    if fig_and_axs is None:
+        fig, axs = create_independent_plots_grid(len(adrs), n_rows=len(adrs), figsize=(7, 4))
+    else:
+        fig, axs = fig_and_axs
+        if axs.shape != (len(adrs), 1):
+            raise ValueError("axs must have shape (len(adrs), 1)")
+
+    for i_adr, adr in enumerate(adrs):
+        ax = axs[i_adr, 0]
+
+        if log:
+            ax.set_yscale("log")
+        
+        for (i_pk, pk), marker in zip(enumerate(problem_kinds), MARKERS):
+            label = {
+                "qp": "QCQP",
+                "lp": "LP"
+            }[pk]
+            ax.scatter(ensemble_sizes, agg_times[i_pk, :, i_adr], marker=marker, label=label)
+        
+        if len(problem_kinds) > 1:
+            ax.legend()
+        ax.set_xlabel("N")
+        ax.set_ylabel("Time (sec)")
+
+    return fig, axs
+
+
 def main(args=None):
     configure_logging()
 
@@ -87,29 +120,14 @@ def main(args=None):
 
     _logger.info(f"{times=}")
 
-    aggregator = args.aggregator or np.min
-
-    agg_times = aggregator(times, axis=2) + 1e-3
-
-    fig, axs = create_independent_plots_grid(len(args.adrs), n_rows=len(args.adrs), figsize=(7, 4))
-
-    for i_adr, adr in enumerate(args.adrs):
-        ax = axs[i_adr, 0]
-
-        if args.log:
-            ax.set_yscale("log")
-        
-        for (i_pk, pk), marker in zip(enumerate(problem_kinds), MARKERS):
-            label = {
-                "qp": "QCQP",
-                "lp": "LP"
-            }[pk]
-            ax.scatter(ensemble_sizes, agg_times[i_pk, :, i_adr], marker=marker, label=label)
-        
-        if len(problem_kinds) > 1:
-            ax.legend()
-        ax.set_xlabel("N")
-        ax.set_ylabel("Time (sec)")
+    fig, axs = aggregate_and_plot_times(
+        ensemble_sizes,
+        times,
+        args.adrs,
+        args.problem_kinds,
+        args.log,
+        args.aggregator
+    )
     
     output_path = get_output_path(f"timing_combined_nonce_{nonce}")
     save_drawing(fig, output_path)
