@@ -281,7 +281,7 @@ def get_metrics(n_forests, n_trees, datasets, adrs, stopping_strategy_getters, d
             1. Dataset (length = len(datasets))
             2. Stopping strategy (length = len(stopping_strategy_getters))
             3. Allowable disagreement rate (length = len(adrs))
-            4. Metric kind: base error rate, disagreement rate, expected runtime, and error rate (length = 4).
+            4. Metric kind: disagreement rate, expected runtime, error rate, and base error rate (length = 4).
     """
     metrics = parallelize_to_array(
         functools.partial(
@@ -312,7 +312,7 @@ def draw_metrics(metrics, dataset_names, allowable_disagreement_rates, ss_names,
             0. Dataset (length = len(dataset_names))
             1. Stopping strategy (length = len(ss_names))
             2. Allowable disagreement rate (length = len(allowable_disagreement_rates))
-            3. Metric kind: base error rate, disagreement rate, expected runtime, and error rate (length = 4).
+            3. Metric kind: disagreement rate, expected runtime, error rate, and base error rate (length = 4).
         dataset_names (Sequence[str]): Names of the datasets.
         allowable_disagreement_rates (Sequence[float]): Allowable disagreement rates used to compute the stopping strategies.
         ss_names (Sequence[str]): Names of the stopping strategies.
