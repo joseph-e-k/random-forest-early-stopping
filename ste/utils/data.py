@@ -42,14 +42,14 @@ class LazyDataset:
     """Dataset that actually loads its data only when unpacked to features and target. Useful for multiprocessing."""
     _wkd = WeakKeyDictionary()
     
-    def _load(self):
+    def load_raw(self):
         raise NotImplementedError()
 
     def __iter__(self) -> Iterator[ConcreteDataset]:
         try:
             data = self._wkd[self]
         except KeyError:
-            data = self._clean_data(*self._load())
+            data = self._clean_data(*self.load_raw())
             self._wkd[self] = data
         yield from data
 
@@ -65,7 +65,7 @@ class UCIDataset(LazyDataset):
     """A dataset stored in the UCI Machine Learning Repository"""
     id: int
     
-    def _load(self):
+    def load_raw(self):
         uci_dataset = fetch_uci_repo(self.id)
         return uci_dataset.data.features, uci_dataset.data.targets.iloc[:, 0]
 
@@ -75,7 +75,7 @@ class OpenMLDataset(LazyDataset):
     """A dataset stored in the OpenML repository"""
     id: int
     
-    def _load(self):
+    def load_raw(self):
         openml_dataset = openml.datasets.get_dataset(self.id)
         data = openml_dataset.get_data(target=openml_dataset.default_target_attribute)
         features, target, _, _ = data

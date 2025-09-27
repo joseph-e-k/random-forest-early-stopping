@@ -1,8 +1,12 @@
 import argparse
+import csv
 import os
+
+import numpy as np
 
 from ste.empirical_performance import get_minimax_ss, get_minimean_flat_ss, get_minimixed_flat_ss
 from ste.optimization import get_optimal_stopping_strategy, plot_stopping_strategy_state_graphs
+from ste.utils.data import get_datasets_with_names
 from ste.utils.figures import create_subplot_grid, label_subplots, plot_stopping_strategies_as_envelopes, save_drawing
 from ste.utils.misc import get_output_path
 
@@ -38,6 +42,25 @@ def generate_figure_2(output_dir):
     save_drawing(fig, output_path)
 
 
+def generate_table_2(output_dir):
+    output_path = f"{output_dir}/Table 2.csv"
+    with open(output_path, "wt", newline="") as output_file:
+        writer = csv.writer(output_file)
+        writer.writerow(["Name", "N", "p", "C", "%pos"])
+
+        named_datasets = get_datasets_with_names()
+        for name, dataset in named_datasets.items():
+            X, y = dataset.load_raw()
+            n_obs = len(y)
+            n_features = X.shape[1]
+            classes, class_counts = np.unique(y, return_counts=True)
+            n_classes = len(classes)
+            largest_class = classes[np.argmax(class_counts)]
+            proportion_of_positive_obs = np.sum(y == largest_class) / n_obs
+
+            writer.writerow([name, n_obs, n_features, n_classes, f"{100*proportion_of_positive_obs:.1f}%"])
+
+
 def parse_args(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("output_dir", nargs="?")
@@ -51,6 +74,7 @@ def main(argv=None):
 
     generate_figure_1(output_dir)
     generate_figure_2(output_dir)
+    generate_table_2(output_dir)
 
 
 if __name__ == "__main__":
