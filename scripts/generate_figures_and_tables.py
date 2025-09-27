@@ -1,9 +1,11 @@
 import argparse
 import csv
 import os
+import shlex
 
 import numpy as np
 
+from ste import empirical_performance
 from ste.empirical_performance import get_minimax_ss, get_minimean_flat_ss, get_minimixed_flat_ss
 from ste.optimization import get_optimal_stopping_strategy, plot_stopping_strategy_state_graphs
 from ste.utils.data import get_datasets_with_names
@@ -61,6 +63,25 @@ def generate_table_2(output_dir):
             writer.writerow([name, n_obs, n_features, n_classes, f"{100*proportion_of_positive_obs:.1f}%"])
 
 
+def generate_figure_3(output_dir):
+    output_sub_dir = f"{output_dir}/Figure 3"
+    os.mkdir(output_sub_dir)
+
+    output_path_1 = f"{output_sub_dir}/Page 1"
+    empirical_performance.main(
+        shlex.split(
+            f'ss-comparison -n 101 -f 30 --combine-plots --dataset-names "Ground Cover" "Income" "Diabetes" "Skin" -o {shlex.quote(output_path_1)}'
+        )
+    )
+
+    output_path_2 = f"{output_sub_dir}/Page 2"
+    empirical_performance.main(
+        shlex.split(
+            f'ss-comparison -n 101 -f 30 --combine-plots --dataset-names "Sepsis" "Dota2" "Hospitalization" "Shuttle" -o {shlex.quote(output_path_2)}'
+        )
+    )
+
+
 def parse_args(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("output_dir", nargs="?")
@@ -75,6 +96,7 @@ def main(argv=None):
     generate_figure_1(output_dir)
     generate_figure_2(output_dir)
     generate_table_2(output_dir)
+    generate_figure_3(output_dir)
 
 
 if __name__ == "__main__":

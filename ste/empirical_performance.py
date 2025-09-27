@@ -466,7 +466,7 @@ def get_minimixed_flat_ss(adr: float, n_trees: int, estimated_smopdis: np.ndarra
 DEFAULT_ADRS = (0, 10**-4, 10**-3.5, 10**-3, 10**-2.5, 10**-2, 10**-1.5, 10**-1)
 
 
-def parse_args(args=None):
+def parse_args(argv=None):
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers()
 
@@ -490,11 +490,11 @@ def parse_args(args=None):
     tree_distribution_subparser.add_argument("--benchmark", "-b", action="store_true")
     tree_distribution_subparser.add_argument("--dataset-names", "-d", type=str, nargs="*", default=None)
 
-    return parser.parse_args(args)
+    return parser.parse_args(argv)
 
 
-def main(args=None):
-    args = parse_args(args)
+def main(argv=None):
+    args = parse_args(argv)
 
     configure_logging()
 
