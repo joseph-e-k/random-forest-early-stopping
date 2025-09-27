@@ -81,6 +81,15 @@ def generate_figure_3(output_dir):
         )
     )
 
+def generate_figure_4(output_dir):
+    output_path = f"{output_dir}/Figure 4"
+    
+    empirical_performance.main(
+        shlex.split(
+            f'tree-distribution -n 101 -f 30 -o {shlex.quote(output_path)}'
+        )
+    )
+
 
 def parse_args(argv=None):
     parser = argparse.ArgumentParser()
@@ -97,6 +106,7 @@ def main(argv=None):
     generate_figure_2(output_dir)
     generate_table_2(output_dir)
     generate_figure_3(output_dir)
+    generate_figure_4(output_dir)
 
 
 if __name__ == "__main__":
