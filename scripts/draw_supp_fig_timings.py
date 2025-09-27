@@ -4,7 +4,7 @@ from ste.utils.figures import create_subplot_grid, save_drawing
 from ste.utils.misc import get_output_path
 
 
-def main():
+def main(output_path=None):
     low_ensemble_sizes = list(range(1, 16))
     low_combined_times = get_os_solution_times(
         ensemble_sizes=low_ensemble_sizes,
@@ -47,8 +47,7 @@ def main():
     axs[0, 1].set_ylabel(None)
     axs[0, 1].set_yticklabels([])
 
-    output_path = get_output_path(f"timing_combined_combined")
-    save_drawing(fig, output_path)
+    save_drawing(fig, output_path or get_output_path(f"timing_combined_combined"))
 
 
 if __name__ == "__main__":

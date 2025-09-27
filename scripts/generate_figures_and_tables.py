@@ -5,6 +5,7 @@ import shlex
 
 import numpy as np
 
+from scripts import draw_supp_fig_timings
 from ste import empirical_performance
 from ste.empirical_performance import get_minimax_ss, get_minimean_flat_ss, get_minimean_ss, get_minimixed_flat_ss
 from ste.optimization import get_optimal_stopping_strategy, plot_stopping_strategy_state_graphs
@@ -126,6 +127,11 @@ def generate_table_3(output_dir):
             ])
 
 
+def generate_figure_supp_1(output_dir):
+    output_path = f"{output_dir}/Figure 1 (Supplementary)"
+    draw_supp_fig_timings.main(output_path)
+
+
 def parse_args(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("output_dir", nargs="?")
@@ -143,6 +149,7 @@ def main(argv=None):
     generate_figure_3(output_dir)
     generate_figure_4(output_dir)
     generate_table_3(output_dir)
+    generate_figure_supp_1(output_dir)
 
 
 if __name__ == "__main__":
