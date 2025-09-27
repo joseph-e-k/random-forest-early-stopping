@@ -6,11 +6,11 @@ import shlex
 import numpy as np
 
 from ste import empirical_performance
-from ste.empirical_performance import get_minimax_ss, get_minimean_flat_ss, get_minimixed_flat_ss
+from ste.empirical_performance import get_minimax_ss, get_minimean_flat_ss, get_minimean_ss, get_minimixed_flat_ss
 from ste.optimization import get_optimal_stopping_strategy, plot_stopping_strategy_state_graphs
 from ste.utils.data import get_datasets_with_names
 from ste.utils.figures import create_subplot_grid, label_subplots, plot_stopping_strategies_as_envelopes, save_drawing
-from ste.utils.misc import get_output_path
+from ste.utils.misc import get_output_path, unzip
 
 
 def generate_figure_1(output_dir):
@@ -91,6 +91,41 @@ def generate_figure_4(output_dir):
     )
 
 
+def generate_table_3(output_dir):
+    output_path = f"{output_dir}/Table 3.csv"
+    with open(output_path, "wt", newline="") as output_file:
+        writer = csv.writer(output_file)
+        writer.writerow(["Dataset Name", "Disagreement Rate", "Expected Runtime", "Base Error Rate", "Error Rate"])
+
+        dataset_names, datasets = unzip(get_datasets_with_names().items())
+
+        # np.ndarray: 5D array of estimated metrics, with axes corresponding to:
+        # 0. Forest (length = n_forests)
+        # 1. Dataset (length = len(datasets))
+        # 2. Stopping strategy (length = len(stopping_strategy_getters))
+        # 3. Allowable disagreement rate (length = len(adrs))
+        # 4. Metric kind: disagreement rate, expected runtime, error rate, and base error rate (length = 4).
+        metrics = empirical_performance.get_metrics(
+            n_forests=30,
+            n_trees=101,
+            datasets=datasets,
+            adrs=[1e-3],
+            stopping_strategy_getters=[get_minimean_ss]
+        )
+
+        mean_metrics = metrics.mean(axis=0)
+
+        for i_dataset, dataset_name in enumerate(dataset_names):
+            disagreement_rate, expected_runtime, error_rate, base_error_rate = mean_metrics[i_dataset, 0, 0]
+            writer.writerow([
+                dataset_name,
+                f"{100*disagreement_rate:.2f}%",
+                f"{100*expected_runtime/101:.2f}%",
+                f"{100*error_rate:.2f}%",
+                f"{100*base_error_rate:.2f}%",
+            ])
+
+
 def parse_args(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("output_dir", nargs="?")
@@ -107,6 +142,7 @@ def main(argv=None):
     generate_table_2(output_dir)
     generate_figure_3(output_dir)
     generate_figure_4(output_dir)
+    generate_table_3(output_dir)
 
 
 if __name__ == "__main__":
