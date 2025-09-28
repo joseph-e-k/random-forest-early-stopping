@@ -132,6 +132,46 @@ def generate_figure_supp_1(output_dir):
     draw_supp_fig_timings.main(output_path)
 
 
+def generate_figure_supp_2(output_dir):
+    output_sub_dir = f"{output_dir}/Figure 2 (Supplementary)"
+    os.mkdir(output_sub_dir)
+
+    output_path_1 = f"{output_sub_dir}/Page 1"
+    empirical_performance.main(
+        shlex.split(
+            f'ss-comparison -n 101 -f 30 -b --combine-plots --dataset-names "Higgs" "eye_movements" "jannis" "KDDCup09_upselling" -o {shlex.quote(output_path_1)}'
+        )
+    )
+
+    output_path_2 = f"{output_sub_dir}/Page 2"
+    empirical_performance.main(
+        shlex.split(
+            f'ss-comparison -n 101 -f 30 -b --combine-plots --dataset-names "MagicTelescope" "bank-marketing" "phoneme" "MiniBooNE" -o {shlex.quote(output_path_2)}'
+        )
+    )
+
+    output_path_3 = f"{output_sub_dir}/Page 3"
+    empirical_performance.main(
+        shlex.split(
+            f'ss-comparison -n 101 -f 30 -b --combine-plots --dataset-names "covertype" "pol" "house_16H" "kdd_ipums_la_97-small" -o {shlex.quote(output_path_3)}'
+        )
+    )
+
+    output_path_4 = f"{output_sub_dir}/Page 4"
+    empirical_performance.main(
+        shlex.split(
+            f'ss-comparison -n 101 -f 30 -b --combine-plots --dataset-names "credit" "california" "wine" "electricity" -o {shlex.quote(output_path_4)}'
+        )
+    )
+
+    output_path_5 = f"{output_sub_dir}/Page 5"
+    empirical_performance.main(
+        shlex.split(
+            f'ss-comparison -n 101 -f 30 -b --combine-plots --dataset-names "rl" "road-safety" "compass" -o {shlex.quote(output_path_5)}'
+        )
+    )
+
+
 def parse_args(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("output_dir", nargs="?")
@@ -150,6 +190,7 @@ def main(argv=None):
     generate_figure_4(output_dir)
     generate_table_3(output_dir)
     generate_figure_supp_1(output_dir)
+    generate_figure_supp_2(output_dir)
 
 
 if __name__ == "__main__":
