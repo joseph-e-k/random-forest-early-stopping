@@ -181,7 +181,7 @@ def parse_args(argv=None):
 def main(argv=None):
     args = parse_args(argv)
     output_dir = args.output_dir or get_output_path("all_figs_and_tables", file_name_suffix="")
-    os.mkdir(output_dir)
+    os.makedirs(output_dir)
 
     generate_figure_1(output_dir)
     generate_figure_2(output_dir)
