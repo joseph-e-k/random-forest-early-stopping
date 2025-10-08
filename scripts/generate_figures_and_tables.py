@@ -23,22 +23,22 @@ def generate_figure_1(output_dir):
     save_drawing(fig, output_path)
 
 
-def generate_figure_2(output_dir):
+def generate_figure_2(output_dir, n_trees, n_forests):
     adrs = [1e-2, 1e-4, 0]
     ss_getters = get_minimax_ss, get_minimean_flat_ss, get_minimixed_flat_ss
-    sses = [[get_ss(adr, 101, None) for adr in adrs] for get_ss in ss_getters]
+    sses = [[get_ss(adr, n_trees, None) for adr in adrs] for get_ss in ss_getters]
 
     fig, axs = create_subplot_grid(len(ss_getters), n_rows=1, tight_layout=False, figsize=(10, 3))
     fig.subplots_adjust(hspace=10)
 
     for i_ss_kind, ss_getter in enumerate(ss_getters):
         ax = axs[0, i_ss_kind]
-        sses = [ss_getter(adr, 101, None) for adr in adrs]
+        sses = [ss_getter(adr, n_trees, None) for adr in adrs]
         plot_stopping_strategies_as_envelopes(sses, ax, [f"ADR = {adr}" for adr in adrs])
         ax.set_title("")
         ax.set_xlabel("")
-        ax.set_xlim((0, 101))
-        ax.set_ylim((0, 52))
+        ax.set_xlim((0, n_trees))
+        ax.set_ylim((0, int(n_trees / 2) + 2))
         ax.grid(which="major")
 
     label_subplots(axs, from_top=0, from_left=-0.205, fontsize=14, bbox=None)
@@ -66,35 +66,35 @@ def generate_table_2(output_dir):
             writer.writerow([name, n_obs, n_features, n_classes, f"{100*proportion_of_positive_obs:.1f}%"])
 
 
-def generate_figure_3(output_dir):
+def generate_figure_3(output_dir, n_trees, n_forests):
     output_sub_dir = f"{output_dir}/Figure 3"
     os.mkdir(output_sub_dir)
 
     output_path_1 = f"{output_sub_dir}/Page 1"
     empirical_performance.main(
         shlex.split(
-            f'ss-comparison -n 101 -f 30 --combine-plots --dataset-names "Ground Cover" "Income" "Diabetes" "Skin" -o {shlex.quote(output_path_1)}'
+            f'ss-comparison -n {n_trees} -f {n_forests} --combine-plots --dataset-names "Ground Cover" "Income" "Diabetes" "Skin" -o {shlex.quote(output_path_1)}'
         )
     )
 
     output_path_2 = f"{output_sub_dir}/Page 2"
     empirical_performance.main(
         shlex.split(
-            f'ss-comparison -n 101 -f 30 --combine-plots --dataset-names "Sepsis" "Dota2" "Hospitalization" "Shuttle" -o {shlex.quote(output_path_2)}'
+            f'ss-comparison -n {n_trees} -f {n_forests} --combine-plots --dataset-names "Sepsis" "Dota2" "Hospitalization" "Shuttle" -o {shlex.quote(output_path_2)}'
         )
     )
 
-def generate_figure_4(output_dir):
+def generate_figure_4(output_dir, n_trees, n_forests):
     output_path = f"{output_dir}/Figure 4"
     
     empirical_performance.main(
         shlex.split(
-            f'tree-distribution -n 101 -f 30 -o {shlex.quote(output_path)}'
+            f'tree-distribution -n {n_trees} -f {n_forests} -o {shlex.quote(output_path)}'
         )
     )
 
 
-def generate_table_3(output_dir):
+def generate_table_3(output_dir, n_trees, n_forests):
     output_path = f"{output_dir}/Table 3.csv"
     with open(output_path, "wt", newline="") as output_file:
         writer = csv.writer(output_file)
@@ -109,8 +109,8 @@ def generate_table_3(output_dir):
         # 3. Allowable disagreement rate (length = len(adrs))
         # 4. Metric kind: disagreement rate, expected runtime, error rate, and base error rate (length = 4).
         metrics = empirical_performance.get_metrics(
-            n_forests=30,
-            n_trees=101,
+            n_forests=n_forests,
+            n_trees=n_trees,
             datasets=datasets,
             adrs=[1e-3],
             stopping_strategy_getters=[get_minimean_ss]
@@ -123,7 +123,7 @@ def generate_table_3(output_dir):
             writer.writerow([
                 dataset_name,
                 f"{100*disagreement_rate:.2f}%",
-                f"{100*expected_runtime/101:.2f}%",
+                f"{100*expected_runtime/n_trees:.2f}%",
                 f"{100*error_rate:.2f}%",
                 f"{100*base_error_rate:.2f}%",
             ])
@@ -134,42 +134,42 @@ def generate_figure_supp_1(output_dir):
     draw_supp_fig_timings.main(output_path)
 
 
-def generate_figure_supp_2(output_dir):
+def generate_figure_supp_2(output_dir, n_trees, n_forests):
     output_sub_dir = f"{output_dir}/Figure 2 (Supplementary)"
     os.mkdir(output_sub_dir)
 
     output_path_1 = f"{output_sub_dir}/Page 1"
     empirical_performance.main(
         shlex.split(
-            f'ss-comparison -n 101 -f 30 -b --combine-plots --dataset-names "Higgs" "eye_movements" "jannis" "KDDCup09_upselling" -o {shlex.quote(output_path_1)}'
+            f'ss-comparison -n {n_trees} -f {n_forests} -b --combine-plots --dataset-names "Higgs" "eye_movements" "jannis" "KDDCup09_upselling" -o {shlex.quote(output_path_1)}'
         )
     )
 
     output_path_2 = f"{output_sub_dir}/Page 2"
     empirical_performance.main(
         shlex.split(
-            f'ss-comparison -n 101 -f 30 -b --combine-plots --dataset-names "MagicTelescope" "bank-marketing" "phoneme" "MiniBooNE" -o {shlex.quote(output_path_2)}'
+            f'ss-comparison -n {n_trees} -f {n_forests} -b --combine-plots --dataset-names "MagicTelescope" "bank-marketing" "phoneme" "MiniBooNE" -o {shlex.quote(output_path_2)}'
         )
     )
 
     output_path_3 = f"{output_sub_dir}/Page 3"
     empirical_performance.main(
         shlex.split(
-            f'ss-comparison -n 101 -f 30 -b --combine-plots --dataset-names "covertype" "pol" "house_16H" "kdd_ipums_la_97-small" -o {shlex.quote(output_path_3)}'
+            f'ss-comparison -n {n_trees} -f {n_forests} -b --combine-plots --dataset-names "covertype" "pol" "house_16H" "kdd_ipums_la_97-small" -o {shlex.quote(output_path_3)}'
         )
     )
 
     output_path_4 = f"{output_sub_dir}/Page 4"
     empirical_performance.main(
         shlex.split(
-            f'ss-comparison -n 101 -f 30 -b --combine-plots --dataset-names "credit" "california" "wine" "electricity" -o {shlex.quote(output_path_4)}'
+            f'ss-comparison -n {n_trees} -f {n_forests} -b --combine-plots --dataset-names "credit" "california" "wine" "electricity" -o {shlex.quote(output_path_4)}'
         )
     )
 
     output_path_5 = f"{output_sub_dir}/Page 5"
     empirical_performance.main(
         shlex.split(
-            f'ss-comparison -n 101 -f 30 -b --combine-plots --dataset-names "rl" "road-safety" "compass" -o {shlex.quote(output_path_5)}'
+            f'ss-comparison -n {n_trees} -f {n_forests} -b --combine-plots --dataset-names "rl" "road-safety" "compass" -o {shlex.quote(output_path_5)}'
         )
     )
 
@@ -177,6 +177,8 @@ def generate_figure_supp_2(output_dir):
 def parse_args(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("output_dir", nargs="?")
+    parser.add_argument("--n-trees", "-n", type=int, default=101)
+    parser.add_argument("--n-forests", "-f", type=int, default=30)
     return parser.parse_args(argv)
 
 
@@ -187,13 +189,13 @@ def main(argv=None):
     os.makedirs(output_dir)
 
     generate_figure_1(output_dir)
-    generate_figure_2(output_dir)
+    generate_figure_2(output_dir, args.n_trees, args.n_forests)
     generate_table_2(output_dir)
-    generate_figure_3(output_dir)
-    generate_figure_4(output_dir)
-    generate_table_3(output_dir)
+    generate_figure_3(output_dir, args.n_trees, args.n_forests)
+    generate_figure_4(output_dir, args.n_trees, args.n_forests)
+    generate_table_3(output_dir, args.n_trees, args.n_forests)
     generate_figure_supp_1(output_dir)
-    generate_figure_supp_2(output_dir)
+    generate_figure_supp_2(output_dir, args.n_trees, args.n_forests)
 
 
 if __name__ == "__main__":
