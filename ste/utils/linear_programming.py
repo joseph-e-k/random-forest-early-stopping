@@ -273,44 +273,73 @@ class Problem:
             return self._optimization_result
 
         if SOPLEX_EXECUTABLE_PATH is None:
-            raise UnspecifiedExecutableError("SOPLEX_PATH environment variable must be set to point to the SoPlex executable file")
-        
-        self._is_finalized = True
-
-        lp_file = tempfile.NamedTemporaryFile("wt", prefix=f"{self._file_prefix}_problem_")
-        solution_file = tempfile.NamedTemporaryFile("rt", prefix=f"{self._file_prefix}_solution_")
-
-        with lp_file:
-            _logger.info("Serializing problem to disk...")
-            self._save_as_lp_format(lp_file)
-            lp_file.flush()
-            _logger.info("Running SoPlex to solve problem...")
-            process = subprocess.run(
-                [
-                    SOPLEX_EXECUTABLE_PATH,
-                    lp_file.name,
-                    "--real:feastol=0",
-                    "--real:opttol=0",
-                    "--int:solvemode=2",
-                    "--int:syncmode=1",
-                    "--int:readmode=1",
-                    "--int:checkmode=2",
-                    "--int:multiprecision_limit=2147483647",
-                    f"--uint:random_seed={random_seed}",
-                    f"-X={solution_file.name}"
-                ],
-                capture_output=True,
-                text=True
+            raise UnspecifiedExecutableError(
+                "SOPLEX_PATH environment variable must be set to point to the SoPlex executable file"
             )
 
-        _logger.info("Parsing SoPlex output...")
-        self._optimization_result = OptimizationResult.from_soplex_output(
-            StringIO(process.stdout),
-            StringIO(process.stderr),
-            solution_file
-        )
+        self._is_finalized = True
+
+        # --- Fix 1: Avoid Windows temp-file locking (use delete=False, close before subprocess)
+        lp_file = tempfile.NamedTemporaryFile("wt", prefix=f"{self._file_prefix}_problem_", delete=False)
+        solution_file = tempfile.NamedTemporaryFile("rt", prefix=f"{self._file_prefix}_solution_", delete=False)
+
+        try:
+            _logger.info("Serializing problem to disk...")
+            with lp_file:
+                self._save_as_lp_format(lp_file)
+                lp_file.flush()
+
+            # --- Fix 2: Ensure DLL path (Library/bin) is visible to SoPlex on Windows
+            import sys, os
+            from pathlib import Path
+
+            conda_dll_dir = Path(sys.prefix) / "Library" / "bin"
+            env = os.environ.copy()
+            if conda_dll_dir.exists():
+                env["PATH"] = str(conda_dll_dir) + os.pathsep + env["PATH"]
+
+            _logger.info(f"Added {conda_dll_dir} to PATH")
+
+            process_cli_parts = [
+                SOPLEX_EXECUTABLE_PATH,
+                lp_file.name,
+                "--real:feastol=0",
+                "--real:opttol=0",
+                "--int:solvemode=2",
+                "--int:syncmode=1",
+                "--int:readmode=1",
+                "--int:checkmode=2",
+                "--int:multiprecision_limit=2147483647",
+                f"--uint:random_seed={random_seed}",
+                f"-X={solution_file.name}",
+            ]
+            _logger.info(f"Running SoPlex to solve problem: {' '.join(process_cli_parts)}")
+
+            process = subprocess.run(
+                process_cli_parts,
+                capture_output=True,
+                text=True,
+                env=env,  # <- ensure DLLs are found
+            )
+
+            _logger.info("Parsing SoPlex output...")
+            self._optimization_result = OptimizationResult.from_soplex_output(
+                StringIO(process.stdout),
+                StringIO(process.stderr),
+                process.returncode,
+                solution_file,
+            )
+
+        finally:
+            # Clean up explicitly created temp files
+            for f in (lp_file.name, solution_file.name):
+                try:
+                    os.remove(f)
+                except OSError:
+                    pass
+
         return self._optimization_result
-    
+
     @staticmethod
     def _close_and_copy_file(source_file, dest_file, mode="t"):
         source_file.close()
@@ -386,13 +415,14 @@ class OptimizationResult:
         return self.variable_values[item]
 
     @classmethod
-    def from_soplex_output(cls, stdout, stderr, solution_file):
+    def from_soplex_output(cls, stdout, stderr, returncode, solution_file):
         """
         Parse the output of the SoPlex solver to create an OptimizationResult instance.
 
         Args:
             stdout (StringIO): The standard output from the SoPlex solver.
             stderr (StringIO): The standard error output from the SoPlex solver.
+            returncode (int): The return code of the SoPlex solver process.
             solution_file (file): The file containing the solution values.
 
         Returns:
@@ -427,7 +457,8 @@ class OptimizationResult:
             raise OptimizationFailure(
                 message,
                 output_text,
-                error_text
+                error_text,
+                returncode
             )
 
         variable_values = defaultdict(lambda: 0)

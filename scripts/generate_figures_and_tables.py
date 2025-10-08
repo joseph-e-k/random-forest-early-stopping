@@ -2,6 +2,7 @@ import argparse
 import csv
 import os
 import shlex
+import warnings
 
 import numpy as np
 
@@ -11,6 +12,7 @@ from ste.empirical_performance import get_minimax_ss, get_minimean_flat_ss, get_
 from ste.optimization import get_optimal_stopping_strategy, plot_stopping_strategy_state_graphs
 from ste.utils.data import get_datasets_with_names
 from ste.utils.figures import create_subplot_grid, label_subplots, plot_stopping_strategies_as_envelopes, save_drawing
+from ste.utils.logging import configure_logging
 from ste.utils.misc import get_output_path, unzip
 
 
@@ -179,9 +181,10 @@ def parse_args(argv=None):
 
 
 def main(argv=None):
+    configure_logging()
     args = parse_args(argv)
     output_dir = args.output_dir or get_output_path("all_figs_and_tables", file_name_suffix="")
-    os.mkdir(output_dir)
+    os.makedirs(output_dir)
 
     generate_figure_1(output_dir)
     generate_figure_2(output_dir)

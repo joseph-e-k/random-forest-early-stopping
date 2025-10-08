@@ -342,7 +342,9 @@ def configure_logging(console_level=logging.INFO):
     root_logger = logging.getLogger()
     root_logger.setLevel(logging.DEBUG)
 
-    file_handler = logging.FileHandler(get_log_file_path())
+    file_path = get_log_file_path()
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    file_handler = logging.FileHandler(file_path)
     file_handler.setLevel(logging.DEBUG)
 
     console_handler = logging.StreamHandler()
