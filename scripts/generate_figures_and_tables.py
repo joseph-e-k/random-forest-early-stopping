@@ -15,7 +15,7 @@ from ste.utils.logging import configure_logging
 from ste.utils.misc import get_output_path, unzip
 
 
-def generate_figure_1(output_dir):
+def generate_figure_1(output_dir, n_trees, n_forests):
     oss = get_optimal_stopping_strategy(N=3, alpha=0.1)
     fig = plot_stopping_strategy_state_graphs(oss, font_size=24)
     output_path = f"{output_dir}/Figure 1"
@@ -46,7 +46,7 @@ def generate_figure_2(output_dir, n_trees, n_forests):
     save_drawing(fig, output_path)
 
 
-def generate_table_2(output_dir):
+def generate_table_2(output_dir, n_trees, n_forests):
     output_path = f"{output_dir}/Table 2.csv"
     with open(output_path, "wt", newline="") as output_file:
         writer = csv.writer(output_file)
@@ -82,6 +82,7 @@ def generate_figure_3(output_dir, n_trees, n_forests):
             f'ss-comparison -N {n_trees} -f {n_forests} --combine-plots --dataset-names "Sepsis" "Dota2" "Hospitalization" "Shuttle" -o {shlex.quote(output_path_2)}'
         )
     )
+
 
 def generate_figure_4(output_dir, n_trees, n_forests):
     output_path = f"{output_dir}/Figure 4"
@@ -128,7 +129,7 @@ def generate_table_3(output_dir, n_trees, n_forests):
             ])
 
 
-def generate_figure_supp_1(output_dir):
+def generate_figure_supp_1(output_dir, n_trees, n_forests):
     output_path = f"{output_dir}/Figure 1 (Supplementary)"
     draw_supp_fig_timings.main(output_path)
 
@@ -174,11 +175,30 @@ def generate_figure_supp_2(output_dir, n_trees, n_forests):
 
 
 def parse_args(argv=None):
+    tasks_by_name = {
+        "fig1": generate_figure_1,
+        "fig2": generate_figure_2,
+        "fig3": generate_figure_3,
+        "fig4": generate_figure_4,
+        "table2": generate_table_2,
+        "table3": generate_table_3,
+        "fig1s": generate_figure_supp_1,
+        "fig2s": generate_figure_supp_2,
+    }
     parser = argparse.ArgumentParser()
     parser.add_argument("output_dir", nargs="?")
     parser.add_argument("--n-trees", "-N", type=int, default=101)
     parser.add_argument("--n-forests", "-f", type=int, default=30)
-    return parser.parse_args(argv)
+    parser.add_argument("--include", nargs="*", default=tasks_by_name.keys(), choices=tasks_by_name.keys())
+    parser.add_argument("--exclude", nargs="*", default=[], choices=tasks_by_name.keys())
+
+    namespace = parser.parse_args(argv)
+    namespace.tasks = []
+
+    for name in set(namespace.include) - set(namespace.exclude):
+        namespace.tasks.append(tasks_by_name[name])
+    
+    return namespace
 
 
 def main(argv=None):
@@ -187,14 +207,8 @@ def main(argv=None):
     output_dir = args.output_dir or get_output_path("all_figs_and_tables", file_name_suffix="")
     os.makedirs(output_dir)
 
-    generate_figure_1(output_dir)
-    generate_figure_2(output_dir, args.n_trees, args.n_forests)
-    generate_table_2(output_dir)
-    generate_figure_3(output_dir, args.n_trees, args.n_forests)
-    generate_figure_4(output_dir, args.n_trees, args.n_forests)
-    generate_table_3(output_dir, args.n_trees, args.n_forests)
-    generate_figure_supp_1(output_dir)
-    generate_figure_supp_2(output_dir, args.n_trees, args.n_forests)
+    for task in args.tasks:
+        task(output_dir, args.n_trees, args.n_forests)
 
 
 if __name__ == "__main__":
