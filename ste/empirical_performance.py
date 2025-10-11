@@ -472,7 +472,7 @@ def parse_args(argv=None):
 
     ss_comparison_subparser = subparsers.add_parser("ss-comparison")
     ss_comparison_subparser.set_defaults(action_name="empirical_comparison")
-    ss_comparison_subparser.add_argument("--n-trees", "--number-of-trees", "-n", type=int, default=101)
+    ss_comparison_subparser.add_argument("--n-trees", "--number-of-trees", "-N", type=int, default=101)
     ss_comparison_subparser.add_argument("--alphas", "--adrs", "-a", type=float, nargs="+", default=DEFAULT_ADRS)
     ss_comparison_subparser.add_argument("--output-path", "-o", type=str, default=None)
     ss_comparison_subparser.add_argument("--random-seed", "-s", type=int, default=1234)
@@ -483,7 +483,7 @@ def parse_args(argv=None):
 
     tree_distribution_subparser = subparsers.add_parser("tree-distribution")
     tree_distribution_subparser.set_defaults(action_name="smopdis")
-    tree_distribution_subparser.add_argument("--n-trees", "--number-of-trees", "-n", type=int, default=100)
+    tree_distribution_subparser.add_argument("--n-trees", "--number-of-trees", "-N", type=int, default=100)
     tree_distribution_subparser.add_argument("--output-path", "-o", type=str, default=None)
     tree_distribution_subparser.add_argument("--random-seed", "-s", type=int, default=1234)
     tree_distribution_subparser.add_argument("--n-forests", "--number-of-forests", "-f", type=int, default=30)

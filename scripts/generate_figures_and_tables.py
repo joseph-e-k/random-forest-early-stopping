@@ -2,7 +2,6 @@ import argparse
 import csv
 import os
 import shlex
-import warnings
 
 import numpy as np
 
@@ -73,14 +72,14 @@ def generate_figure_3(output_dir, n_trees, n_forests):
     output_path_1 = f"{output_sub_dir}/Page 1"
     empirical_performance.main(
         shlex.split(
-            f'ss-comparison -n {n_trees} -f {n_forests} --combine-plots --dataset-names "Ground Cover" "Income" "Diabetes" "Skin" -o {shlex.quote(output_path_1)}'
+            f'ss-comparison -N {n_trees} -f {n_forests} --combine-plots --dataset-names "Ground Cover" "Income" "Diabetes" "Skin" -o {shlex.quote(output_path_1)}'
         )
     )
 
     output_path_2 = f"{output_sub_dir}/Page 2"
     empirical_performance.main(
         shlex.split(
-            f'ss-comparison -n {n_trees} -f {n_forests} --combine-plots --dataset-names "Sepsis" "Dota2" "Hospitalization" "Shuttle" -o {shlex.quote(output_path_2)}'
+            f'ss-comparison -N {n_trees} -f {n_forests} --combine-plots --dataset-names "Sepsis" "Dota2" "Hospitalization" "Shuttle" -o {shlex.quote(output_path_2)}'
         )
     )
 
@@ -89,7 +88,7 @@ def generate_figure_4(output_dir, n_trees, n_forests):
     
     empirical_performance.main(
         shlex.split(
-            f'tree-distribution -n {n_trees} -f {n_forests} -o {shlex.quote(output_path)}'
+            f'tree-distribution -N {n_trees} -f {n_forests} -o {shlex.quote(output_path)}'
         )
     )
 
@@ -141,35 +140,35 @@ def generate_figure_supp_2(output_dir, n_trees, n_forests):
     output_path_1 = f"{output_sub_dir}/Page 1"
     empirical_performance.main(
         shlex.split(
-            f'ss-comparison -n {n_trees} -f {n_forests} -b --combine-plots --dataset-names "Higgs" "eye_movements" "jannis" "KDDCup09_upselling" -o {shlex.quote(output_path_1)}'
+            f'ss-comparison -N {n_trees} -f {n_forests} -b --combine-plots --dataset-names "Higgs" "eye_movements" "jannis" "KDDCup09_upselling" -o {shlex.quote(output_path_1)}'
         )
     )
 
     output_path_2 = f"{output_sub_dir}/Page 2"
     empirical_performance.main(
         shlex.split(
-            f'ss-comparison -n {n_trees} -f {n_forests} -b --combine-plots --dataset-names "MagicTelescope" "bank-marketing" "phoneme" "MiniBooNE" -o {shlex.quote(output_path_2)}'
+            f'ss-comparison -N {n_trees} -f {n_forests} -b --combine-plots --dataset-names "MagicTelescope" "bank-marketing" "phoneme" "MiniBooNE" -o {shlex.quote(output_path_2)}'
         )
     )
 
     output_path_3 = f"{output_sub_dir}/Page 3"
     empirical_performance.main(
         shlex.split(
-            f'ss-comparison -n {n_trees} -f {n_forests} -b --combine-plots --dataset-names "covertype" "pol" "house_16H" "kdd_ipums_la_97-small" -o {shlex.quote(output_path_3)}'
+            f'ss-comparison -N {n_trees} -f {n_forests} -b --combine-plots --dataset-names "covertype" "pol" "house_16H" "kdd_ipums_la_97-small" -o {shlex.quote(output_path_3)}'
         )
     )
 
     output_path_4 = f"{output_sub_dir}/Page 4"
     empirical_performance.main(
         shlex.split(
-            f'ss-comparison -n {n_trees} -f {n_forests} -b --combine-plots --dataset-names "credit" "california" "wine" "electricity" -o {shlex.quote(output_path_4)}'
+            f'ss-comparison -N {n_trees} -f {n_forests} -b --combine-plots --dataset-names "credit" "california" "wine" "electricity" -o {shlex.quote(output_path_4)}'
         )
     )
 
     output_path_5 = f"{output_sub_dir}/Page 5"
     empirical_performance.main(
         shlex.split(
-            f'ss-comparison -n {n_trees} -f {n_forests} -b --combine-plots --dataset-names "rl" "road-safety" "compass" -o {shlex.quote(output_path_5)}'
+            f'ss-comparison -N {n_trees} -f {n_forests} -b --combine-plots --dataset-names "rl" "road-safety" "compass" -o {shlex.quote(output_path_5)}'
         )
     )
 
@@ -177,8 +176,7 @@ def generate_figure_supp_2(output_dir, n_trees, n_forests):
 def parse_args(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("output_dir", nargs="?")
-    # TODO: Change '-n' to '-N' or '-t' throughout the entire project
-    parser.add_argument("--n-trees", "-n", type=int, default=101)
+    parser.add_argument("--n-trees", "-N", type=int, default=101)
     parser.add_argument("--n-forests", "-f", type=int, default=30)
     return parser.parse_args(argv)
 
