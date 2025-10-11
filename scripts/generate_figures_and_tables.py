@@ -177,6 +177,7 @@ def generate_figure_supp_2(output_dir, n_trees, n_forests):
 def parse_args(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("output_dir", nargs="?")
+    # TODO: Change '-n' to '-N' or '-t' throughout the entire project
     parser.add_argument("--n-trees", "-n", type=int, default=101)
     parser.add_argument("--n-forests", "-f", type=int, default=30)
     return parser.parse_args(argv)
