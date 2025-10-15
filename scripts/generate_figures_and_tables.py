@@ -185,12 +185,30 @@ def parse_args(argv=None):
         "fig1s": generate_figure_supp_1,
         "fig2s": generate_figure_supp_2,
     }
-    parser = argparse.ArgumentParser()
-    parser.add_argument("output_dir", nargs="?")
-    parser.add_argument("--n-trees", "-N", type=int, default=101)
-    parser.add_argument("--n-forests", "-f", type=int, default=30)
-    parser.add_argument("--include", nargs="*", default=tasks_by_name.keys(), choices=tasks_by_name.keys())
-    parser.add_argument("--exclude", nargs="*", default=[], choices=tasks_by_name.keys())
+    parser = argparse.ArgumentParser(
+        description="Script to reproduce numeric figures and tables in the main body and supplementary material of the paper. " \
+        "Note that the timing figure in the supplementary material (fig1s) will fail to generate if you don't have a Gurobi license, and will take days even if you do; you may wish to exclude it using the command-line options."
+    )
+    parser.add_argument(
+        "--output-dir", "-o", nargs="?",
+        help="Directory in which to save generated files. Defaults to <project root>/results/all_figs_and_tables_<timestamp>."
+    )
+    parser.add_argument(
+        "--n-trees", "-N", type=int, default=101,
+        help="Size of ensembles to use in empirical evaluations. Defaults to 101."
+    )
+    parser.add_argument(
+        "--n-forests", "-f", type=int, default=30,
+        help="Number of ensembles to average over in empirical evaluations. Defaults to 30."
+    )
+    parser.add_argument(
+        "--include", nargs="*", default=tasks_by_name.keys(), choices=tasks_by_name.keys(),
+        help=f"List of figures and tables to generate. Names with 's' on the end are those in the Supplementary Materials. Defaults to everything."
+    )
+    parser.add_argument(
+        "--exclude", nargs="*", default=[], choices=tasks_by_name.keys(),
+        help="List of figures and tables NOT to generate."
+    )
 
     namespace = parser.parse_args(argv)
     namespace.tasks = []
