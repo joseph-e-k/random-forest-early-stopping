@@ -11,6 +11,8 @@ import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 
+from ste import schwing
+
 from .EnsembleVote import EnsembleVote, EnsembleVoteWithStoppingStrategy
 from .utils.figures import (
     DISTINCT_DASH_STYLES, MARKERS, create_independent_plots_grid, create_subplot_grid,
@@ -463,6 +465,11 @@ def get_minimixed_flat_ss(adr: float, n_trees: int, estimated_smopdis: np.ndarra
     return get_optimal_stopping_strategy(n_trees, adr, np.ones(shape=(n_trees + 1)), disagreement_minimax=True, runtime_minimax=False)
 
 
+@memoize(args_to_ignore=["estimated_smopdis"])
+def get_schwing_ss(adr: float, n_trees: int, estimated_smopdis: np.ndarray) -> np.ndarray:
+    return schwing.get_ss(n_trees, adr)
+
+
 DEFAULT_ADRS = (0, 10**-4, 10**-3.5, 10**-3, 10**-2.5, 10**-2, 10**-1.5, 10**-1)
 
 
@@ -526,7 +533,8 @@ def main(argv=None):
                     "Minimean (Cal)": get_minimean_ss,
                     "Minimean (Flat)": get_minimean_flat_ss,
                     "Minimixed (Cal)": get_minimixed_ss,
-                    "Minimixed (Flat)": get_minimixed_flat_ss
+                    "Minimixed (Flat)": get_minimixed_flat_ss,
+                    "Schwing et al": get_schwing_ss
                 },
                 args.combine_plots
             )
