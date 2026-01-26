@@ -5,7 +5,7 @@ import shlex
 
 import numpy as np
 
-from scripts import draw_supp_fig_timings
+from scripts import draw_supp_fig_timings, measure_tree_certainties
 from ste import empirical_performance
 from ste.empirical_performance import get_minimax_ss, get_minimean_flat_ss, get_minimean_ss, get_minimixed_flat_ss
 from ste.optimization import get_optimal_stopping_strategy, plot_stopping_strategy_state_graphs
@@ -174,6 +174,35 @@ def generate_figure_supp_2(output_dir, n_trees, n_forests):
     )
 
 
+def generate_table_supp_1(output_dir, n_trees, n_forests):
+    output_path = f"{output_dir}/Table 1 (Supplementary).csv"
+
+    base_datasets_by_name = get_datasets_with_names()
+    more_datasets_by_name = get_datasets_with_names(full_benchmark=True)
+
+    datasets = list(base_datasets_by_name.values()) + list(more_datasets_by_name.values())
+    dataset_names = list(base_datasets_by_name.keys()) + list(more_datasets_by_name.keys())
+
+    metrics = measure_tree_certainties.compute_metrics_for_each_dataset(
+        n_forests=n_forests,
+        n_trees=n_trees,
+        eval_proportion=0.1,
+        datasets=datasets
+    )
+
+    with open(output_path, "wt", newline="") as output_file:
+        writer = csv.writer(output_file)
+        writer.writerow(["Dataset name", "Tree prediction equal to 0 or 1", "Ensemble classification unaffected by rounding"])
+
+        for i_dataset, dataset_name in enumerate(dataset_names):
+            certainty_proportion, indifference_proportion = metrics[i_dataset, :]
+            writer.writerow([
+                dataset_name,
+                f"{100*certainty_proportion:.2f}%",
+                f"{100*indifference_proportion:.2f}%",
+            ])
+
+
 def parse_args(argv=None):
     tasks_by_name = {
         "fig1": generate_figure_1,
@@ -184,6 +213,7 @@ def parse_args(argv=None):
         "table3": generate_table_3,
         "fig1s": generate_figure_supp_1,
         "fig2s": generate_figure_supp_2,
+        "table1s": generate_table_supp_1,
     }
     parser = argparse.ArgumentParser(
         description="Script to reproduce numeric figures and tables in the main body and supplementary material of the paper. " \
