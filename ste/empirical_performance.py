@@ -534,7 +534,7 @@ def main(argv=None):
                     "Minimean (Flat)": get_minimean_flat_ss,
                     "Minimixed (Cal)": get_minimixed_ss,
                     "Minimixed (Flat)": get_minimixed_flat_ss,
-                    "Schwing et al": get_schwing_ss
+                    "Schwing et al.": get_schwing_ss
                 },
                 args.combine_plots
             )
