@@ -367,7 +367,7 @@ def function_call_to_tuple(function, name, args_to_ignore, arg_transformations, 
     try:
         bound_arguments = signature.bind(*args, **kwargs)
     except TypeError as e:
-        raise TypeError(f"Function {function} cannot be bound to arguments {args} and keyword arguments {kwargs}") from e
+        raise TypeError(f"{function} cannot be bound to arguments {args} and keyword arguments {kwargs}") from e
     bound_arguments.apply_defaults()
 
     key = [name]

@@ -398,7 +398,12 @@ def parallelize_to_array(function_or_functions, reps=None, argses_to_iter=None, 
                 result_type = type(result)
 
             results_array = np.empty(shape=results_shape, dtype=result_type)
-        
-        results_array[task.index] = result
+            
+        try:
+            results_array[task.index] = result
+        except ValueError as e:
+            if "shape" not in str(e):
+                raise
+            raise ValueError("mismatched shapes when parallelizing to array") from e
 
     return results_array
