@@ -440,6 +440,56 @@ def get_and_draw_disagreement_rates_and_runtimes(n_forests, n_trees, datasets, d
     )
 
 
+def get_and_draw_error_rates_and_runtimes(n_forests, n_trees, datasets, dataset_names, allowable_disagreement_rates, ss_getters_by_name):
+    """Estimate and draw error rates and expected runtimes for a collection of datasets and stopping strategy kinds, as a single scatter plot.
+
+    Args:
+        n_forests (int): Number of forests to train and evaluate on each dataset.
+        n_trees (int): Number of trees in each forest.
+        datasets (Sequence[Dataset]): Datasets to test the stopping strategies on.
+        dataset_names (Sequence[str]): Names of the datasets.
+        allowable_disagreement_rates (Sequence[float]): Allowable disagreement rates to compute the stopping strategies with.
+        ss_getters_by_name (dict[str, StoppingStrategyGetter]): Dictionary of stopping strategy getters, with names as keys and functions as values.
+    """
+
+    ss_names, ss_getters = zip(*ss_getters_by_name.items())
+
+    metrics = get_metrics(
+        n_forests, n_trees, datasets, allowable_disagreement_rates, ss_getters
+    )
+
+    mean_metrics = metrics.mean(axis=0)
+
+    # mean_metrics has axes corresponding to:
+    # 0. Dataset (length = len(datasets))
+    # 1. Stopping strategy (length = len(stopping_strategy_getters))
+    # 2. Allowable disagreement rate (length = len(adrs))
+    # 3. Metric kind: disagreement rate, expected runtime, error rate, and base error rate (length = 4).
+
+    expected_runtimes = mean_metrics[..., 1]
+    error_rates = mean_metrics[..., 2]
+
+    fig, axs = create_subplot_grid(1, n_rows=1, n_columns=1, figsize=(6, 6))
+    ax = axs[0, 0]
+    ax.set_yscale("log")
+    
+    for i_ss, (ss_name, ss_getter) in enumerate(zip(ss_names, ss_getters)):
+        marker = MARKERS[i_ss % len(MARKERS)]
+        ax.scatter(
+            x=error_rates[:, i_ss, :],
+            y=expected_runtimes[:, i_ss, :],
+            label=ss_name,
+            marker=marker,
+            facecolors="C{}".format(i_ss) if marker == "x" else "none",
+            edgecolors="C{}".format(i_ss)
+        )
+
+    ax.set_xlabel("Error rate")
+    ax.set_ylabel("Expected runtime")
+
+    return fig
+
+
 @memoize(args_to_ignore=["estimated_smopdis"])
 def get_minimax_ss(adr: float, n_trees: int, estimated_smopdis: np.ndarray) -> np.ndarray:
     return get_optimal_stopping_strategy(n_trees, adr)
@@ -477,16 +527,27 @@ def parse_args(argv=None):
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers()
 
-    ss_comparison_subparser = subparsers.add_parser("ss-comparison")
-    ss_comparison_subparser.set_defaults(action_name="empirical_comparison")
-    ss_comparison_subparser.add_argument("--n-trees", "--number-of-trees", "-N", type=int, default=101)
-    ss_comparison_subparser.add_argument("--alphas", "--adrs", "-a", type=float, nargs="+", default=DEFAULT_ADRS)
-    ss_comparison_subparser.add_argument("--output-path", "-o", type=str, default=None)
-    ss_comparison_subparser.add_argument("--random-seed", "-s", type=int, default=1234)
-    ss_comparison_subparser.add_argument("--n-forests", "--number-of-forests", "-f", type=int, default=30)
-    ss_comparison_subparser.add_argument("--combine-plots", "-c", action="store_true")
-    ss_comparison_subparser.add_argument("--benchmark", "-b", action="store_true")
-    ss_comparison_subparser.add_argument("--dataset-names", "-d", type=str, nargs="*", default=None)
+    detailed_comparison_subparser = subparsers.add_parser("detailed-comparison")
+    detailed_comparison_subparser.set_defaults(action_name="detailed_empirical_comparison")
+    detailed_comparison_subparser.add_argument("--n-trees", "--number-of-trees", "-N", type=int, default=101)
+    detailed_comparison_subparser.add_argument("--alphas", "--adrs", "-a", type=float, nargs="+", default=DEFAULT_ADRS)
+    detailed_comparison_subparser.add_argument("--output-path", "-o", type=str, default=None)
+    detailed_comparison_subparser.add_argument("--random-seed", "-s", type=int, default=1234)
+    detailed_comparison_subparser.add_argument("--n-forests", "--number-of-forests", "-f", type=int, default=30)
+    detailed_comparison_subparser.add_argument("--combine-plots", "-c", action="store_true")
+    detailed_comparison_subparser.add_argument("--benchmark", "-b", action="store_true")
+    detailed_comparison_subparser.add_argument("--dataset-names", "-d", type=str, nargs="*", default=None)
+
+
+    er_and_rt_comparison = subparsers.add_parser("er-rt-comparison")
+    er_and_rt_comparison.set_defaults(action_name="er_rt_comparison")
+    er_and_rt_comparison.add_argument("--n-trees", "--number-of-trees", "-N", type=int, default=101)
+    er_and_rt_comparison.add_argument("--alphas", "--adrs", "-a", type=float, nargs="+", default=DEFAULT_ADRS)
+    er_and_rt_comparison.add_argument("--output-path", "-o", type=str, default=None)
+    er_and_rt_comparison.add_argument("--random-seed", "-s", type=int, default=1234)
+    er_and_rt_comparison.add_argument("--n-forests", "--number-of-forests", "-f", type=int, default=30)
+    er_and_rt_comparison.add_argument("--benchmark", "-b", action="store_true")
+    er_and_rt_comparison.add_argument("--dataset-names", "-d", type=str, nargs="*", default=None)
 
     tree_distribution_subparser = subparsers.add_parser("tree-distribution")
     tree_distribution_subparser.set_defaults(action_name="smopdis")
@@ -521,7 +582,7 @@ def main(argv=None):
         datasets = [datasets_by_name[name] for name in dataset_names]
 
     with warnings.catch_warnings(category=UserWarning, action="ignore"):
-        if args.action_name == "empirical_comparison":
+        if args.action_name == "detailed_empirical_comparison":
             drawing = get_and_draw_disagreement_rates_and_runtimes(
                 args.n_forests,
                 args.n_trees,
@@ -537,6 +598,22 @@ def main(argv=None):
                     "Schwing et al.": get_schwing_ss
                 },
                 args.combine_plots
+            )
+        elif args.action_name == "er_rt_comparison":
+            drawing = get_and_draw_error_rates_and_runtimes(
+                args.n_forests,
+                args.n_trees,
+                datasets,
+                dataset_names,
+                args.alphas,
+                {
+                    "Minimax": get_minimax_ss,
+                    "Minimean (Cal)": get_minimean_ss,
+                    "Minimean (Flat)": get_minimean_flat_ss,
+                    "Minimixed (Cal)": get_minimixed_ss,
+                    "Minimixed (Flat)": get_minimixed_flat_ss,
+                    "Schwing et al.": get_schwing_ss
+                }
             )
         elif args.action_name == "smopdis":
             drawing = draw_smopdises(args.n_trees, datasets, dataset_names, n_forests=args.n_forests)

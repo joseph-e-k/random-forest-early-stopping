@@ -36,7 +36,7 @@ def test_ss_state_graph_visualization_sanity():
 
 @pytest.mark.skip()
 def test_ss_performance_comparison_visualization():
-    reference_dir = os.path.join(REFERENCES_DIR, "empirical_comparison_10_forests_of_51_trees")
+    reference_dir = os.path.join(REFERENCES_DIR, "detailed_empirical_comparison_10_forests_of_51_trees")
 
     n_forests = 10
     n_trees = 51
