@@ -395,7 +395,7 @@ def draw_metrics(metrics, dataset_names, allowable_disagreement_rates, ss_names,
             for (line, dash_pattern) in zip(lines, DISTINCT_DASH_STYLES):
                 line.set_dashes(dash_pattern)
 
-            ax.legend()
+            ax.legend(framealpha=0.5)
             ax.set_title(f"{metric_names[i_metric]} ({dataset_names[i_dataset]})")
             ax.set_xlabel("Allowable disagreement rate")
             ax.figure.canvas.draw()
