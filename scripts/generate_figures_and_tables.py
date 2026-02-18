@@ -89,6 +89,16 @@ def generate_figure_4(output_dir, n_trees, n_forests):
     
     empirical_performance.main(
         shlex.split(
+            f'er-rt-comparison -N {n_trees} -f {n_forests} -o {shlex.quote(output_path)}'
+        )
+    )
+
+
+def generate_figure_5(output_dir, n_trees, n_forests):
+    output_path = f"{output_dir}/Figure 5"
+    
+    empirical_performance.main(
+        shlex.split(
             f'tree-distribution -N {n_trees} -f {n_forests} -o {shlex.quote(output_path)}'
         )
     )
@@ -209,6 +219,7 @@ def parse_args(argv=None):
         "fig2": generate_figure_2,
         "fig3": generate_figure_3,
         "fig4": generate_figure_4,
+        "fig5": generate_figure_5,
         "table2": generate_table_2,
         "table3": generate_table_3,
         "fig1s": generate_figure_supp_1,
