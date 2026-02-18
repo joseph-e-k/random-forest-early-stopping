@@ -472,6 +472,7 @@ def get_and_draw_error_rates_and_runtimes(n_forests, n_trees, datasets, dataset_
     fig, axs = create_subplot_grid(1, n_rows=1, n_columns=1, figsize=(6, 6))
     ax = axs[0, 0]
     ax.set_yscale("log")
+    ax.set_xscale("log")
     
     for i_ss, (ss_name, ss_getter) in enumerate(zip(ss_names, ss_getters)):
         marker = MARKERS[i_ss % len(MARKERS)]
@@ -486,6 +487,7 @@ def get_and_draw_error_rates_and_runtimes(n_forests, n_trees, datasets, dataset_
 
     ax.set_xlabel("Error rate")
     ax.set_ylabel("Expected runtime")
+    ax.legend(framealpha=0.5, loc="upper center")
 
     return fig
 
