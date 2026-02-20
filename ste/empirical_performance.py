@@ -537,7 +537,7 @@ def parse_args(argv=None):
     detailed_comparison_subparser.add_argument("--random-seed", "-s", type=int, default=1234)
     detailed_comparison_subparser.add_argument("--n-forests", "--number-of-forests", "-f", type=int, default=30)
     detailed_comparison_subparser.add_argument("--combine-plots", "-c", action="store_true")
-    detailed_comparison_subparser.add_argument("--benchmark", "-b", action="store_true")
+    detailed_comparison_subparser.add_argument("--grinsztajn", action="store_true")
     detailed_comparison_subparser.add_argument("--dataset-names", "-d", type=str, nargs="*", default=None)
 
 
@@ -548,7 +548,7 @@ def parse_args(argv=None):
     er_and_rt_comparison.add_argument("--output-path", "-o", type=str, default=None)
     er_and_rt_comparison.add_argument("--random-seed", "-s", type=int, default=1234)
     er_and_rt_comparison.add_argument("--n-forests", "--number-of-forests", "-f", type=int, default=30)
-    er_and_rt_comparison.add_argument("--benchmark", "-b", action="store_true")
+    er_and_rt_comparison.add_argument("--grinsztajn", action="store_true")
     er_and_rt_comparison.add_argument("--dataset-names", "-d", type=str, nargs="*", default=None)
 
     tree_distribution_subparser = subparsers.add_parser("tree-distribution")
@@ -557,7 +557,7 @@ def parse_args(argv=None):
     tree_distribution_subparser.add_argument("--output-path", "-o", type=str, default=None)
     tree_distribution_subparser.add_argument("--random-seed", "-s", type=int, default=1234)
     tree_distribution_subparser.add_argument("--n-forests", "--number-of-forests", "-f", type=int, default=30)
-    tree_distribution_subparser.add_argument("--benchmark", "-b", action="store_true")
+    tree_distribution_subparser.add_argument("--grinsztajn", action="store_true")
     tree_distribution_subparser.add_argument("--dataset-names", "-d", type=str, nargs="*", default=None)
 
     return parser.parse_args(argv)
@@ -575,7 +575,7 @@ def main(argv=None):
 
     pd.options.mode.chained_assignment = None
 
-    datasets_by_name = get_datasets_with_names(full_benchmark=args.benchmark)
+    datasets_by_name = get_datasets_with_names(grinsztajn=args.grinsztajn)
 
     if args.dataset_names is None:
         dataset_names, datasets = unzip(datasets_by_name.items())
@@ -620,7 +620,7 @@ def main(argv=None):
         elif args.action_name == "smopdis":
             drawing = draw_smopdises(args.n_trees, datasets, dataset_names, n_forests=args.n_forests)
             
-    output_path = args.output_path or get_output_path(f"{args.action_name}{'_b' if args.benchmark else ''}_{args.n_forests}_forests_of_{args.n_trees}_trees")
+    output_path = args.output_path or get_output_path(f"{args.action_name}{'_grinsztajn' if args.grinsztajn else ''}_{args.n_forests}_forests_of_{args.n_trees}_trees")
     save_drawing(drawing, output_path)
 
 

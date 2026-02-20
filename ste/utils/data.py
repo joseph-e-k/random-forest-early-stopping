@@ -18,7 +18,7 @@ from .misc import unzip
 # The benchmark referenced in this module is that of Grinsztajn, Grinjsztajn, and Varoquax (2022). The exact list can be found in Appendix A.1 of
 # https://arxiv.org/pdf/2207.08815. Since we are only interested in classification, only tables A.1.1 and A.1.3 were used.
 # The numerical IDs are for the OpenML repository.
-BENCHMARK_DATASET_IDS = [44089, 44090, 44091, 44120, 44121, 44122, 44123, 44124, 44125, 44126, 44127, 44128, 44129, 44130, 44131, 44156, 44157, 44158, 44159, 44160, 44161, 44162]
+GRINSZTAJN_DATASET_IDS = [44089, 44090, 44091, 44120, 44121, 44122, 44123, 44124, 44125, 44126, 44127, 44128, 44129, 44130, 44131, 44156, 44157, 44158, 44159, 44160, 44161, 44162]
 
 DATA_DIRECTORY = os.path.join(os.path.dirname(__file__), "../../data")
 
@@ -122,10 +122,10 @@ def coerce_nonnumeric_columns_to_numeric(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def get_benchmark_datasets() -> dict[str, Dataset]:
+def get_grinsztajn_datasets() -> dict[str, Dataset]:
     """Return a dictionary of datasets in the Grinsztajn et al. benchmark, indexed by name"""
     datasets_by_name = {}
-    for dataset_id in BENCHMARK_DATASET_IDS:
+    for dataset_id in GRINSZTAJN_DATASET_IDS:
         dataset = openml.datasets.get_dataset(dataset_id)
         datasets_by_name[dataset.name] = OpenMLDataset(dataset_id)
 
@@ -133,17 +133,17 @@ def get_benchmark_datasets() -> dict[str, Dataset]:
 
 
 @logged(message_level=logging.DEBUG)
-def get_datasets_with_names(full_benchmark=False) -> dict[str, Dataset]:
+def get_datasets_with_names(grinsztajn=False) -> dict[str, Dataset]:
     """Get a collection of datasets with their names.
 
     Args:
-        full_benchmark (bool, optional): If True, use the Grinsztajn et al. datasets. Otherwise (the default), use eight large datasets from UCIML.
+        grinsztajn (bool, optional): If True, use the Grinsztajn et al. datasets. Otherwise (the default), use eight large datasets from UCIML.
 
     Returns:
         dict[str, Dataset]: The requested datasets, keyed by name.
     """
-    if full_benchmark:
-        named_datasets = get_benchmark_datasets()
+    if grinsztajn:
+        named_datasets = get_grinsztajn_datasets()
     else:
         named_datasets = {
             "Ground Cover": UCIDataset(id=31),

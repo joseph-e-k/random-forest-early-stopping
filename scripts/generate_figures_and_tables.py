@@ -151,35 +151,35 @@ def generate_figure_supp_2(output_dir, n_trees, n_forests):
     output_path_1 = f"{output_sub_dir}/Page 1"
     empirical_performance.main(
         shlex.split(
-            f'detailed-comparison -N {n_trees} -f {n_forests} -b --combine-plots --dataset-names "Higgs" "eye_movements" "jannis" "KDDCup09_upselling" -o {shlex.quote(output_path_1)}'
+            f'detailed-comparison -N {n_trees} -f {n_forests} --grinsztajn --combine-plots --dataset-names "Higgs" "eye_movements" "jannis" "KDDCup09_upselling" -o {shlex.quote(output_path_1)}'
         )
     )
 
     output_path_2 = f"{output_sub_dir}/Page 2"
     empirical_performance.main(
         shlex.split(
-            f'detailed-comparison -N {n_trees} -f {n_forests} -b --combine-plots --dataset-names "MagicTelescope" "bank-marketing" "phoneme" "MiniBooNE" -o {shlex.quote(output_path_2)}'
+            f'detailed-comparison -N {n_trees} -f {n_forests} --grinsztajn --combine-plots --dataset-names "MagicTelescope" "bank-marketing" "phoneme" "MiniBooNE" -o {shlex.quote(output_path_2)}'
         )
     )
 
     output_path_3 = f"{output_sub_dir}/Page 3"
     empirical_performance.main(
         shlex.split(
-            f'detailed-comparison -N {n_trees} -f {n_forests} -b --combine-plots --dataset-names "covertype" "pol" "house_16H" "kdd_ipums_la_97-small" -o {shlex.quote(output_path_3)}'
+            f'detailed-comparison -N {n_trees} -f {n_forests} --grinsztajn --combine-plots --dataset-names "covertype" "pol" "house_16H" "kdd_ipums_la_97-small" -o {shlex.quote(output_path_3)}'
         )
     )
 
     output_path_4 = f"{output_sub_dir}/Page 4"
     empirical_performance.main(
         shlex.split(
-            f'detailed-comparison -N {n_trees} -f {n_forests} -b --combine-plots --dataset-names "credit" "california" "wine" "electricity" -o {shlex.quote(output_path_4)}'
+            f'detailed-comparison -N {n_trees} -f {n_forests} --grinsztajn --combine-plots --dataset-names "credit" "california" "wine" "electricity" -o {shlex.quote(output_path_4)}'
         )
     )
 
     output_path_5 = f"{output_sub_dir}/Page 5"
     empirical_performance.main(
         shlex.split(
-            f'detailed-comparison -N {n_trees} -f {n_forests} -b --combine-plots --dataset-names "rl" "road-safety" "compass" -o {shlex.quote(output_path_5)}'
+            f'detailed-comparison -N {n_trees} -f {n_forests} --grinsztajn --combine-plots --dataset-names "rl" "road-safety" "compass" -o {shlex.quote(output_path_5)}'
         )
     )
 
@@ -188,7 +188,7 @@ def generate_table_supp_1(output_dir, n_trees, n_forests):
     output_path = f"{output_dir}/Table 1 (Supplementary).csv"
 
     base_datasets_by_name = get_datasets_with_names()
-    more_datasets_by_name = get_datasets_with_names(full_benchmark=True)
+    more_datasets_by_name = get_datasets_with_names(grinsztajn=True)
 
     datasets = list(base_datasets_by_name.values()) + list(more_datasets_by_name.values())
     dataset_names = list(base_datasets_by_name.keys()) + list(more_datasets_by_name.keys())
