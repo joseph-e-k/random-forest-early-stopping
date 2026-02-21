@@ -89,7 +89,7 @@ def generate_figure_4(output_dir, n_trees, n_forests):
     
     empirical_performance.main(
         shlex.split(
-            f'er-rt-comparison -N {n_trees} -f {n_forests} -o {shlex.quote(output_path)}'
+            f'er-rt-comparison -N {n_trees} -f {n_forests} --all-datasets -o {shlex.quote(output_path)}'
         )
     )
 
@@ -112,12 +112,6 @@ def generate_table_3(output_dir, n_trees, n_forests):
 
         dataset_names, datasets = unzip(SHORT_BENCHMARK_DATASETS.items())
 
-        # np.ndarray: 5D array of estimated metrics, with axes corresponding to:
-        # 0. Forest (length = n_forests)
-        # 1. Dataset (length = len(datasets))
-        # 2. Stopping strategy (length = len(stopping_strategy_getters))
-        # 3. Allowable disagreement rate (length = len(adrs))
-        # 4. Metric kind: disagreement rate, expected runtime, error rate, and base error rate (length = 4).
         metrics = empirical_performance.get_metrics(
             n_forests=n_forests,
             n_trees=n_trees,
@@ -151,35 +145,35 @@ def generate_figure_supp_2(output_dir, n_trees, n_forests):
     output_path_1 = f"{output_sub_dir}/Page 1"
     empirical_performance.main(
         shlex.split(
-            f'detailed-comparison -N {n_trees} -f {n_forests} --grinsztajn --combine-plots --dataset-names "Higgs" "eye_movements" "jannis" "KDDCup09_upselling" -o {shlex.quote(output_path_1)}'
+            f'detailed-comparison -N {n_trees} -f {n_forests} --combine-plots --dataset-names "Higgs" "eye_movements" "jannis" "KDDCup09_upselling" -o {shlex.quote(output_path_1)}'
         )
     )
 
     output_path_2 = f"{output_sub_dir}/Page 2"
     empirical_performance.main(
         shlex.split(
-            f'detailed-comparison -N {n_trees} -f {n_forests} --grinsztajn --combine-plots --dataset-names "MagicTelescope" "bank-marketing" "phoneme" "MiniBooNE" -o {shlex.quote(output_path_2)}'
+            f'detailed-comparison -N {n_trees} -f {n_forests} --combine-plots --dataset-names "MagicTelescope" "bank-marketing" "phoneme" "MiniBooNE" -o {shlex.quote(output_path_2)}'
         )
     )
 
     output_path_3 = f"{output_sub_dir}/Page 3"
     empirical_performance.main(
         shlex.split(
-            f'detailed-comparison -N {n_trees} -f {n_forests} --grinsztajn --combine-plots --dataset-names "covertype" "pol" "house_16H" "kdd_ipums_la_97-small" -o {shlex.quote(output_path_3)}'
+            f'detailed-comparison -N {n_trees} -f {n_forests} --combine-plots --dataset-names "covertype" "pol" "house_16H" "kdd_ipums_la_97-small" -o {shlex.quote(output_path_3)}'
         )
     )
 
     output_path_4 = f"{output_sub_dir}/Page 4"
     empirical_performance.main(
         shlex.split(
-            f'detailed-comparison -N {n_trees} -f {n_forests} --grinsztajn --combine-plots --dataset-names "credit" "california" "wine" "electricity" -o {shlex.quote(output_path_4)}'
+            f'detailed-comparison -N {n_trees} -f {n_forests} --combine-plots --dataset-names "credit" "california" "wine" "electricity" -o {shlex.quote(output_path_4)}'
         )
     )
 
     output_path_5 = f"{output_sub_dir}/Page 5"
     empirical_performance.main(
         shlex.split(
-            f'detailed-comparison -N {n_trees} -f {n_forests} --grinsztajn --combine-plots --dataset-names "rl" "road-safety" "compass" -o {shlex.quote(output_path_5)}'
+            f'detailed-comparison -N {n_trees} -f {n_forests} --combine-plots --dataset-names "rl" "road-safety" "compass" -o {shlex.quote(output_path_5)}'
         )
     )
 
