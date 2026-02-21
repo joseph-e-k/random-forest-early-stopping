@@ -3,6 +3,7 @@ import functools
 import os
 import random
 import warnings
+from dataclasses import dataclass
 from typing import Callable, Sequence
 
 from matplotlib import ticker
@@ -18,15 +19,12 @@ from .utils.figures import (
     DISTINCT_DASH_STYLES, MARKERS, create_independent_plots_grid, create_subplot_grid,
     enforce_character_limit, plot_functions, save_drawing
 )
-from .utils.logging import configure_logging, get_module_logger
+from .utils.logging import configure_logging
 from .utils.multiprocessing import parallelize_to_array
 from .optimization import get_optimal_stopping_strategy
 from .utils.caching import memoize
-from .utils.data import Dataset, get_datasets_with_names, split_dataset
-from .utils.misc import get_output_path, swap_indices_of_axis, unzip
-
-
-_logger = get_module_logger()
+from .utils.data import ALL_BENCHMARK_DATASETS, Dataset, SHORT_BENCHMARK_DATASETS, GRINSZTAJN_DATASETS, split_dataset
+from .utils.misc import get_output_path, swap_indices_of_axis
 
 
 class ReproducibilityError(Exception):
@@ -306,18 +304,18 @@ def _getitem(sequence, index):
     return sequence[index]
 
 
-def draw_metrics(metrics, dataset_names, allowable_disagreement_rates, ss_names, combine_plots=False):
+def draw_metrics(metrics, dataset_names, ss_getters, allowable_disagreement_rates, combine_plots=False):
     """Draw precomputed performance metrics for a collection of datasets and stopping strategies.
 
     Args:
         metrics (np.ndarray): 4D array of estimated metrics, with axes corresponding to:
             0. Dataset (length = len(dataset_names))
-            1. Stopping strategy (length = len(ss_names))
+            1. Stopping strategy (length = len(ss_getters))
             2. Allowable disagreement rate (length = len(allowable_disagreement_rates))
             3. Metric kind: disagreement rate, expected runtime, error rate, and base error rate (length = 4).
         dataset_names (Sequence[str]): Names of the datasets.
+        ss_getters (Sequence[StoppingStrategyGetter]): Functions used to compute the stopping strategies.
         allowable_disagreement_rates (Sequence[float]): Allowable disagreement rates used to compute the stopping strategies.
-        ss_names (Sequence[str]): Names of the stopping strategies.
         combine_plots (bool, optional): Whether to combine all plots into a single figure. Defaults to False.
     
     Returns:
@@ -329,7 +327,6 @@ def draw_metrics(metrics, dataset_names, allowable_disagreement_rates, ss_names,
     n_datasets, n_ss_kinds, n_adrs, n_metrics = metrics.shape
 
     assert len(dataset_names) == n_datasets
-    assert len(ss_names) == n_ss_kinds
     assert len(allowable_disagreement_rates) == n_adrs
     assert n_metrics == 3
 
@@ -348,6 +345,14 @@ def draw_metrics(metrics, dataset_names, allowable_disagreement_rates, ss_names,
 
     metric_names = ["Disagreement Rate", "Error Rate",  "Expected Runtime"]
     metric_maxima = np.max(metrics, axis=(0, 1, 2))
+
+    plot_labels = []
+    plot_kwargses = []
+
+    for ss_getter in ss_getters:
+        plot_details = PLOT_DETAILS_BY_SS_GETTER[ss_getter]
+        plot_labels.append(plot_details.label)
+        plot_kwargses.append(dict(marker=plot_details.marker, fillstyle="none", color=plot_details.color))
 
     for i_dataset, dataset_name in enumerate(dataset_names):
         for i_metric in range(n_metrics):
@@ -387,9 +392,9 @@ def draw_metrics(metrics, dataset_names, allowable_disagreement_rates, ss_names,
                     index=range(n_adrs)[::-1],
                 ),
                 concurrently=False,
-                labels=ss_names,
+                labels=plot_labels,
                 x_axis_values_transform=lambda i_adrs: [allowable_disagreement_rates[i_adr] for i_adr in i_adrs],
-                plot_kwargses=[dict(marker=marker, fillstyle="none") for marker in MARKERS]
+                plot_kwargses=plot_kwargses
             )
 
             for (line, dash_pattern) in zip(lines, DISTINCT_DASH_STYLES):
@@ -408,7 +413,7 @@ def draw_metrics(metrics, dataset_names, allowable_disagreement_rates, ss_names,
     return fig
 
 
-def get_and_draw_disagreement_rates_and_runtimes(n_forests, n_trees, datasets, dataset_names, allowable_disagreement_rates, ss_getters_by_name, combine_plots=False):
+def get_and_draw_disagreement_rates_and_runtimes(n_forests, n_trees, datasets, dataset_names, allowable_disagreement_rates, ss_getters, combine_plots=False):
     """Estimate and draw performance metrics for a collection of datasets and stopping strategy kinds.
 
     Args:
@@ -417,14 +422,12 @@ def get_and_draw_disagreement_rates_and_runtimes(n_forests, n_trees, datasets, d
         datasets (Sequence[Dataset]): Datasets to test the stopping strategies on.
         dataset_names (Sequence[str]): Names of the datasets.
         allowable_disagreement_rates (Sequence[float]): Allowable disagreement rates to compute the stopping strategies with.
-        ss_getters_by_name (dict[str, StoppingStrategyGetter]): Dictionary of stopping strategy getters, with names as keys and functions as values.
+        ss_getters (Sequence[StoppingStrategyGetter]): Sequence of functions to compute stopping strategies.
         combine_plots (bool, optional): Whether to combine all plots into a single figure. Defaults to False.
     
     Returns:
         matplotlib.Figure or MultiFigure: Plots of the metrics.
     """
-    ss_names, ss_getters = zip(*ss_getters_by_name.items())
-
     metrics = get_metrics(
         n_forests, n_trees, datasets, allowable_disagreement_rates, ss_getters
     )
@@ -434,13 +437,13 @@ def get_and_draw_disagreement_rates_and_runtimes(n_forests, n_trees, datasets, d
     return draw_metrics(
         mean_metrics,
         dataset_names,
+        ss_getters,
         allowable_disagreement_rates,
-        ss_names or [func.__name__ for func in ss_getters],
         combine_plots
     )
 
 
-def get_and_draw_error_rates_and_runtimes(n_forests, n_trees, datasets, dataset_names, allowable_disagreement_rates, ss_getters_by_name):
+def get_and_draw_error_rates_and_runtimes(n_forests, n_trees, datasets, dataset_names, allowable_disagreement_rates, ss_getters):
     """Estimate and draw error rates and expected runtimes for a collection of datasets and stopping strategy kinds, as a single scatter plot.
 
     Args:
@@ -449,11 +452,8 @@ def get_and_draw_error_rates_and_runtimes(n_forests, n_trees, datasets, dataset_
         datasets (Sequence[Dataset]): Datasets to test the stopping strategies on.
         dataset_names (Sequence[str]): Names of the datasets.
         allowable_disagreement_rates (Sequence[float]): Allowable disagreement rates to compute the stopping strategies with.
-        ss_getters_by_name (dict[str, StoppingStrategyGetter]): Dictionary of stopping strategy getters, with names as keys and functions as values.
+        ss_getters (Sequence[StoppingStrategyGetter]): Sequence of functions to compute stopping strategies.
     """
-
-    ss_names, ss_getters = zip(*ss_getters_by_name.items())
-
     metrics = get_metrics(
         n_forests, n_trees, datasets, allowable_disagreement_rates, ss_getters
     )
@@ -474,15 +474,16 @@ def get_and_draw_error_rates_and_runtimes(n_forests, n_trees, datasets, dataset_
     ax.set_yscale("log")
     ax.set_xscale("log")
     
-    for i_ss, (ss_name, ss_getter) in enumerate(zip(ss_names, ss_getters)):
-        marker = MARKERS[i_ss % len(MARKERS)]
+    for i_ss, ss_getter in enumerate(ss_getters):
+        plot_details = PLOT_DETAILS_BY_SS_GETTER[ss_getter]
+        marker = plot_details.marker
         ax.scatter(
             x=error_rates[:, i_ss, :],
             y=expected_runtimes[:, i_ss, :],
-            label=ss_name,
+            label=plot_details.label,
             marker=marker,
-            facecolors="C{}".format(i_ss) if marker == "x" else "none",
-            edgecolors="C{}".format(i_ss)
+            facecolors=plot_details.color if marker == "x" else "none",
+            edgecolors=plot_details.color
         )
 
     ax.set_xlabel("Error rate")
@@ -522,6 +523,24 @@ def get_schwing_ss(adr: float, n_trees: int, estimated_smopdis: np.ndarray) -> n
     return schwing.get_ss(n_trees, adr)
 
 
+
+@dataclass(frozen=True)
+class PlotDetails:
+    label: str
+    marker: str
+    color: str
+
+
+PLOT_DETAILS_BY_SS_GETTER = {
+    get_minimax_ss: PlotDetails(label="Minimax", marker=MARKERS[0], color="C0"),
+    get_minimean_ss: PlotDetails(label="Minimean (Cal)", marker=MARKERS[1], color="C1"),
+    get_minimean_flat_ss: PlotDetails(label="Minimean (Flat)", marker=MARKERS[2], color="C2"),
+    get_minimixed_ss: PlotDetails(label="Minimixed (Cal)", marker=MARKERS[3], color="C3"),
+    get_minimixed_flat_ss: PlotDetails(label="Minimixed (Flat)", marker=MARKERS[4], color="C4"),
+    get_schwing_ss: PlotDetails(label="Schwing et al.", marker=MARKERS[5], color="C5"),
+}
+
+
 DEFAULT_ADRS = (0, 10**-4, 10**-3.5, 10**-3, 10**-2.5, 10**-2, 10**-1.5, 10**-1)
 
 
@@ -537,8 +556,9 @@ def parse_args(argv=None):
     detailed_comparison_subparser.add_argument("--random-seed", "-s", type=int, default=1234)
     detailed_comparison_subparser.add_argument("--n-forests", "--number-of-forests", "-f", type=int, default=30)
     detailed_comparison_subparser.add_argument("--combine-plots", "-c", action="store_true")
-    detailed_comparison_subparser.add_argument("--grinsztajn", action="store_true")
-    detailed_comparison_subparser.add_argument("--dataset-names", "-d", type=str, nargs="*", default=None)
+    detailed_comparison_subparser.add_argument("--dataset-names", "-d", type=str, nargs="*", default=tuple(SHORT_BENCHMARK_DATASETS.keys()))
+    detailed_comparison_subparser.add_argument("--grinsztajn", action="store_const", dest="dataset_names", const=tuple(GRINSZTAJN_DATASETS.keys()))
+    detailed_comparison_subparser.add_argument("--all-datasets", action="store_const", dest="dataset_names", const=tuple(ALL_BENCHMARK_DATASETS.keys()))
 
 
     er_and_rt_comparison = subparsers.add_parser("er-rt-comparison")
@@ -548,8 +568,9 @@ def parse_args(argv=None):
     er_and_rt_comparison.add_argument("--output-path", "-o", type=str, default=None)
     er_and_rt_comparison.add_argument("--random-seed", "-s", type=int, default=1234)
     er_and_rt_comparison.add_argument("--n-forests", "--number-of-forests", "-f", type=int, default=30)
-    er_and_rt_comparison.add_argument("--grinsztajn", action="store_true")
-    er_and_rt_comparison.add_argument("--dataset-names", "-d", type=str, nargs="*", default=None)
+    er_and_rt_comparison.add_argument("--dataset-names", "-d", type=str, nargs="*", default=tuple(SHORT_BENCHMARK_DATASETS.keys()))
+    er_and_rt_comparison.add_argument("--grinsztajn", action="store_const", dest="dataset_names", const=tuple(GRINSZTAJN_DATASETS.keys()))
+    er_and_rt_comparison.add_argument("--all-datasets", action="store_const", dest="dataset_names", const=tuple(ALL_BENCHMARK_DATASETS.keys()))
 
     tree_distribution_subparser = subparsers.add_parser("tree-distribution")
     tree_distribution_subparser.set_defaults(action_name="smopdis")
@@ -557,8 +578,9 @@ def parse_args(argv=None):
     tree_distribution_subparser.add_argument("--output-path", "-o", type=str, default=None)
     tree_distribution_subparser.add_argument("--random-seed", "-s", type=int, default=1234)
     tree_distribution_subparser.add_argument("--n-forests", "--number-of-forests", "-f", type=int, default=30)
-    tree_distribution_subparser.add_argument("--grinsztajn", action="store_true")
-    tree_distribution_subparser.add_argument("--dataset-names", "-d", type=str, nargs="*", default=None)
+    tree_distribution_subparser.add_argument("--dataset-names", "-d", type=str, nargs="*", default=tuple(SHORT_BENCHMARK_DATASETS.keys()))
+    tree_distribution_subparser.add_argument("--grinsztajn", action="store_const", dest="dataset_names", const=tuple(GRINSZTAJN_DATASETS.keys()))
+    tree_distribution_subparser.add_argument("--all-datasets", action="store_const", dest="dataset_names", const=tuple(ALL_BENCHMARK_DATASETS.keys()))
 
     return parser.parse_args(argv)
 
@@ -575,13 +597,9 @@ def main(argv=None):
 
     pd.options.mode.chained_assignment = None
 
-    datasets_by_name = get_datasets_with_names(grinsztajn=args.grinsztajn)
 
-    if args.dataset_names is None:
-        dataset_names, datasets = unzip(datasets_by_name.items())
-    else:
-        dataset_names = args.dataset_names
-        datasets = [datasets_by_name[name] for name in dataset_names]
+    dataset_names = args.dataset_names
+    datasets = [ALL_BENCHMARK_DATASETS[name] for name in dataset_names]
 
     with warnings.catch_warnings(category=UserWarning, action="ignore"):
         if args.action_name == "detailed_empirical_comparison":
@@ -591,14 +609,14 @@ def main(argv=None):
                 datasets,
                 dataset_names,
                 args.alphas,
-                {
-                    "Minimax": get_minimax_ss,
-                    "Minimean (Cal)": get_minimean_ss,
-                    "Minimean (Flat)": get_minimean_flat_ss,
-                    "Minimixed (Cal)": get_minimixed_ss,
-                    "Minimixed (Flat)": get_minimixed_flat_ss,
-                    "Schwing et al.": get_schwing_ss
-                },
+                [
+                    get_minimax_ss,
+                    get_minimean_ss,
+                    get_minimean_flat_ss,
+                    get_minimixed_ss,
+                    get_minimixed_flat_ss,
+                    get_schwing_ss
+                ],
                 args.combine_plots
             )
         elif args.action_name == "er_rt_comparison":
@@ -608,19 +626,17 @@ def main(argv=None):
                 datasets,
                 dataset_names,
                 args.alphas,
-                {
-                    "Minimax": get_minimax_ss,
-                    "Minimean (Cal)": get_minimean_ss,
-                    "Minimean (Flat)": get_minimean_flat_ss,
-                    "Minimixed (Cal)": get_minimixed_ss,
-                    "Minimixed (Flat)": get_minimixed_flat_ss,
-                    "Schwing et al.": get_schwing_ss
-                }
+                [
+                    get_minimax_ss,
+                    get_minimean_ss,
+                    get_minimixed_ss,
+                    get_schwing_ss
+                ]
             )
         elif args.action_name == "smopdis":
             drawing = draw_smopdises(args.n_trees, datasets, dataset_names, n_forests=args.n_forests)
             
-    output_path = args.output_path or get_output_path(f"{args.action_name}{'_grinsztajn' if args.grinsztajn else ''}_{args.n_forests}_forests_of_{args.n_trees}_trees")
+    output_path = args.output_path or get_output_path(f"{args.action_name}_{args.n_forests}_forests_of_{args.n_trees}_trees_on_{len(args.dataset_names)}_datasets")
     save_drawing(drawing, output_path)
 
 

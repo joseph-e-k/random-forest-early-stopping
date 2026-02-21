@@ -13,12 +13,7 @@ import ucimlrepo
 
 from .caching  import memoize
 from .logging import logged
-from .misc import unzip
 
-# The benchmark referenced in this module is that of Grinsztajn, Grinjsztajn, and Varoquax (2022). The exact list can be found in Appendix A.1 of
-# https://arxiv.org/pdf/2207.08815. Since we are only interested in classification, only tables A.1.1 and A.1.3 were used.
-# The numerical IDs are for the OpenML repository.
-GRINSZTAJN_DATASET_IDS = [44089, 44090, 44091, 44120, 44121, 44122, 44123, 44124, 44125, 44126, 44127, 44128, 44129, 44130, 44131, 44156, 44157, 44158, 44159, 44160, 44161, 44162]
 
 DATA_DIRECTORY = os.path.join(os.path.dirname(__file__), "../../data")
 
@@ -82,6 +77,46 @@ class OpenMLDataset(LazyDataset):
         return features, target
 
 
+SHORT_BENCHMARK_DATASETS = {
+    "Ground Cover": UCIDataset(id=31),
+    "Income": UCIDataset(id=117),
+    "Diabetes": UCIDataset(id=891),
+    "Skin": UCIDataset(id=229),
+    "Sepsis": UCIDataset(id=827),
+    "Dota2": UCIDataset(id=367),
+    "Hospitalization": UCIDataset(id=296),
+    "Shuttle": UCIDataset(id=148)
+}
+
+
+# This benchmark is that of Grinsztajn, Grinjsztajn, and Varoquax (2022). The exact list can be found in Appendix A.1 of
+# https://arxiv.org/pdf/2207.08815. Since we are only interested in classification, only tables A.1.1 and A.1.3 were used.
+GRINSZTAJN_DATASETS = {
+    "credit": OpenMLDataset(id=44089),
+    "california": OpenMLDataset(id=44090),
+    "wine": OpenMLDataset(id=44091),
+    "electricity": OpenMLDataset(id=44156),
+    "covertype": OpenMLDataset(id=44159),
+    "pol": OpenMLDataset(id=44122),
+    "house_16H": OpenMLDataset(id=44123),
+    "kdd_ipums_la_97-small": OpenMLDataset(id=44124),
+    "MagicTelescope": OpenMLDataset(id=44125),
+    "bank-marketing": OpenMLDataset(id=44126),
+    "phoneme": OpenMLDataset(id=44127),
+    "MiniBooNE": OpenMLDataset(id=44128),
+    "Higgs": OpenMLDataset(id=44129),
+    "eye_movements": OpenMLDataset(id=44157),
+    "jannis": OpenMLDataset(id=44131),
+    "KDDCup09_upselling": OpenMLDataset(id=44158),
+    "rl": OpenMLDataset(id=44160),
+    "road-safety": OpenMLDataset(id=44161),
+    "compass": OpenMLDataset(id=44162)
+}
+
+
+ALL_BENCHMARK_DATASETS = {**SHORT_BENCHMARK_DATASETS, **GRINSZTAJN_DATASETS}
+
+
 def dichotomize_classifications(classifications):
     """Dichotomize an array of classes.
 
@@ -120,43 +155,6 @@ def coerce_nonnumeric_columns_to_numeric(df: pd.DataFrame) -> pd.DataFrame:
     category_columns = df.select_dtypes(["category"]).columns
     df[category_columns] = df[category_columns].apply(lambda x: x.cat.codes)
     return df
-
-
-def get_grinsztajn_datasets() -> dict[str, Dataset]:
-    """Return a dictionary of datasets in the Grinsztajn et al. benchmark, indexed by name"""
-    datasets_by_name = {}
-    for dataset_id in GRINSZTAJN_DATASET_IDS:
-        dataset = openml.datasets.get_dataset(dataset_id)
-        datasets_by_name[dataset.name] = OpenMLDataset(dataset_id)
-
-    return datasets_by_name
-
-
-@logged(message_level=logging.DEBUG)
-def get_datasets_with_names(grinsztajn=False) -> dict[str, Dataset]:
-    """Get a collection of datasets with their names.
-
-    Args:
-        grinsztajn (bool, optional): If True, use the Grinsztajn et al. datasets. Otherwise (the default), use eight large datasets from UCIML.
-
-    Returns:
-        dict[str, Dataset]: The requested datasets, keyed by name.
-    """
-    if grinsztajn:
-        named_datasets = get_grinsztajn_datasets()
-    else:
-        named_datasets = {
-            "Ground Cover": UCIDataset(id=31),
-            "Income": UCIDataset(id=117),
-            "Diabetes": UCIDataset(id=891),
-            "Skin": UCIDataset(id=229),
-            "Sepsis": UCIDataset(id=827),
-            "Dota2": UCIDataset(id=367),
-            "Hospitalization": UCIDataset(id=296),
-            "Shuttle": UCIDataset(id=148)
-        }
-
-    return named_datasets
 
 
 def split_dataset(dataset: Dataset, relative_proportions: Sequence[float | int]) -> Iterable[Dataset]:

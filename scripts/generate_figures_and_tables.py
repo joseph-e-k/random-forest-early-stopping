@@ -9,7 +9,7 @@ from scripts import draw_supp_fig_timings, measure_tree_certainties
 from ste import empirical_performance
 from ste.empirical_performance import get_minimax_ss, get_minimean_flat_ss, get_minimean_ss, get_minimixed_flat_ss
 from ste.optimization import get_optimal_stopping_strategy, plot_stopping_strategy_state_graphs
-from ste.utils.data import get_datasets_with_names
+from ste.utils.data import SHORT_BENCHMARK_DATASETS, GRINSZTAJN_DATASETS
 from ste.utils.figures import create_subplot_grid, label_subplots, plot_stopping_strategies_as_envelopes, save_drawing
 from ste.utils.logging import configure_logging
 from ste.utils.misc import get_output_path, unzip
@@ -52,7 +52,7 @@ def generate_table_2(output_dir, n_trees, n_forests):
         writer = csv.writer(output_file)
         writer.writerow(["Name", "N", "p", "C", "%pos"])
 
-        named_datasets = get_datasets_with_names()
+        named_datasets = SHORT_BENCHMARK_DATASETS
         for name, dataset in named_datasets.items():
             X, y = dataset.load_raw()
             n_obs = len(y)
@@ -110,7 +110,7 @@ def generate_table_3(output_dir, n_trees, n_forests):
         writer = csv.writer(output_file)
         writer.writerow(["Dataset Name", "Disagreement Rate", "Expected Runtime", "Base Error Rate", "Error Rate"])
 
-        dataset_names, datasets = unzip(get_datasets_with_names().items())
+        dataset_names, datasets = unzip(SHORT_BENCHMARK_DATASETS.items())
 
         # np.ndarray: 5D array of estimated metrics, with axes corresponding to:
         # 0. Forest (length = n_forests)
@@ -187,8 +187,8 @@ def generate_figure_supp_2(output_dir, n_trees, n_forests):
 def generate_table_supp_1(output_dir, n_trees, n_forests):
     output_path = f"{output_dir}/Table 1 (Supplementary).csv"
 
-    base_datasets_by_name = get_datasets_with_names()
-    more_datasets_by_name = get_datasets_with_names(grinsztajn=True)
+    base_datasets_by_name = SHORT_BENCHMARK_DATASETS
+    more_datasets_by_name = GRINSZTAJN_DATASETS
 
     datasets = list(base_datasets_by_name.values()) + list(more_datasets_by_name.values())
     dataset_names = list(base_datasets_by_name.keys()) + list(more_datasets_by_name.keys())

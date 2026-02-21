@@ -5,7 +5,7 @@ import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 
 from ste.utils.caching import memoize
-from ste.utils.data import get_datasets_with_names, split_dataset
+from ste.utils.data import SHORT_BENCHMARK_DATASETS, split_dataset
 from ste.utils.logging import configure_logging
 from ste.utils.multiprocessing import parallelize_to_array
 
@@ -38,7 +38,7 @@ def compute_metrics_for_each_dataset(n_forests, n_trees, eval_proportion, datase
 def main():
     configure_logging()
 
-    datasets_by_name = get_datasets_with_names()
+    datasets_by_name = SHORT_BENCHMARK_DATASETS
     datasets = list(datasets_by_name.values())
 
     eval_proportion = 0.1
