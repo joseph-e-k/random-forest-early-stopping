@@ -86,10 +86,12 @@ def generate_figure_3(output_dir, n_trees, n_forests):
 
 def generate_figure_4(output_dir, n_trees, n_forests):
     output_path = f"{output_dir}/Figure 4"
+    adrs = [10**-x for x in [2.5, 2, 1.5, 1]]
+    adrs_str = " ".join(str(adr) for adr in adrs)
     
     empirical_performance.main(
         shlex.split(
-            f'er-rt-comparison -N {n_trees} -f {n_forests} --all-datasets -o {shlex.quote(output_path)}'
+            f'er-rt-comparison -N {n_trees} -f {n_forests} --all-datasets --adrs {adrs_str} -o {shlex.quote(output_path)}'
         )
     )
 
