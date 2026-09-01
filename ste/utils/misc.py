@@ -116,11 +116,11 @@ class TimerContext:
         return self.end_time - self.start_time
 
     def __enter__(self):
-        self.start_time = time.time()
+        self.start_time = time.perf_counter()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self.end_time = time.time()
+        self.end_time = time.perf_counter()
 
         if self.verbose:
             message = f"Time ({self.tag})" if self.tag is not None else "Time"

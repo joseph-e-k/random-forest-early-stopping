@@ -2,11 +2,12 @@ import argparse
 import csv
 import os
 import shlex
+import random
 
 import numpy as np
 
 from scripts import draw_supp_fig_timings, measure_tree_certainties
-from ste import theoretical_performance
+from ste import execution, theoretical_performance
 from ste.theoretical_performance import get_minimax_ss, get_minimean_flat_ss, get_minimean_ss, get_minimixed_flat_ss
 from ste.optimization import get_optimal_stopping_strategy, plot_stopping_strategy_state_graphs
 from ste.utils.data import SHORT_BENCHMARK_DATASETS, GRINSZTAJN_DATASETS
@@ -108,9 +109,11 @@ def generate_figure_5(output_dir, n_trees, n_forests):
 
 def generate_table_4(output_dir, n_trees, n_forests):
     output_path = f"{output_dir}/Table 4.csv"
+    adr = 1e-3
+
     with open(output_path, "wt", newline="") as output_file:
         writer = csv.writer(output_file)
-        writer.writerow(["Dataset Name", "Disagreement Rate", "Expected Runtime", "Base Error Rate", "Error Rate"])
+        writer.writerow(["Dataset Name", "Disagreement Rate", "Expected Runtime", "Base Error Rate", "Error Rate", "Wall-Clock Time"])
 
         dataset_names, datasets = unzip(SHORT_BENCHMARK_DATASETS.items())
 
@@ -118,20 +121,39 @@ def generate_table_4(output_dir, n_trees, n_forests):
             n_forests=n_forests,
             n_trees=n_trees,
             datasets=datasets,
-            adrs=[1e-3],
+            adrs=[adr],
             stopping_strategy_getters=[get_minimean_ss]
         )
 
         mean_metrics = metrics.mean(axis=0)
 
+        data_partition_ratios = (0.7, 0.1, 0.2)
+
+        wall_clock_times = execution.get_wall_clock_times(
+            n_forests=n_forests,
+            n_trees=n_trees,
+            datasets=datasets,
+            adr=adr,
+            stopping_strategy_getter=get_minimean_ss,
+            data_partition_ratios=data_partition_ratios
+        )
+
+        n_eval_samples = np.array([
+            len(tuple(dataset)[0]) * data_partition_ratios[2] for dataset in datasets
+        ], dtype=int)
+
+        mean_wall_clock_ms = 1000 * wall_clock_times.mean(axis=0) / n_eval_samples[:, None]
+
         for i_dataset, dataset_name in enumerate(dataset_names):
             disagreement_rate, expected_runtime, error_rate, base_error_rate = mean_metrics[i_dataset, 0, 0]
+            wall_clock_stf, wall_clock_full = mean_wall_clock_ms[i_dataset]
             writer.writerow([
                 dataset_name,
                 f"{100*disagreement_rate:.2f}%",
                 f"{100*expected_runtime/n_trees:.2f}%",
                 f"{100*error_rate:.2f}%",
                 f"{100*base_error_rate:.2f}%",
+                f"{wall_clock_stf:.1f}ms / {wall_clock_full:.1f}ms"
             ])
 
 
@@ -246,6 +268,9 @@ def parse_args(argv=None):
         "--exclude", nargs="*", default=[], choices=tasks_by_name.keys(),
         help="List of figures and tables NOT to generate."
     )
+    parser.add_argument(
+        "--seed", "-s", type=int, default=0
+    )
 
     namespace = parser.parse_args(argv)
     namespace.tasks = []
@@ -263,6 +288,8 @@ def main(argv=None):
     os.makedirs(output_dir)
 
     for task in args.tasks:
+        np.random.seed(args.seed)
+        random.seed(args.seed)
         task(output_dir, args.n_trees, args.n_forests)
 
 
