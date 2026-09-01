@@ -1,5 +1,5 @@
 import matplotlib.pyplot as plt
-from ste.empirical_performance import get_minimax_ss, get_minimean_flat_ss, get_minimixed_flat_ss
+from ste.theoretical_performance import get_minimax_ss, get_minimean_flat_ss, get_minimixed_flat_ss
 from ste.utils.figures import create_subplot_grid, label_subplots, plot_stopping_strategies_as_envelopes, save_drawing
 from ste.utils.misc import get_output_path
 

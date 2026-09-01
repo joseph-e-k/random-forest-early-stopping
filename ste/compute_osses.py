@@ -9,7 +9,7 @@ from ste.utils.caching import memoize
 from .utils.logging import configure_logging, get_module_logger
 from .utils.multiprocessing import parallelize
 from .utils.misc import TimerContext, get_output_path
-from .empirical_performance import get_minimax_ss, get_minimean_flat_ss, get_minimixed_flat_ss
+from .theoretical_performance import get_minimax_ss, get_minimean_flat_ss, get_minimixed_flat_ss
 
 
 _logger = get_module_logger()

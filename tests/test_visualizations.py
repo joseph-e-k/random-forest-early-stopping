@@ -5,7 +5,7 @@ import warnings
 
 import numpy as np
 import pytest
-from ste.empirical_performance import (
+from ste.theoretical_performance import (
     DEFAULT_ADRS, get_and_draw_disagreement_rates_and_runtimes,
     get_minimean_flat_ss, get_minimean_ss, get_minimax_ss, get_minimixed_flat_ss, get_minimixed_ss
 )

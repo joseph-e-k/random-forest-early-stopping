@@ -6,8 +6,8 @@ import shlex
 import numpy as np
 
 from scripts import draw_supp_fig_timings, measure_tree_certainties
-from ste import empirical_performance
-from ste.empirical_performance import get_minimax_ss, get_minimean_flat_ss, get_minimean_ss, get_minimixed_flat_ss
+from ste import theoretical_performance
+from ste.theoretical_performance import get_minimax_ss, get_minimean_flat_ss, get_minimean_ss, get_minimixed_flat_ss
 from ste.optimization import get_optimal_stopping_strategy, plot_stopping_strategy_state_graphs
 from ste.utils.data import SHORT_BENCHMARK_DATASETS, GRINSZTAJN_DATASETS
 from ste.utils.figures import create_subplot_grid, label_subplots, plot_stopping_strategies_as_envelopes, save_drawing
@@ -70,14 +70,14 @@ def generate_figure_3(output_dir, n_trees, n_forests):
     os.mkdir(output_sub_dir)
 
     output_path_1 = f"{output_sub_dir}/Page 1"
-    empirical_performance.main(
+    theoretical_performance.main(
         shlex.split(
             f'detailed-comparison -N {n_trees} -f {n_forests} --combine-plots --dataset-names "Ground Cover" "Income" "Diabetes" "Skin" -o {shlex.quote(output_path_1)}'
         )
     )
 
     output_path_2 = f"{output_sub_dir}/Page 2"
-    empirical_performance.main(
+    theoretical_performance.main(
         shlex.split(
             f'detailed-comparison -N {n_trees} -f {n_forests} --combine-plots --dataset-names "Sepsis" "Dota2" "Hospitalization" "Shuttle" -o {shlex.quote(output_path_2)}'
         )
@@ -89,7 +89,7 @@ def generate_figure_4(output_dir, n_trees, n_forests):
     adrs = [10**-x for x in [3, 2.5, 2, 1.5, 1]]
     adrs_str = " ".join(str(adr) for adr in adrs)
     
-    empirical_performance.main(
+    theoretical_performance.main(
         shlex.split(
             f'er-rt-comparison -N {n_trees} -f {n_forests} --all-datasets --adrs {adrs_str} -o {shlex.quote(output_path)}'
         )
@@ -99,7 +99,7 @@ def generate_figure_4(output_dir, n_trees, n_forests):
 def generate_figure_5(output_dir, n_trees, n_forests):
     output_path = f"{output_dir}/Figure 5"
     
-    empirical_performance.main(
+    theoretical_performance.main(
         shlex.split(
             f'tree-distribution -N {n_trees} -f {n_forests} -o {shlex.quote(output_path)}'
         )
@@ -114,7 +114,7 @@ def generate_table_4(output_dir, n_trees, n_forests):
 
         dataset_names, datasets = unzip(SHORT_BENCHMARK_DATASETS.items())
 
-        metrics = empirical_performance.get_metrics(
+        metrics = theoretical_performance.get_metrics(
             n_forests=n_forests,
             n_trees=n_trees,
             datasets=datasets,
@@ -145,35 +145,35 @@ def generate_figure_supp_2(output_dir, n_trees, n_forests):
     os.mkdir(output_sub_dir)
 
     output_path_1 = f"{output_sub_dir}/Page 1"
-    empirical_performance.main(
+    theoretical_performance.main(
         shlex.split(
             f'detailed-comparison -N {n_trees} -f {n_forests} --combine-plots --dataset-names "Higgs" "eye_movements" "jannis" "KDDCup09_upselling" -o {shlex.quote(output_path_1)}'
         )
     )
 
     output_path_2 = f"{output_sub_dir}/Page 2"
-    empirical_performance.main(
+    theoretical_performance.main(
         shlex.split(
             f'detailed-comparison -N {n_trees} -f {n_forests} --combine-plots --dataset-names "MagicTelescope" "bank-marketing" "phoneme" "MiniBooNE" -o {shlex.quote(output_path_2)}'
         )
     )
 
     output_path_3 = f"{output_sub_dir}/Page 3"
-    empirical_performance.main(
+    theoretical_performance.main(
         shlex.split(
             f'detailed-comparison -N {n_trees} -f {n_forests} --combine-plots --dataset-names "covertype" "pol" "house_16H" "kdd_ipums_la_97-small" -o {shlex.quote(output_path_3)}'
         )
     )
 
     output_path_4 = f"{output_sub_dir}/Page 4"
-    empirical_performance.main(
+    theoretical_performance.main(
         shlex.split(
             f'detailed-comparison -N {n_trees} -f {n_forests} --combine-plots --dataset-names "credit" "california" "wine" "electricity" -o {shlex.quote(output_path_4)}'
         )
     )
 
     output_path_5 = f"{output_sub_dir}/Page 5"
-    empirical_performance.main(
+    theoretical_performance.main(
         shlex.split(
             f'detailed-comparison -N {n_trees} -f {n_forests} --combine-plots --dataset-names "rl" "road-safety" "compass" -o {shlex.quote(output_path_5)}'
         )
