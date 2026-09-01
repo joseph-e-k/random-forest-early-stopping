@@ -46,8 +46,8 @@ def generate_figure_2(output_dir, n_trees, n_forests):
     save_drawing(fig, output_path)
 
 
-def generate_table_2(output_dir, n_trees, n_forests):
-    output_path = f"{output_dir}/Table 2.csv"
+def generate_table_3(output_dir, n_trees, n_forests):
+    output_path = f"{output_dir}/Table 3.csv"
     with open(output_path, "wt", newline="") as output_file:
         writer = csv.writer(output_file)
         writer.writerow(["Name", "N", "p", "C", "%pos"])
@@ -106,8 +106,8 @@ def generate_figure_5(output_dir, n_trees, n_forests):
     )
 
 
-def generate_table_3(output_dir, n_trees, n_forests):
-    output_path = f"{output_dir}/Table 3.csv"
+def generate_table_4(output_dir, n_trees, n_forests):
+    output_path = f"{output_dir}/Table 4.csv"
     with open(output_path, "wt", newline="") as output_file:
         writer = csv.writer(output_file)
         writer.writerow(["Dataset Name", "Disagreement Rate", "Expected Runtime", "Base Error Rate", "Error Rate"])
@@ -216,8 +216,8 @@ def parse_args(argv=None):
         "fig3": generate_figure_3,
         "fig4": generate_figure_4,
         "fig5": generate_figure_5,
-        "table2": generate_table_2,
         "table3": generate_table_3,
+        "table4": generate_table_4,
         "fig1s": generate_figure_supp_1,
         "fig2s": generate_figure_supp_2,
         "table1s": generate_table_supp_1,
