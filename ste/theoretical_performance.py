@@ -1,5 +1,6 @@
 import argparse
 import functools
+import math
 import os
 import random
 import warnings
@@ -443,7 +444,7 @@ def get_and_draw_disagreement_rates_and_runtimes(n_forests, n_trees, datasets, d
     )
 
 
-def get_and_draw_error_rates_and_runtimes(n_forests, n_trees, datasets, dataset_names, allowable_disagreement_rates, ss_getters):
+def get_and_draw_error_rates_and_runtimes(n_forests, n_trees, datasets, dataset_names, allowable_disagreement_rates, ss_getters, combine_plots=False):
     """Estimate and draw error rates and expected runtimes for a collection of datasets and stopping strategy kinds, as a single scatter plot.
 
     Args:
@@ -453,6 +454,7 @@ def get_and_draw_error_rates_and_runtimes(n_forests, n_trees, datasets, dataset_
         dataset_names (Sequence[str]): Names of the datasets.
         allowable_disagreement_rates (Sequence[float]): Allowable disagreement rates to compute the stopping strategies with.
         ss_getters (Sequence[StoppingStrategyGetter]): Sequence of functions to compute stopping strategies.
+        combine_plots (bool, optional): Whether to combine all plots into a single figure. Defaults to False.
     """
     metrics = get_metrics(
         n_forests, n_trees, datasets, allowable_disagreement_rates, ss_getters
@@ -469,26 +471,33 @@ def get_and_draw_error_rates_and_runtimes(n_forests, n_trees, datasets, dataset_
     expected_runtimes = mean_metrics[..., 1]
     error_rates = mean_metrics[..., 2]
 
-    fig, axs = create_subplot_grid(1, n_rows=1, n_columns=1, figsize=(6, 6))
-    ax = axs[0, 0]
-    ax.set_yscale("log")
-    ax.set_xscale("log")
-    
-    for i_ss, ss_getter in enumerate(ss_getters):
-        plot_details = PLOT_DETAILS_BY_SS_GETTER[ss_getter]
-        marker = plot_details.marker
-        ax.scatter(
-            x=error_rates[:, i_ss, :],
-            y=expected_runtimes[:, i_ss, :],
-            label=plot_details.label,
-            marker=marker,
-            facecolors=plot_details.color if marker == "x" else "none",
-            edgecolors=plot_details.color
-        )
+    n_datasets = len(datasets)
 
-    ax.set_xlabel("Error rate")
-    ax.set_ylabel("Expected runtime")
-    ax.legend(framealpha=0.5, loc="upper center")
+    if combine_plots:
+        fig, axs = create_subplot_grid(n_datasets, n_columns=2, tight_layout=False, figsize=(10, 12.75))
+    else:
+        fig, axs = create_independent_plots_grid(n_datasets, n_columns=2, figsize=(6, 4))
+
+    for i_dataset, (dataset_name, ax) in enumerate(zip(dataset_names, axs.flat)):
+        expected_runtimes = mean_metrics[i_dataset, ..., 1]
+        error_rates = mean_metrics[i_dataset, ..., 2]
+        
+        for i_ss, ss_getter in enumerate(ss_getters):
+            plot_details = PLOT_DETAILS_BY_SS_GETTER[ss_getter]
+            marker = plot_details.marker
+            ax.scatter(
+                x=error_rates[i_ss, :],
+                y=expected_runtimes[i_ss, :],
+                label=plot_details.label,
+                marker=marker,
+                facecolors=plot_details.color if marker == "x" else "none",
+                edgecolors=plot_details.color
+            )
+
+        ax.set_title(dataset_name)
+        ax.set_xlabel("Error rate")
+        ax.set_ylabel("Expected runtime")
+        ax.legend(framealpha=0.5, loc="upper right")
 
     return fig
 
@@ -579,6 +588,7 @@ def parse_args(argv=None):
     er_and_rt_comparison.add_argument("--output-path", "-o", type=str, default=None)
     er_and_rt_comparison.add_argument("--random-seed", "-s", type=int, default=1234)
     er_and_rt_comparison.add_argument("--n-forests", "--number-of-forests", "-f", type=int, default=30)
+    er_and_rt_comparison.add_argument("--combine-plots", "-c", action="store_true")
     er_and_rt_comparison.add_argument("--dataset-names", "-d", type=str, nargs="*", default=tuple(SHORT_BENCHMARK_DATASETS.keys()))
     er_and_rt_comparison.add_argument("--grinsztajn", action="store_const", dest="dataset_names", const=tuple(GRINSZTAJN_DATASETS.keys()))
     er_and_rt_comparison.add_argument("--all-datasets", action="store_const", dest="dataset_names", const=tuple(ALL_BENCHMARK_DATASETS.keys()))
@@ -643,7 +653,8 @@ def main(argv=None):
                     get_minimixed_ss,
                     get_schwing_ss,
                     get_daghero_ss
-                ]
+                ],
+                args.combine_plots
             )
         elif args.action_name == "smopdis":
             drawing = draw_smopdises(args.n_trees, datasets, dataset_names, n_forests=args.n_forests)

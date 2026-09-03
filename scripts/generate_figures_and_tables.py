@@ -92,7 +92,13 @@ def generate_figure_4(output_dir, n_trees, n_forests):
     
     theoretical_performance.main(
         shlex.split(
-            f'er-rt-comparison -N {n_trees} -f {n_forests} --all-datasets --adrs {adrs_str} -o {shlex.quote(output_path)}'
+            f'er-rt-comparison'
+            f' --combine-plots'
+            f' -N {n_trees}'
+            f' -f {n_forests}'
+            f' -d "Ground Cover" "Income" "Diabetes" "Skin" "Sepsis" "Dota2" "Hospitalization" "Shuttle"'
+            f' --adrs {adrs_str}'
+            f' -o {shlex.quote(output_path)}'
         )
     )
 
