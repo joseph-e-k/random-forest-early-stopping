@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 
-from ste import schwing
+from ste import schwing, daghero
 
 from .EnsembleVote import EnsembleVote, EnsembleVoteWithStoppingStrategy
 from .utils.figures import (
@@ -523,6 +523,16 @@ def get_schwing_ss(adr: float, n_trees: int, estimated_smopdis: np.ndarray) -> n
     return schwing.get_ss(n_trees, adr)
 
 
+@memoize(args_to_ignore=["estimated_smopdis"])
+def get_daghero_ss(adr: float, n_trees: int, estimated_smopdis: np.ndarray) -> np.ndarray:
+    # The conversion from ADR to the probability threshold parameter used by Schwing is completely arbitrary,
+    # except that it's tuned to produce sensible results for the default range of ADRs that we use.
+    # For DEFAULT_ADRS, this gives approximately
+    # (0.5, 0.4, 0.3, 0.2, 0.1, 0.05, 0.02, 0.01)
+    threshold_factor = 1 / (2*(1 + 284 * adr**0.764))
+    threshold = 1 + int(threshold_factor * n_trees)
+    return daghero.get_ss(n_trees, threshold)
+
 
 @dataclass(frozen=True)
 class PlotDetails:
@@ -538,6 +548,7 @@ PLOT_DETAILS_BY_SS_GETTER = {
     get_minimixed_ss: PlotDetails(label="Minimixed (Cal)", marker=MARKERS[3], color="C3"),
     get_minimixed_flat_ss: PlotDetails(label="Minimixed (Flat)", marker=MARKERS[4], color="C4"),
     get_schwing_ss: PlotDetails(label="Schwing et al.", marker=MARKERS[5], color="C5"),
+    get_daghero_ss: PlotDetails(label="Daghero et al.", marker=MARKERS[6], color="C6")
 }
 
 
@@ -630,7 +641,8 @@ def main(argv=None):
                     get_minimax_ss,
                     get_minimean_ss,
                     get_minimixed_ss,
-                    get_schwing_ss
+                    get_schwing_ss,
+                    get_daghero_ss
                 ]
             )
         elif args.action_name == "smopdis":
