@@ -467,10 +467,7 @@ def get_and_draw_error_rates_and_runtimes(n_forests, n_trees, datasets, dataset_
     # 1. Stopping strategy (length = len(stopping_strategy_getters))
     # 2. Allowable disagreement rate (length = len(adrs))
     # 3. Metric kind: disagreement rate, expected runtime, error rate, and base error rate (length = 4).
-
-    expected_runtimes = mean_metrics[..., 1]
-    error_rates = mean_metrics[..., 2]
-
+    
     n_datasets = len(datasets)
 
     if combine_plots:
