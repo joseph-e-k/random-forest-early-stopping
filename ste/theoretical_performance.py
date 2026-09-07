@@ -147,7 +147,7 @@ def _analyse_stopping_strategy_if_relevant(i_ss_kind, i_adr, true_class, n_posit
     return out
 
 
-def _analyse_stopping_strategies(stopping_strategies, smopdis_estimates):
+def analyse_stopping_strategies(stopping_strategies, smopdis_estimates):
     n_ss_kinds, n_adrs, n_trees_plus_one, _ = stopping_strategies.shape
     n_trees = n_trees_plus_one - 1
 
@@ -262,7 +262,7 @@ def get_metrics_once(data: Dataset, adrs: Sequence[float], n_trees: int, stoppin
         job_name="get_ss"
     )
 
-    return _analyse_stopping_strategies(stopping_strategies, smopdis_estimates_for_evaluation)
+    return analyse_stopping_strategies(stopping_strategies, smopdis_estimates_for_evaluation)
 
 
 @memoize()
@@ -467,7 +467,7 @@ def get_and_draw_error_rates_and_runtimes(n_forests, n_trees, datasets, dataset_
     # 1. Stopping strategy (length = len(stopping_strategy_getters))
     # 2. Allowable disagreement rate (length = len(adrs))
     # 3. Metric kind: disagreement rate, expected runtime, error rate, and base error rate (length = 4).
-    
+
     n_datasets = len(datasets)
 
     if combine_plots:

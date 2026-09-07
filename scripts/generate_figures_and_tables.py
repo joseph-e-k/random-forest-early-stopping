@@ -6,7 +6,7 @@ import random
 
 import numpy as np
 
-from scripts import draw_supp_fig_timings, measure_tree_certainties
+from scripts import draw_supp_fig_timings, draw_worst_case_performance, measure_tree_certainties
 from ste import execution, theoretical_performance
 from ste.theoretical_performance import get_minimax_ss, get_minimean_flat_ss, get_minimean_ss, get_minimixed_flat_ss
 from ste.optimization import get_optimal_stopping_strategy, plot_stopping_strategy_state_graphs
@@ -47,6 +47,17 @@ def generate_figure_2(output_dir, n_trees, n_forests):
     save_drawing(fig, output_path)
 
 
+def generate_figure_3(output_dir, n_trees, n_forests):
+    output_path = f"{output_dir}/Figure 3"
+    draw_worst_case_performance.main(
+        shlex.split(
+            f'--combine-plots'
+            f' -N {n_trees}'
+            f' -o {shlex.quote(output_path)}'
+        )
+    )
+
+
 def generate_table_3(output_dir, n_trees, n_forests):
     output_path = f"{output_dir}/Table 3.csv"
     with open(output_path, "wt", newline="") as output_file:
@@ -66,8 +77,8 @@ def generate_table_3(output_dir, n_trees, n_forests):
             writer.writerow([name, n_obs, n_features, n_classes, f"{100*proportion_of_positive_obs:.1f}%"])
 
 
-def generate_figure_3(output_dir, n_trees, n_forests):
-    output_sub_dir = f"{output_dir}/Figure 3"
+def generate_figure_4(output_dir, n_trees, n_forests):
+    output_sub_dir = f"{output_dir}/Figure 4"
     os.mkdir(output_sub_dir)
 
     output_path_1 = f"{output_sub_dir}/Page 1"
@@ -85,8 +96,8 @@ def generate_figure_3(output_dir, n_trees, n_forests):
     )
 
 
-def generate_figure_4(output_dir, n_trees, n_forests):
-    output_path = f"{output_dir}/Figure 4"
+def generate_figure_5(output_dir, n_trees, n_forests):
+    output_path = f"{output_dir}/Figure 5"
     adrs = [10**-x for x in [3, 2.5, 2, 1.5, 1]]
     adrs_str = " ".join(str(adr) for adr in adrs)
     
@@ -103,8 +114,8 @@ def generate_figure_4(output_dir, n_trees, n_forests):
     )
 
 
-def generate_figure_5(output_dir, n_trees, n_forests):
-    output_path = f"{output_dir}/Figure 5"
+def generate_figure_6(output_dir, n_trees, n_forests):
+    output_path = f"{output_dir}/Figure 6"
     
     theoretical_performance.main(
         shlex.split(
@@ -244,6 +255,7 @@ def parse_args(argv=None):
         "fig3": generate_figure_3,
         "fig4": generate_figure_4,
         "fig5": generate_figure_5,
+        "fig6": generate_figure_6,
         "table3": generate_table_3,
         "table4": generate_table_4,
         "fig1s": generate_figure_supp_1,
