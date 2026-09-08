@@ -180,7 +180,17 @@ def generate_figure_supp_1(output_dir, n_trees, n_forests):
 
 
 def generate_figure_supp_2(output_dir, n_trees, n_forests):
-    output_sub_dir = f"{output_dir}/Figure 2 (Supplementary)"
+    output_path = f"{output_dir}/Figure 2 (Supplementary)"
+    
+    theoretical_performance.main(
+        shlex.split(
+            f"runtimes-per-size --n-trees-start 11 --n-trees-stop 202 --n-trees-step 10 --combine-plots -f 5 -o {shlex.quote(output_path)}"
+        )
+    )
+
+
+def generate_figure_supp_3(output_dir, n_trees, n_forests):
+    output_sub_dir = f"{output_dir}/Figure 3 (Supplementary)"
     os.mkdir(output_sub_dir)
 
     output_path_1 = f"{output_sub_dir}/Page 1"
@@ -260,6 +270,7 @@ def parse_args(argv=None):
         "table4": generate_table_4,
         "fig1s": generate_figure_supp_1,
         "fig2s": generate_figure_supp_2,
+        "fig3s": generate_figure_supp_3,
         "table1s": generate_table_supp_1,
     }
     parser = argparse.ArgumentParser(

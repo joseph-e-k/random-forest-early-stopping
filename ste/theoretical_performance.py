@@ -499,6 +499,71 @@ def get_and_draw_error_rates_and_runtimes(n_forests, n_trees, datasets, dataset_
     return fig
 
 
+@memoize()
+def get_expected_runtimes_per_size(n_forests, sizes, datasets, adr, ss_getters, data_partition_ratios=(0.7, 0.1, 0.2)):
+    metrics = parallelize_to_array(
+        functools.partial(
+            get_metrics_once,
+            data_partition_ratios=data_partition_ratios,
+            stopping_strategy_getters=ss_getters,
+        ),
+        reps=n_forests,
+        argses_to_combine=(
+            datasets,
+            [[adr]],
+            sizes
+        )
+    )
+
+    # `metrics` is now a 5D array of estimated metrics, with axes corresponding to:
+    # 0. Forest (length = n_forests)
+    # 1. Dataset (length = len(datasets))
+    # 2. ADR (length = 1)
+    # 3. Size (length = len(sizes))
+    # 4. Stopping strategy (length = len(stopping_strategy_getters))
+    # 5. ADR again (length = 1)
+    # 6. Metric kind: disagreement rate, expected runtime, error rate, and base error rate (length = 4).
+
+    return metrics[..., 1].squeeze(axis=(2, 5)).mean(axis=0)
+
+
+def get_and_draw_expected_runtimes_per_size(n_forests, sizes, datasets, dataset_names, adr, ss_getters, combine_plots=False):
+    runtimes = get_expected_runtimes_per_size(
+        n_forests=n_forests,
+        sizes=sizes,
+        datasets=datasets,
+        adr=adr,
+        ss_getters=ss_getters
+    )
+
+    n_datasets = len(datasets)
+
+    if combine_plots:
+        fig, axs = create_subplot_grid(n_datasets, n_columns=2, tight_layout=False, figsize=(10, 12.75))
+    else:
+        fig, axs = create_independent_plots_grid(n_datasets, n_columns=2, figsize=(6, 4))
+
+    for i_dataset, (dataset_name, ax) in enumerate(zip(dataset_names, axs.flat)):
+        for i_ss, ss_getter in enumerate(ss_getters):
+            plot_details = PLOT_DETAILS_BY_SS_GETTER[ss_getter]
+            marker = plot_details.marker
+            ax.scatter(
+                x=sizes,
+                y=runtimes[i_dataset, :, i_ss] / sizes,
+                label=plot_details.label,
+                marker=marker,
+                facecolors=plot_details.color if marker == "x" else "none",
+                edgecolors=plot_details.color
+            )
+
+        ax.set_title(dataset_name)
+        ax.set_xlabel("N")
+        ax.set_ylabel("Expected run proportion")
+        ax.legend(framealpha=0.5, loc="upper right")
+
+    return fig
+
+
 @memoize(args_to_ignore=["estimated_smopdis"])
 def get_minimax_ss(adr: float, n_trees: int, estimated_smopdis: np.ndarray) -> np.ndarray:
     return get_optimal_stopping_strategy(n_trees, adr)
@@ -590,6 +655,21 @@ def parse_args(argv=None):
     er_and_rt_comparison.add_argument("--grinsztajn", action="store_const", dest="dataset_names", const=tuple(GRINSZTAJN_DATASETS.keys()))
     er_and_rt_comparison.add_argument("--all-datasets", action="store_const", dest="dataset_names", const=tuple(ALL_BENCHMARK_DATASETS.keys()))
 
+    runtimes_per_size = subparsers.add_parser("runtimes-per-size")
+    runtimes_per_size.set_defaults(action_name="runtimes_per_size")
+    runtimes_per_size.add_argument("--n-trees-start", type=int)
+    runtimes_per_size.add_argument("--n-trees-stop", type=int)
+    runtimes_per_size.add_argument("--n-trees-step", type=int)
+    runtimes_per_size.add_argument("--alpha", "--adr", "-a", type=float, default=1e-3)
+    runtimes_per_size.add_argument("--output-path", "-o", type=str, default=None)
+    runtimes_per_size.add_argument("--random-seed", "-s", type=int, default=1234)
+    runtimes_per_size.add_argument("--n-forests", "--number-of-forests", "-f", type=int, default=30)
+    runtimes_per_size.add_argument("--combine-plots", "-c", action="store_true")
+    runtimes_per_size.add_argument("--dataset-names", "-d", type=str, nargs="*", default=tuple(SHORT_BENCHMARK_DATASETS.keys()))
+    runtimes_per_size.add_argument("--grinsztajn", action="store_const", dest="dataset_names", const=tuple(GRINSZTAJN_DATASETS.keys()))
+    runtimes_per_size.add_argument("--all-datasets", action="store_const", dest="dataset_names", const=tuple(ALL_BENCHMARK_DATASETS.keys()))
+
+
     tree_distribution_subparser = subparsers.add_parser("tree-distribution")
     tree_distribution_subparser.set_defaults(action_name="smopdis")
     tree_distribution_subparser.add_argument("--n-trees", "--number-of-trees", "-N", type=int, default=100)
@@ -618,6 +698,8 @@ def main(argv=None):
 
     dataset_names = args.dataset_names
     datasets = [ALL_BENCHMARK_DATASETS[name] for name in dataset_names]
+
+    output_path = args.output_path
 
     with warnings.catch_warnings(category=UserWarning, action="ignore"):
         if args.action_name == "detailed_empirical_comparison":
@@ -653,10 +735,27 @@ def main(argv=None):
                 ],
                 args.combine_plots
             )
+        elif args.action_name == "runtimes_per_size":
+            drawing = get_and_draw_expected_runtimes_per_size(
+                n_forests=args.n_forests,
+                sizes=range(args.n_trees_start, args.n_trees_stop, args.n_trees_step),
+                datasets=datasets,
+                dataset_names=dataset_names,
+                adr=args.alpha,
+                ss_getters=[
+                    get_minimax_ss,
+                    get_minimean_ss,
+                    get_minimean_flat_ss,
+                    get_minimixed_ss,
+                    get_minimixed_flat_ss,
+                ],
+                combine_plots=args.combine_plots
+            )
+            output_path = output_path or get_output_path(f"{args.action_name}_{args.n_trees_start}_to_{args.n_trees_stop}")
         elif args.action_name == "smopdis":
             drawing = draw_smopdises(args.n_trees, datasets, dataset_names, n_forests=args.n_forests)
             
-    output_path = args.output_path or get_output_path(f"{args.action_name}_{args.n_forests}_forests_of_{args.n_trees}_trees_on_{len(args.dataset_names)}_datasets")
+    output_path = output_path or get_output_path(f"{args.action_name}_{args.n_forests}_forests_of_{args.n_trees}_trees_on_{len(args.dataset_names)}_datasets")
     save_drawing(drawing, output_path)
 
 
