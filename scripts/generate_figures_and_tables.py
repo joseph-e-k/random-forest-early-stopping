@@ -304,7 +304,7 @@ def parse_args(argv=None):
         help="Number of ensembles to average over in empirical evaluations. Defaults to 30."
     )
     parser.add_argument(
-        "--include", nargs="*", default=tasks_by_name.keys(), choices=tasks_by_name.keys(),
+        "--include", nargs="*", default=list(tasks_by_name.keys()), choices=tasks_by_name.keys(),
         help=f"List of figures and tables to generate. Names with 's' on the end are those in the Supplementary Materials. Defaults to everything."
     )
     parser.add_argument(
