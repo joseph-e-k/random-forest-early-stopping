@@ -1,6 +1,5 @@
 import numpy as np
-from scipy.special import hyp2f1
-from scipy.special import factorial
+from scipy.special import betainc
 
 from ste.utils.caching import memoize
 from ste.utils.multiprocessing import parallelize_to_array
@@ -10,10 +9,7 @@ from ste.utils.multiprocessing import parallelize_to_array
 def compute_prob_under_null(i, j):
     K = i
     k1 = j
-
-    return 1 - \
-        (factorial(K + 1) * 0.5**(k1+1)) / (factorial(k1 + 1) * factorial(K - k1)) \
-            * hyp2f1(k1 + 1, k1 - K, k1 + 2, 0.5)
+    return betainc(K - k1 + 1, k1 + 1, 0.5)
 
 
 def compute_probs_under_null(N):
