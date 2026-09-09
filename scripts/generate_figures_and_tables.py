@@ -1,6 +1,8 @@
 import argparse
 import csv
+import logging
 import os
+import pickle
 import shlex
 import random
 
@@ -12,10 +14,11 @@ from ste.theoretical_performance import get_minimax_ss, get_minimean_flat_ss, ge
 from ste.optimization import get_optimal_stopping_strategy, plot_stopping_strategy_state_graphs
 from ste.utils.data import SHORT_BENCHMARK_DATASETS, GRINSZTAJN_DATASETS
 from ste.utils.figures import create_subplot_grid, label_subplots, plot_stopping_strategies_as_envelopes, save_drawing
-from ste.utils.logging import configure_logging
+from ste.utils.logging import configure_logging, logged
 from ste.utils.misc import get_output_path, unzip
 
 
+@logged(message_level=logging.INFO)
 def generate_figure_1(output_dir, n_trees, n_forests):
     oss = get_optimal_stopping_strategy(N=3, alpha=0.1)
     fig = plot_stopping_strategy_state_graphs(oss, font_size=24)
@@ -23,6 +26,7 @@ def generate_figure_1(output_dir, n_trees, n_forests):
     save_drawing(fig, output_path)
 
 
+@logged(message_level=logging.INFO)
 def generate_figure_2(output_dir, n_trees, n_forests):
     adrs = [1e-2, 1e-4, 0]
     ss_getters = get_minimax_ss, get_minimean_flat_ss, get_minimixed_flat_ss
@@ -47,6 +51,7 @@ def generate_figure_2(output_dir, n_trees, n_forests):
     save_drawing(fig, output_path)
 
 
+@logged(message_level=logging.INFO)
 def generate_figure_3(output_dir, n_trees, n_forests):
     output_path = f"{output_dir}/Figure 3"
     draw_worst_case_performance.main(
@@ -58,6 +63,7 @@ def generate_figure_3(output_dir, n_trees, n_forests):
     )
 
 
+@logged(message_level=logging.INFO)
 def generate_table_3(output_dir, n_trees, n_forests):
     output_path = f"{output_dir}/Table 3.csv"
     with open(output_path, "wt", newline="") as output_file:
@@ -77,6 +83,7 @@ def generate_table_3(output_dir, n_trees, n_forests):
             writer.writerow([name, n_obs, n_features, n_classes, f"{100*proportion_of_positive_obs:.1f}%"])
 
 
+@logged(message_level=logging.INFO)
 def generate_figure_4(output_dir, n_trees, n_forests):
     output_sub_dir = f"{output_dir}/Figure 4"
     os.mkdir(output_sub_dir)
@@ -96,6 +103,7 @@ def generate_figure_4(output_dir, n_trees, n_forests):
     )
 
 
+@logged(message_level=logging.INFO)
 def generate_figure_5(output_dir, n_trees, n_forests):
     output_path = f"{output_dir}/Figure 5"
     adrs = [10**-x for x in [3, 2.5, 2, 1.5, 1]]
@@ -114,6 +122,7 @@ def generate_figure_5(output_dir, n_trees, n_forests):
     )
 
 
+@logged(message_level=logging.INFO)
 def generate_figure_6(output_dir, n_trees, n_forests):
     output_path = f"{output_dir}/Figure 6"
     
@@ -124,6 +133,7 @@ def generate_figure_6(output_dir, n_trees, n_forests):
     )
 
 
+@logged(message_level=logging.INFO)
 def generate_table_4(output_dir, n_trees, n_forests):
     output_path = f"{output_dir}/Table 4.csv"
     adr = 1e-3
@@ -174,11 +184,13 @@ def generate_table_4(output_dir, n_trees, n_forests):
             ])
 
 
+@logged(message_level=logging.INFO)
 def generate_figure_supp_1(output_dir, n_trees, n_forests):
     output_path = f"{output_dir}/Figure 1 (Supplementary)"
     draw_supp_fig_timings.main(output_path)
 
 
+@logged(message_level=logging.INFO)
 def generate_figure_supp_2(output_dir, n_trees, n_forests):
     output_path = f"{output_dir}/Figure 2 (Supplementary)"
     
@@ -189,6 +201,7 @@ def generate_figure_supp_2(output_dir, n_trees, n_forests):
     )
 
 
+@logged(message_level=logging.INFO)
 def generate_figure_supp_3(output_dir, n_trees, n_forests):
     output_sub_dir = f"{output_dir}/Figure 3 (Supplementary)"
     os.mkdir(output_sub_dir)
@@ -229,6 +242,7 @@ def generate_figure_supp_3(output_dir, n_trees, n_forests):
     )
 
 
+@logged(message_level=logging.INFO)
 def generate_table_supp_1(output_dir, n_trees, n_forests):
     output_path = f"{output_dir}/Table 1 (Supplementary).csv"
 
@@ -315,6 +329,9 @@ def main(argv=None):
     args = parse_args(argv)
     output_dir = args.output_dir or get_output_path("all_figs_and_tables", file_name_suffix="")
     os.makedirs(output_dir)
+
+    with open(f"{output_dir}/args.pickle", "wb") as f:
+        pickle.dump(args, f)
 
     for task in args.tasks:
         np.random.seed(args.seed)
