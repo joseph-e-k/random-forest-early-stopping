@@ -605,6 +605,19 @@ def get_daghero_ss(adr: float, n_trees: int, estimated_smopdis: np.ndarray) -> n
     return daghero.get_ss(n_trees, threshold)
 
 
+@memoize(args_to_ignore=["estimated_smopdis"])
+def get_fixed_truncation_ss(adr: float, n_trees: int, estimated_smopdis: np.ndarray) -> np.ndarray:
+    # The conversion from ADR to the truncation point is completely arbitrary,
+    # except that it's tuned to produce sensible results for the default range of ADRs that we use.
+    # For DEFAULT_ADRS, this gives approximately
+    # (0.9, .75, .6, .4, .2, .1, .05, .01)
+    truncation_factor = 0.9 / (1 + 438.3*(adr**0.844))
+    truncation_threshold = int(truncation_factor * n_trees)
+    ss = np.zeros(shape=(n_trees + 1, n_trees + 1))
+    ss[truncation_threshold:, :] = 1
+    return ss
+
+
 @dataclass(frozen=True)
 class PlotDetails:
     label: str
@@ -619,7 +632,8 @@ PLOT_DETAILS_BY_SS_GETTER = {
     get_minimixed_ss: PlotDetails(label="Minimixed (Cal)", marker=MARKERS[3], color="C3"),
     get_minimixed_flat_ss: PlotDetails(label="Minimixed (Flat)", marker=MARKERS[4], color="C4"),
     get_schwing_ss: PlotDetails(label="Schwing et al.", marker=MARKERS[5], color="C5"),
-    get_daghero_ss: PlotDetails(label="Daghero et al.", marker=MARKERS[6], color="C6")
+    get_daghero_ss: PlotDetails(label="Daghero et al.", marker=MARKERS[6], color="C6"),
+    get_fixed_truncation_ss: PlotDetails(label="Fixed truncation", marker=MARKERS[7], color="C7")
 }
 
 
@@ -731,7 +745,8 @@ def main(argv=None):
                     get_minimean_ss,
                     get_minimixed_ss,
                     get_schwing_ss,
-                    get_daghero_ss
+                    get_daghero_ss,
+                    get_fixed_truncation_ss
                 ],
                 args.combine_plots
             )

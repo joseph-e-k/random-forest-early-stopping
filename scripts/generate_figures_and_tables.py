@@ -106,8 +106,6 @@ def generate_figure_4(output_dir, n_trees, n_forests):
 @logged(message_level=logging.INFO)
 def generate_figure_5(output_dir, n_trees, n_forests):
     output_path = f"{output_dir}/Figure 5"
-    adrs = [10**-x for x in [3, 2.5, 2, 1.5, 1]]
-    adrs_str = " ".join(str(adr) for adr in adrs)
     
     theoretical_performance.main(
         shlex.split(
@@ -116,7 +114,6 @@ def generate_figure_5(output_dir, n_trees, n_forests):
             f' -N {n_trees}'
             f' -f {n_forests}'
             f' -d "Ground Cover" "Income" "Diabetes" "Skin" "Sepsis" "Dota2" "Hospitalization" "Shuttle"'
-            f' --adrs {adrs_str}'
             f' -o {shlex.quote(output_path)}'
         )
     )
