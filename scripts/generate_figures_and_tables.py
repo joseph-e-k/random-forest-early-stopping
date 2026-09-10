@@ -176,7 +176,7 @@ def generate_table_4(output_dir, n_trees, n_forests):
             wall_clock_stf, wall_clock_full = mean_wall_clock_ms[i_dataset]
             writer.writerow([
                 dataset_name,
-                f"{100*disagreement_rate:.2f}%",
+                f"{100*disagreement_rate:.3f}%",
                 f"{100*expected_runtime/n_trees:.2f}%",
                 f"{100*error_rate:.2f}%",
                 f"{100*base_error_rate:.2f}%",
