@@ -494,6 +494,7 @@ def get_and_draw_error_rates_and_runtimes(n_forests, n_trees, datasets, dataset_
         ax.set_xlim(*quantile_limits(error_rates.flatten(), 0, 0.8))
         ax.set_ylim(*quantile_limits(expected_runtimes.flatten(), 0, 0.8))
         ax.ticklabel_format(axis='x', style='sci', scilimits=(0, 0))
+        ax.grid(visible=True, axis='y', which='major')
         ax.set_title(dataset_name)
         ax.set_xlabel("Error rate")
         ax.set_ylabel("Expected runtime")
@@ -562,6 +563,7 @@ def get_and_draw_expected_runtimes_per_size(n_forests, sizes, datasets, dataset_
         ax.set_title(dataset_name)
         ax.set_xlabel("N")
         ax.set_ylabel("Expected run proportion")
+        ax.grid(visible=True, axis='y', which='major')
         ax.legend(framealpha=0.5, loc="upper right")
 
     return fig
