@@ -107,7 +107,7 @@ def get_and_draw_worst_case_metrics(ss_getters, allowable_disagreement_rates, n_
         else:
             raise ValueError(f"Unrecognized metric name: {metric_name!r}")
         
-        ax.grid(visible=True, axis='y', which='both')
+        ax.grid(visible=True, axis='y', which='major')
         ax.set_xscale("symlog", linthresh=min(set(allowable_disagreement_rates) - {0}), linscale=0.5)
         ax.set_xlim((min(allowable_disagreement_rates), max(allowable_disagreement_rates)))
 
