@@ -420,3 +420,10 @@ def label_subplots(axs, labels=None, from_left=0.02, from_top=0.02, **kwargs):
 
     for ax, label in zip(axs, labels):
         ax.text(from_left, 1-from_top, label, transform=ax.transAxes, **text_kwargs)
+
+
+def quantile_limits(data, q_lower, q_upper, padding_proportion=0.05):
+    upper = np.quantile(data, q_upper, method="lower")
+    lower = np.quantile(data, q_lower, method="higher")
+    padding = (upper - lower) * padding_proportion
+    return lower - padding, upper + padding

@@ -18,7 +18,7 @@ from ste import schwing, daghero
 from .EnsembleVote import EnsembleVote, EnsembleVoteWithStoppingStrategy
 from .utils.figures import (
     DISTINCT_DASH_STYLES, MARKERS, create_independent_plots_grid, create_subplot_grid,
-    enforce_character_limit, plot_functions, save_drawing
+    enforce_character_limit, plot_functions, quantile_limits, save_drawing
 )
 from .utils.logging import configure_logging
 from .utils.multiprocessing import parallelize_to_array
@@ -491,6 +491,9 @@ def get_and_draw_error_rates_and_runtimes(n_forests, n_trees, datasets, dataset_
                 edgecolors=plot_details.color
             )
 
+        ax.set_xlim(*quantile_limits(error_rates.flatten(), 0, 0.8))
+        ax.set_ylim(*quantile_limits(expected_runtimes.flatten(), 0, 0.8))
+        ax.ticklabel_format(axis='x', style='sci', scilimits=(0, 0))
         ax.set_title(dataset_name)
         ax.set_xlabel("Error rate")
         ax.set_ylabel("Expected runtime")
