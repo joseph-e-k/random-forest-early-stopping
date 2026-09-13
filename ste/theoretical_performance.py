@@ -12,20 +12,22 @@ import matplotlib
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes, zoomed_inset_axes
+from mpl_toolkits.axes_grid1.inset_locator import mark_inset
 
 from ste import schwing, daghero
 
 from .EnsembleVote import EnsembleVote, EnsembleVoteWithStoppingStrategy
 from .utils.figures import (
     DISTINCT_DASH_STYLES, MARKERS, create_independent_plots_grid, create_subplot_grid,
-    enforce_character_limit, plot_functions, quantile_limits, save_drawing
+    enforce_character_limit, plot_functions, quantile_limits, save_drawing, set_digit_ticks
 )
 from .utils.logging import configure_logging
 from .utils.multiprocessing import parallelize_to_array
 from .optimization import get_optimal_stopping_strategy
 from .utils.caching import memoize
 from .utils.data import ALL_BENCHMARK_DATASETS, Dataset, SHORT_BENCHMARK_DATASETS, GRINSZTAJN_DATASETS, split_dataset
-from .utils.misc import get_output_path, swap_indices_of_axis
+from .utils.misc import get_output_path, swap_indices_of_axis, find_smallest_rectangle
 
 
 class ReproducibilityError(Exception):
@@ -479,25 +481,59 @@ def get_and_draw_error_rates_and_runtimes(n_forests, n_trees, datasets, dataset_
     for i_dataset, (dataset_name, ax) in enumerate(zip(dataset_names, axs.flat)):
         expected_runtimes = mean_metrics[i_dataset, ..., 1]
         error_rates = mean_metrics[i_dataset, ..., 2]
-        
-        for i_ss, ss_getter in enumerate(ss_getters):
-            plot_details = PLOT_DETAILS_BY_SS_GETTER[ss_getter]
-            marker = plot_details.marker
-            ax.scatter(
-                x=error_rates[i_ss, :],
-                y=expected_runtimes[i_ss, :],
-                label=plot_details.label,
-                marker=marker,
-                facecolors=plot_details.color if marker == "x" else "none",
-                edgecolors=plot_details.color
-            )
+
+        def draw_this_dataset(ax_):
+            for i_ss, ss_getter in enumerate(ss_getters):
+                plot_details = PLOT_DETAILS_BY_SS_GETTER[ss_getter]
+                marker = plot_details.marker
+                ax_.scatter(
+                    x=error_rates[i_ss, :],
+                    y=expected_runtimes[i_ss, :],
+                    label=plot_details.label,
+                    marker=marker,
+                    facecolors=plot_details.color if marker == "x" else "none",
+                    edgecolors=plot_details.color
+                )
+
+        draw_this_dataset(ax)
 
         ax.ticklabel_format(axis='x', style='sci', scilimits=(0, 0))
-        ax.grid(visible=True, axis='y', which='major')
+        ax.grid(visible=True, axis='both', which='major')
         ax.set_title(dataset_name)
         ax.set_xlabel("Error rate")
         ax.set_ylabel("Expected runtime")
-        if not combine_plots:
+
+        if combine_plots:
+            axins = inset_axes(ax, width="60%", height="60%", loc="upper right")
+
+            x = error_rates.flatten()
+            y = expected_runtimes.flatten()
+            x1, x2, y1, y2 = find_smallest_rectangle(
+                x=x,
+                y=y,
+                k=len(x) // 2, 
+                min_width=(x.max() - x.min()) / 20,
+                min_height=(y.max() - y.min()) / 10,
+            )
+            inset_margin_x = (x.max() - x.min()) / 80
+            inset_margin_y = (y.max() - y.min()) / 40
+            axins.set_xlim(x1 - inset_margin_x, x2 + inset_margin_x)
+            axins.set_ylim(y1 - inset_margin_y, y2 + inset_margin_y)
+            axins.set_aspect("auto")  # let x/y scale independently
+
+            draw_this_dataset(axins)
+
+            set_digit_ticks(axins, "x")
+            set_digit_ticks(axins, "y")
+            axins.ticklabel_format(axis='x', style='sci', scilimits=(0, 0))
+            main_tick_font_size = ax.xaxis.get_ticklabels()[0].get_fontsize()
+            inset_tick_font_size = main_tick_font_size - 2
+            axins.tick_params(axis='both', labelsize=inset_tick_font_size)
+            axins.xaxis.get_offset_text().set_fontsize(inset_tick_font_size)
+            axins.grid(True, which="major")
+
+            mark_inset(ax, axins, loc1=2, loc2=4, fc="none", ec="0.5")
+        else:
             ax.legend(framealpha=0.5, loc="upper right")
 
     if combine_plots:

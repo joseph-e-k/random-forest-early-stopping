@@ -1,3 +1,4 @@
+import bisect
 import dataclasses
 from datetime import datetime, timezone
 import functools
@@ -461,3 +462,41 @@ def retain_central_nonzeros(arr):
         mask[upper_idx] = True
 
     return np.where(mask, arr, 0)
+
+
+def find_smallest_rectangle(x, y, k, min_width=0.0, min_height=0.0):
+    n = len(x)
+
+    pts = sorted(zip(x, y), key=lambda p: p[0])
+
+    best_area = float('inf')
+    best_rect = None  # (x_min, x_max, y_min, y_max)
+
+    for i in range(n - k + 1):
+        ys = []
+        for j in range(i, n):
+            bisect.insort(ys, pts[j][1])
+            m = len(ys)
+            if m >= k:
+                width = max(pts[j][0] - pts[i][0], min_width)
+                for t in range(m - k + 1):
+                    h = max(ys[t + k - 1] - ys[t], min_height)
+                    area = width * h
+                    if area < best_area:
+                        best_area = area
+                        best_rect = (pts[i][0], pts[j][0], ys[t], ys[t + k - 1])
+
+    x_min, x_max, y_min, y_max = best_rect
+    
+    if x_max - x_min < min_width:
+        pad = (min_width - (x_max - x_min)) / 2
+        x_min -= pad
+        x_max += pad
+
+    if y_max - y_min < min_height:
+        pad = (min_height - (y_max - y_min)) / 2
+        y_min -= pad
+        y_max += pad
+
+    
+    return x_min, x_max, y_min, y_max

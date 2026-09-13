@@ -5,7 +5,7 @@ import os
 import string
 
 import matplotlib.style as mplstyle
-from matplotlib import pyplot as plt
+from matplotlib import pyplot as plt, ticker
 from matplotlib import colors
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
@@ -427,3 +427,13 @@ def quantile_limits(data, q_lower, q_upper, padding_proportion=0.05):
     lower = np.quantile(data, q_lower, method="higher")
     padding = (upper - lower) * padding_proportion
     return lower - padding, upper + padding
+
+
+def set_digit_ticks(ax, axis_name):
+    axis = {"x": ax.xaxis, "y": ax.yaxis}[axis_name]
+    vmin, vmax = {"x": ax.get_xlim, "y": ax.get_ylim}[axis_name]()
+    span = vmax - vmin
+    magnitude = 10 ** np.floor(np.log10(span))
+    
+    axis.set_major_locator(ticker.MultipleLocator(magnitude))
+    axis.set_minor_locator(ticker.MultipleLocator(magnitude / 10))
