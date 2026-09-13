@@ -471,7 +471,8 @@ def get_and_draw_error_rates_and_runtimes(n_forests, n_trees, datasets, dataset_
     n_datasets = len(datasets)
 
     if combine_plots:
-        fig, axs = create_subplot_grid(n_datasets, n_columns=2, tight_layout=False, figsize=(10, 12.75))
+        fig, axs = create_subplot_grid(n_datasets, n_columns=2, tight_layout=None, figsize=(10, 12.75))
+        fig.subplots_adjust(bottom=0.075, top=0.975, hspace=0.5)
     else:
         fig, axs = create_independent_plots_grid(n_datasets, n_columns=2, figsize=(6, 4))
 
@@ -496,7 +497,12 @@ def get_and_draw_error_rates_and_runtimes(n_forests, n_trees, datasets, dataset_
         ax.set_title(dataset_name)
         ax.set_xlabel("Error rate")
         ax.set_ylabel("Expected runtime")
-        ax.legend(framealpha=0.5, loc="upper right")
+        if not combine_plots:
+            ax.legend(framealpha=0.5, loc="upper right")
+
+    if combine_plots:
+        handles, labels = ax.get_legend_handles_labels()
+        fig.legend(handles, labels, loc="lower center", ncol=len(labels), framealpha=0.5, bbox_to_anchor=(0.5, 0))
 
     return fig
 
