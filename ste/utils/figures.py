@@ -437,3 +437,28 @@ def set_digit_ticks(ax, axis_name):
     
     axis.set_major_locator(ticker.MultipleLocator(magnitude))
     axis.set_minor_locator(ticker.MultipleLocator(magnitude / 10))
+
+
+def hide_overlapping_labels(ax, axis_name, margin_px=0):
+    fig = ax.figure
+    fig.canvas.draw()  # ensure labels are rendered so extents are valid
+    renderer = fig.canvas.get_renderer()
+    
+    axis = {"x": ax.xaxis, "y": ax.yaxis}[axis_name]
+    labels = axis.get_ticklabels()
+    
+    # Sort by position along the axis
+    coord_idx = {"x": 0, "y": 1}[axis_name]
+    labels_sorted = sorted(labels, key=lambda l: l.get_position()[coord_idx])
+    
+    last_bbox = None
+    for label in labels_sorted:
+        if not label.get_text():
+            continue
+        bbox = label.get_window_extent(renderer)
+        if last_bbox is not None:
+            gap = {"x": bbox.x0 - last_bbox.x1, "y": bbox.y0 - last_bbox.y1}[axis_name]
+            if gap < margin_px:
+                label.set_visible(False)
+                continue
+        last_bbox = bbox

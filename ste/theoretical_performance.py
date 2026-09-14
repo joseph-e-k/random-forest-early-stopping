@@ -20,7 +20,7 @@ from ste import schwing, daghero
 from .EnsembleVote import EnsembleVote, EnsembleVoteWithStoppingStrategy
 from .utils.figures import (
     DISTINCT_DASH_STYLES, MARKERS, create_independent_plots_grid, create_subplot_grid,
-    enforce_character_limit, plot_functions, quantile_limits, save_drawing, set_digit_ticks
+    enforce_character_limit, hide_overlapping_labels, plot_functions, quantile_limits, save_drawing, set_digit_ticks
 )
 from .utils.logging import configure_logging
 from .utils.multiprocessing import parallelize_to_array
@@ -497,7 +497,6 @@ def get_and_draw_error_rates_and_runtimes(n_forests, n_trees, datasets, dataset_
 
         draw_this_dataset(ax)
 
-        ax.ticklabel_format(axis='x', style='sci', scilimits=(0, 0))
         ax.grid(visible=True, axis='both', which='major')
         ax.set_title(dataset_name)
         ax.set_xlabel("Error rate")
@@ -525,11 +524,10 @@ def get_and_draw_error_rates_and_runtimes(n_forests, n_trees, datasets, dataset_
 
             set_digit_ticks(axins, "x")
             set_digit_ticks(axins, "y")
-            axins.ticklabel_format(axis='x', style='sci', scilimits=(0, 0))
             main_tick_font_size = ax.xaxis.get_ticklabels()[0].get_fontsize()
             inset_tick_font_size = main_tick_font_size - 2
             axins.tick_params(axis='both', labelsize=inset_tick_font_size)
-            axins.xaxis.get_offset_text().set_fontsize(inset_tick_font_size)
+            hide_overlapping_labels(axins, "x")
             axins.grid(True, which="major")
 
             mark_inset(ax, axins, loc1=2, loc2=4, fc="none", ec="0.5")
